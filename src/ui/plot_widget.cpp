@@ -907,9 +907,10 @@ void PlotWidget::renderBasePlot(QPainter& painter) const
         if (displayPoints.size() < 2) {
             continue;
         }
-        QPainterPath path;
+        QVector<QPoint> polyline;
+        polyline.reserve(displayPoints.size() + 1);
         QPointF pixel = dataToPixel(displayPoints.front(), view, pr);
-        path.moveTo(pixel);
+        polyline.push_back(QPoint(qRound(pixel.x()), qRound(pixel.y())));
         if (renderedPixels.size() < 4096) {
             renderedPixels.push_back(pixel);
         }
@@ -917,18 +918,18 @@ void PlotWidget::renderBasePlot(QPainter& painter) const
         const int stride = std::max(1, pointCount / std::max(1, static_cast<int>(pr.width() * 2)));
         for (int p = stride; p < displayPoints.size(); p += stride) {
             pixel = dataToPixel(displayPoints[p], view, pr);
-            path.lineTo(pixel);
+            polyline.push_back(QPoint(qRound(pixel.x()), qRound(pixel.y())));
             if (renderedPixels.size() < 4096) {
                 renderedPixels.push_back(pixel);
             }
         }
         pixel = dataToPixel(displayPoints.back(), view, pr);
-        path.lineTo(pixel);
+        polyline.push_back(QPoint(qRound(pixel.x()), qRound(pixel.y())));
         if (renderedPixels.size() < 4096) {
             renderedPixels.push_back(pixel);
         }
-        painter.setPen(QPen(seriesColor(i), 1.4));
-        painter.drawPath(path);
+        painter.setPen(QPen(seriesColor(i), 1));
+        painter.drawPolyline(polyline.constData(), polyline.size());
     }
     painter.setClipping(false);
 
@@ -1144,7 +1145,6 @@ void PlotWidget::renderBasePlot(QPainter& painter) const
         const QString text = errors.isEmpty() ? "No data loaded" : errors.join("; ");
         painter.drawText(pr.adjusted(8, 8, -8, -8), Qt::AlignCenter | Qt::TextWordWrap, text);
     }
-
 }
 
 void PlotWidget::mousePressEvent(QMouseEvent* event)
