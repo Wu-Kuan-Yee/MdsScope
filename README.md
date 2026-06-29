@@ -31,6 +31,9 @@ MdsScope requires:
 - A C++23 compiler
 - Qt 6.4 or newer with Core, Widgets, Network, Concurrent, and DBus
 
+MdsScope is currently developed and tested for Linux desktop environments.
+macOS and Windows are not currently supported.
+
 The current development machine uses:
 
 ```text
@@ -55,36 +58,6 @@ Fedora:
 
 ```bash
 sudo dnf install gcc-c++ cmake qt6-qtbase-devel
-```
-
-macOS with Homebrew:
-
-```bash
-brew install cmake qt
-```
-
-If CMake cannot find Qt on macOS, pass Qt's CMake prefix explicitly:
-
-```bash
-cmake -S . -B build -DCMAKE_PREFIX_PATH="$(brew --prefix qt)"
-```
-
-Windows with MSYS2 UCRT64:
-
-```bash
-pacman -Syu
-pacman -S --needed mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-qt6-base
-```
-
-Windows with Visual Studio:
-
-Install Visual Studio with the C++ desktop workload, install Qt 6 from the Qt
-online installer, then configure with a matching generator and Qt prefix, for
-example:
-
-```powershell
-cmake -S . -B build -DCMAKE_PREFIX_PATH="C:\Qt\6.10.2\msvc2022_64"
-cmake --build build --config Release
 ```
 
 ## Build and Install
