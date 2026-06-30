@@ -65,14 +65,19 @@ sudo dnf install gcc-c++ cmake qt6-qtbase-devel
 ```bash
 cmake -S . -B build
 cmake --build build -j
-cmake --install build --prefix "$HOME/opt/mdsscope"
+cmake --install build
 ```
 
-Run the installed application:
+With the default user install prefix, this installs the application under
+`~/.local/bin` and desktop resources under `~/.local/share`. Run the installed
+application:
 
 ```bash
-~/opt/mdsscope/bin/MdsScope
+MdsScope
 ```
+
+Use `cmake --install build --prefix /path/to/prefix` when an explicit install
+location is needed.
 
 Run the converter:
 
