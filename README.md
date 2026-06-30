@@ -21,7 +21,10 @@ configuration, MDSIP defaults, login flow, and HTTP metadata API target EAST.
 - Switch between thin and full data read modes.
 - Apply shot numbers globally across panels.
 - EAST HTTP metadata support for latest shot and top-bar shot summary.
-- Follow the system light/dark preference on GNOME via the desktop portal.
+- Follow the system light/dark preference on Linux and Windows, with a manual
+  Auto / Light / Dark theme switch.
+- About dialog with application, Git, Qt, system, source, and update-check
+  information.
 - Run on Linux and Windows desktop environments.
 
 ## Requirements
@@ -67,6 +70,18 @@ Windows source builds require Visual Studio 2022 with the C++ desktop workload,
 CMake, and a matching Qt 6 MSVC build.
 
 ## Build and Install
+
+Prebuilt release packages are published from Git tags:
+
+- Windows portable package: download the Windows zip from the GitHub release
+  page, extract it, and run `MdsScope.exe`.
+- Ubuntu packages: download the matching `.deb` package for the target Ubuntu
+  release and CPU architecture, then install it with your preferred package
+  tool.
+
+The About dialog can check for newer GitHub releases and open the release page.
+
+To build from source:
 
 ```bash
 cmake -S . -B build
