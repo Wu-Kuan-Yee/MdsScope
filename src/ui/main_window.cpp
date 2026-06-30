@@ -309,7 +309,6 @@ public:
 
         connect(addCurve, &QPushButton::clicked, this, [this] {
             SignalSpec sig;
-            sig.shot = defaultShot_;
             int activeCount = 0;
             bool copiedDefaults = false;
             if (!rows_.isEmpty()) {
@@ -344,7 +343,8 @@ public:
             if (sig.yExpr.isEmpty()) {
                 continue;
             }
-            sig.shot = row->shot->text().trimmed();
+            const QString shot = row->shot->text().trimmed();
+            sig.shot = shot == defaultShot_ ? QString() : shot;
             sig.xExpr = row->xExpr;
             sig.experiment = row->tree->text().trimmed();
             sig.serverIp = row->server->text().trimmed();
