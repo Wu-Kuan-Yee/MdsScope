@@ -920,9 +920,23 @@ void writeTomlString(QTextStream& out, const QString& key, const QString& value)
     out << key << " = " << tomlEscape(value) << '\n';
 }
 
+void writeTomlStringIfNotEmpty(QTextStream& out, const QString& key, const QString& value)
+{
+    if (!value.isEmpty()) {
+        writeTomlString(out, key, value);
+    }
+}
+
 void writeTomlBool(QTextStream& out, const QString& key, bool value)
 {
     out << key << " = " << (value ? "true" : "false") << '\n';
+}
+
+void writeTomlBoolIfNotDefault(QTextStream& out, const QString& key, bool value, bool defaultValue)
+{
+    if (value != defaultValue) {
+        writeTomlBool(out, key, value);
+    }
 }
 
 void writeTomlDouble(QTextStream& out, const QString& key, double value)
@@ -1132,20 +1146,23 @@ bool writeEnvironmentToml(const LayoutConfig& config, const QString& path, QStri
             out << "[[panels]]\n";
             out << "column = " << c + 1 << '\n';
             out << "row = " << r + 1 << '\n';
-            writeTomlString(out, "title", plot.title);
-            writeTomlString(out, "x_label", plot.xLabel);
-            writeTomlString(out, "y_label", plot.yLabel);
-            out << "extraction_points = " << plot.extractionPoints << '\n';
-            writeTomlBool(out, "grid", plot.grid);
-            writeTomlBool(out, "custom_x_range", plot.customXRange);
-            writeTomlBool(out, "custom_y_range", plot.customYRange);
+            writeTomlStringIfNotEmpty(out, "title", plot.title);
+            writeTomlStringIfNotEmpty(out, "x_label", plot.xLabel);
+            writeTomlStringIfNotEmpty(out, "y_label", plot.yLabel);
+            if (plot.extractionPoints != 2000) {
+                out << "extraction_points = " << plot.extractionPoints << '\n';
+            }
+            writeTomlBoolIfNotDefault(out, "grid", plot.grid, true);
+            writeTomlBoolIfNotDefault(out, "custom_x_range", plot.customXRange, false);
+            writeTomlBoolIfNotDefault(out, "custom_y_range", plot.customYRange, false);
             writeTomlDouble(out, "xmin", plot.xmin);
             writeTomlDouble(out, "xmax", plot.xmax);
             writeTomlDouble(out, "ymin", plot.ymin);
             writeTomlDouble(out, "ymax", plot.ymax);
             out << '\n';
 
-            for (const SignalSpec& sig : plot.signalSpecs) {
+            for (int s = 0; s < plot.signalSpecs.size(); ++s) {
+                const SignalSpec& sig = plot.signalSpecs[s];
                 out << "[[panels.signals]]\n";
                 QString signalShot = sig.shot.trimmed();
                 if (signalShot.isEmpty() && !panelShot.isEmpty() && panelShot != defaultShot) {
@@ -1154,13 +1171,17 @@ bool writeEnvironmentToml(const LayoutConfig& config, const QString& path, QStri
                 if (!signalShot.isEmpty() && signalShot != defaultShot) {
                     writeTomlString(out, "shot", signalShot);
                 }
-                writeTomlString(out, "tree", sig.experiment);
-                writeTomlString(out, "server", sig.serverIp);
-                writeTomlString(out, "y", sig.yExpr);
-                writeTomlString(out, "x", sig.xExpr);
-                writeTomlString(out, "color", sig.colorName);
-                writeTomlBool(out, "manual_color", sig.manualColor);
-                writeTomlBool(out, "hidden", sig.hidden);
+                writeTomlStringIfNotEmpty(out, "tree", sig.experiment);
+                writeTomlStringIfNotEmpty(out, "server", sig.serverIp);
+                writeTomlStringIfNotEmpty(out, "y", sig.yExpr);
+                writeTomlStringIfNotEmpty(out, "x", sig.xExpr);
+                if (sig.manualColor) {
+                    writeTomlString(out, "color", sig.colorName.isEmpty() ? colorForIndex(s) : sig.colorName);
+                    writeTomlBool(out, "manual_color", true);
+                }
+                if (sig.hidden) {
+                    writeTomlBool(out, "hidden", true);
+                }
                 if (sig.fullData) {
                     writeTomlBool(out, "full", true);
                 }

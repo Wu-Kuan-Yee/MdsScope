@@ -177,19 +177,11 @@ row = 1
 title = "Plasma current"
 x_label = "s"
 y_label = "kA"
-extraction_points = 2000
-grid = true
-custom_x_range = false
-custom_y_range = false
 
 [[panels.signals]]
 tree = "pcs_east"
 server = "202.127.204.12"
 y = "\\pcrl01"
-x = ""
-color = "#2364aa"
-manual_color = false
-hidden = false
 full = true
 ```
 
@@ -208,6 +200,11 @@ Signals default to thin data loading. Add `full = true` under an individual
 `[[panels.signals]]` entry to load that curve in full mode while the rest of the
 configuration stays thin. Legacy `.webscp` files do not carry this setting;
 converting TOML to `.webscp` intentionally omits it.
+
+When MdsScope saves TOML, it omits default values to keep files compact. Omitted
+panel defaults are empty labels, `extraction_points = 2000`, `grid = true`, and
+automatic axis ranges. Omitted signal defaults are an empty `x`, automatic
+series color, `hidden = false`, and thin data loading.
 
 When converting from legacy `.webscp`, MdsScope treats the most common
 `shot_txt` value as the old default shot and omits it from TOML. If a panel or

@@ -4,112 +4,59 @@ version = 1
 column = 1
 row = 1
 title = "Ip"
-x_label = ""
-y_label = ""
-extraction_points = 2000
-grid = true
-custom_x_range = false
-custom_y_range = false
 
 [[panels.signals]]
 tree = "pcs_east"
 server = "202.127.204.12"
 y = "\\pcrl01"
-x = ""
-color = "#2364aa"
-manual_color = false
 
 [[panels]]
 column = 1
 row = 2
 title = "R"
-x_label = ""
-y_label = ""
-extraction_points = 2000
-grid = true
-custom_x_range = false
-custom_y_range = false
 
 [[panels.signals]]
 tree = "pcs_east"
 server = "202.127.204.12"
 y = "\\lmsr"
-x = ""
-color = "#2364aa"
-manual_color = false
 
 [[panels]]
 column = 1
 row = 3
 title = "Z"
-x_label = ""
-y_label = ""
-extraction_points = 2000
-grid = true
-custom_x_range = false
-custom_y_range = false
 
 [[panels.signals]]
 tree = "pcs_east"
 server = "202.127.204.12"
 y = "\\lmsz"
-x = ""
-color = "#2364aa"
-manual_color = false
 
 [[panels]]
 column = 2
 row = 1
 title = "Vloop"
-x_label = ""
-y_label = ""
-extraction_points = 2000
-grid = true
-custom_x_range = false
-custom_y_range = false
 
 [[panels.signals]]
 tree = "pcs_east"
 server = "202.127.204.12"
 y = "\\pcvloop"
-x = ""
-color = "#2364aa"
-manual_color = false
 
 [[panels]]
 column = 2
 row = 2
 title = "Ne"
-x_label = ""
-y_label = ""
-extraction_points = 2000
-grid = true
-custom_x_range = false
-custom_y_range = false
 
 [[panels.signals]]
 tree = "pcs_east"
 server = "202.127.204.12"
 y = "\\dfsdev"
-x = ""
-color = "#2364aa"
-manual_color = false
 
 [[panels]]
 column = 2
 row = 3
 title = "Pf1 current"
-x_label = ""
-y_label = ""
-extraction_points = 2000
-grid = true
-custom_x_range = false
-custom_y_range = false
 
 [[panels.signals]]
 tree = "pcs_east"
 server = "202.127.204.12"
 y = "\\pcpf1"
-x = ""
-color = "#2364aa"
-manual_color = false
+
