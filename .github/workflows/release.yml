@@ -140,11 +140,19 @@ jobs:
 
           Compress-Archive -Path $stage -DestinationPath "build\mdsscope-windows-x64.zip" -Force
 
-      - name: Upload artifact
+      - name: Upload release zip artifact
+        if: startsWith(github.ref, 'refs/tags/')
         uses: actions/upload-artifact@v7
         with:
           name: mdsscope-windows-x64
           path: build/mdsscope-windows-x64.zip
+
+      - name: Upload portable app artifact
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: mdsscope-windows-x64
+          path: build/windows-package
 
   release:
     needs:
