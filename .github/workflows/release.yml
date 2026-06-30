@@ -100,7 +100,7 @@ jobs:
     name: Build Windows portable zip
     needs: package-plan
     if: ${{ needs.package-plan.outputs.windows == 'true' }}
-    runs-on: windows-latest
+    runs-on: windows-2022
 
     steps:
       - name: Checkout
