@@ -4,6 +4,11 @@
 namespace {
 constexpr int kMinMaxBlockSize = 256;
 
+bool signalVisible(const PlotSpec& spec, int index)
+{
+    return index < 0 || index >= spec.signalSpecs.size() || !spec.signalSpecs[index].hidden;
+}
+
 void rebuildMinMaxIndex(SignalSeries& series)
 {
     const int n = series.hasUniformData() ? series.uniformY.size() : series.points.size();
@@ -467,6 +472,9 @@ void PlotWidget::rebuildLegendCache()
     legendSeriesIndexes_.reserve(spec_.signalSpecs.size());
     for (int i = 0; i < spec_.signalSpecs.size(); ++i) {
         const SignalSpec& sig = spec_.signalSpecs[i];
+        if (sig.hidden) {
+            continue;
+        }
         QString label = normalizedMdsSignal(sig.yExpr);
         if (label.startsWith('\\')) {
             label.remove(0, 1);
@@ -612,7 +620,11 @@ QRectF PlotWidget::dataBounds() const
     double maxX = -std::numeric_limits<double>::infinity();
     double minY = std::numeric_limits<double>::infinity();
     double maxY = -std::numeric_limits<double>::infinity();
-    for (const auto& s : series_) {
+    for (int i = 0; i < series_.size(); ++i) {
+        if (i < spec_.signalSpecs.size() && spec_.signalSpecs[i].hidden) {
+            continue;
+        }
+        const auto& s = series_[i];
         if (s.hasUniformData()) {
             const double x0 = s.uniformStart;
             const double x1 = s.uniformStart + static_cast<double>(s.uniformY.size() - 1) * s.uniformStep;
@@ -907,6 +919,9 @@ void PlotWidget::renderBasePlot(QPainter& painter) const
     QVector<QPointF> renderedPixels;
     renderedPixels.reserve(4096);
     for (int i = 0; i < series_.size(); ++i) {
+        if (i < spec_.signalSpecs.size() && spec_.signalSpecs[i].hidden) {
+            continue;
+        }
         const auto& s = series_[i];
         const QVector<QPointF> displayPoints = displayPointsForSeries(s, view, pr.width());
         if (displayPoints.size() < 2) {
@@ -1419,6 +1434,9 @@ bool PlotWidget::nearestPointForSeries(int seriesIndex,
     if (seriesIndex < 0 || seriesIndex >= series_.size()) {
         return false;
     }
+    if (seriesIndex < spec_.signalSpecs.size() && spec_.signalSpecs[seriesIndex].hidden) {
+        return false;
+    }
     const SignalSeries& s = series_[seriesIndex];
     if (!s.hasData() || !std::isfinite(dataX)) {
         return false;
@@ -1552,8 +1570,11 @@ int PlotWidget::nearestSeriesAtPixel(const QPointF& pixelPos, double maxDistance
 
 bool PlotWidget::updateHoverForSeriesX(int seriesIndex, double dataX, bool lockSeries)
 {
-    if (seriesIndex < 0 || seriesIndex >= series_.size() || !series_[seriesIndex].hasData()) {
+    if (seriesIndex < 0 || seriesIndex >= series_.size() || !signalVisible(spec_, seriesIndex) || !series_[seriesIndex].hasData()) {
         for (int i = 0; i < series_.size(); ++i) {
+            if (!signalVisible(spec_, i)) {
+                continue;
+            }
             if (series_[i].hasData()) {
                 seriesIndex = i;
                 break;
@@ -1655,8 +1676,17 @@ void PlotWidget::setSyncedPointX(double x, int seriesIndex)
         clearSyncedPoint();
         return;
     }
-    if (seriesIndex < 0 || seriesIndex >= series_.size() || !series_[seriesIndex].hasData()) {
-        seriesIndex = 0;
+    if (seriesIndex < 0 || seriesIndex >= series_.size() || !signalVisible(spec_, seriesIndex) || !series_[seriesIndex].hasData()) {
+        seriesIndex = -1;
+        for (int i = 0; i < series_.size(); ++i) {
+            if (!signalVisible(spec_, i)) {
+                continue;
+            }
+            if (series_[i].hasData()) {
+                seriesIndex = i;
+                break;
+            }
+        }
     }
 
     PointReadout next;

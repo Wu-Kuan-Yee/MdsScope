@@ -84,6 +84,9 @@ public:
                 const PlotSpec& plot = snapshot.columns[c][r];
                 for (int s = 0; s < plot.signalSpecs.size(); ++s) {
                     const SignalSpec& sig = plot.signalSpecs[s];
+                    if (sig.hidden) {
+                        continue;
+                    }
                     const QString shot = effectiveSignalShot(plot, sig);
                     LoadedSignal item;
                     item.column = c;
@@ -149,6 +152,9 @@ public:
                 const PlotSpec& plot = snapshot.columns[c][r];
                 for (int s = 0; s < plot.signalSpecs.size(); ++s) {
                     const SignalSpec& sig = plot.signalSpecs[s];
+                    if (sig.hidden) {
+                        continue;
+                    }
                     const QString shot = effectiveSignalShot(plot, sig);
                     if (sig.serverIp.isEmpty() || sig.experiment.isEmpty() || shot.isEmpty() || sig.yExpr.isEmpty()) {
                         continue;

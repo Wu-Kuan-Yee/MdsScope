@@ -31,8 +31,11 @@ int runMdsScopeBenchmark(const QString& configPath,
     for (const auto& column : config.columns) {
         plotCount += column.size();
         for (const PlotSpec& plot : column) {
-            signalCount += plot.signalSpecs.size();
             for (const SignalSpec& sig : plot.signalSpecs) {
+                if (sig.hidden) {
+                    continue;
+                }
+                ++signalCount;
                 const QString shot = effectiveSignalShot(plot, sig);
                 if (!shot.isEmpty() && !sig.serverIp.isEmpty() && !sig.experiment.isEmpty()) {
                     groups.insert(sig.serverIp.trimmed() + "|" + sig.experiment.trimmed() + "|" + shot);

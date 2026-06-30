@@ -171,12 +171,19 @@ y = "\\pcrl01"
 x = ""
 color = "#2364aa"
 manual_color = false
+hidden = false
 ```
 
 The native TOML format intentionally does not store a normal panel shot number.
 Panels use the current shot shown in the MdsScope UI. The `shot` field under
 `[[panels.signals]]` is only for an explicit per-signal shot override, for
 example when comparing one signal against another shot.
+
+Signals can be hidden with `hidden = true`. Hidden signals stay in the panel
+configuration, but MdsScope skips data loading, plotting, point readouts,
+axis-range calculation, export, and benchmark work for those curves. Legacy
+`.webscp` files do not carry this setting; converted signals default to
+`hidden = false`.
 
 When converting from legacy `.webscp`, MdsScope treats the most common
 `shot_txt` value as the old default shot and omits it from TOML. If a panel or

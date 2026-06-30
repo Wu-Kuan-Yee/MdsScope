@@ -58,6 +58,7 @@ struct SignalSpec {
     QString serverIp;
     QString colorName;
     bool manualColor = false;
+    bool hidden = false;
 };
 
 struct PlotSpec {

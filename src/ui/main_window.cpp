@@ -20,6 +20,9 @@ bool loadedSignalMatchesConfig(const LayoutConfig& config, const LoadedSignal& i
     }
     const PlotSpec& plot = config.columns[item.column][item.row];
     const SignalSpec& sig = plot.signalSpecs[item.signal];
+    if (sig.hidden) {
+        return false;
+    }
     if (item.shot != effectiveSignalShot(plot, sig)) {
         return false;
     }
@@ -37,6 +40,7 @@ QString signalRefreshSignature(const SignalSpec& sig)
         sig.serverIp,
         sig.colorName,
         sig.manualColor ? QStringLiteral("manual-color") : QStringLiteral("auto-color"),
+        sig.hidden ? QStringLiteral("hidden") : QStringLiteral("shown"),
     }.join(QChar(0x1f));
 }
 
@@ -81,7 +85,8 @@ bool signalDataSourceEqual(const SignalSpec& lhs, const SignalSpec& rhs)
            && lhs.yExpr == rhs.yExpr
            && lhs.xExpr == rhs.xExpr
            && lhs.experiment == rhs.experiment
-           && lhs.serverIp == rhs.serverIp;
+           && lhs.serverIp == rhs.serverIp
+           && lhs.hidden == rhs.hidden;
 }
 
 bool signalDataSourcesEqual(const QVector<SignalSpec>& lhs, const QVector<SignalSpec>& rhs)
@@ -101,7 +106,8 @@ bool signalSpecEqual(const SignalSpec& lhs, const SignalSpec& rhs)
 {
     return signalDataSourceEqual(lhs, rhs)
            && lhs.colorName == rhs.colorName
-           && lhs.manualColor == rhs.manualColor;
+           && lhs.manualColor == rhs.manualColor
+           && lhs.hidden == rhs.hidden;
 }
 
 bool signalSpecsEqual(const QVector<SignalSpec>& lhs, const QVector<SignalSpec>& rhs)
@@ -266,7 +272,8 @@ public:
         rowsLayout_->addWidget(new QLabel("Signal", rowsHost_), 0, 2);
         rowsLayout_->addWidget(new QLabel("Server IP", rowsHost_), 0, 3);
         rowsLayout_->addWidget(new QLabel("Color", rowsHost_), 0, 4);
-        rowsLayout_->addWidget(new QLabel("", rowsHost_), 0, 5);
+        rowsLayout_->addWidget(new QLabel("Hide", rowsHost_), 0, 5);
+        rowsLayout_->addWidget(new QLabel("", rowsHost_), 0, 6);
         mainLayout->addWidget(rowsHost_);
 
         QString defaultTree;
@@ -338,6 +345,7 @@ public:
             sig.serverIp = row->server->text().trimmed();
             sig.colorName = row->color.name();
             sig.manualColor = row->manualColor;
+            sig.hidden = row->hidden->isChecked();
             out.push_back(std::move(sig));
         }
         return out;
@@ -350,6 +358,7 @@ private:
         QLineEdit* signal = nullptr;
         QLineEdit* server = nullptr;
         QPushButton* colorButton = nullptr;
+        QCheckBox* hidden = nullptr;
         QPushButton* deleteButton = nullptr;
         QColor color;
         QString xExpr;
@@ -365,10 +374,12 @@ private:
         row->signal = new QLineEdit(sig.yExpr, rowsHost_);
         row->server = new QLineEdit(sig.serverIp, rowsHost_);
         row->colorButton = new QPushButton(rowsHost_);
+        row->hidden = new QCheckBox(rowsHost_);
         row->deleteButton = new QPushButton("Delete", rowsHost_);
         row->manualColor = sig.manualColor;
         row->color = QColor(row->manualColor && !sig.colorName.isEmpty() ? sig.colorName : colorForIndex(colorIndex));
         row->xExpr = sig.xExpr;
+        row->hidden->setChecked(sig.hidden);
         row->shot->setMinimumWidth(72);
         row->signal->setMinimumWidth(150);
         row->server->setMinimumWidth(120);
@@ -380,7 +391,8 @@ private:
         rowsLayout_->addWidget(row->signal, gridRow, 2);
         rowsLayout_->addWidget(row->server, gridRow, 3);
         rowsLayout_->addWidget(row->colorButton, gridRow, 4);
-        rowsLayout_->addWidget(row->deleteButton, gridRow, 5);
+        rowsLayout_->addWidget(row->hidden, gridRow, 5, Qt::AlignCenter);
+        rowsLayout_->addWidget(row->deleteButton, gridRow, 6);
         rows_.push_back(row);
 
         connect(row->colorButton, &QPushButton::clicked, this, [this, row] {
@@ -398,6 +410,7 @@ private:
                                     static_cast<QWidget*>(row->signal),
                                     static_cast<QWidget*>(row->server),
                                     static_cast<QWidget*>(row->colorButton),
+                                    static_cast<QWidget*>(row->hidden),
                                     static_cast<QWidget*>(row->deleteButton)}) {
                 widget->hide();
             }
@@ -2506,6 +2519,9 @@ void MainWindow::exportDataForPanels(const QVector<QPair<int, int>>& panels, con
                 }
                 const PlotSpec& plot = snapshot.columns[item.column][item.row];
                 const SignalSpec& sig = plot.signalSpecs[item.signal];
+                if (sig.hidden) {
+                    continue;
+                }
                 const QString shot = exportFileToken(item.shot.isEmpty() ? effectiveSignalShot(plot, sig) : item.shot);
                 const QString tree = exportFileToken(sig.experiment);
                 const QString signal = exportFileToken(normalizedMdsSignal(sig.yExpr));

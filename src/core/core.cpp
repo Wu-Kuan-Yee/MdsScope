@@ -875,6 +875,7 @@ LayoutConfig parseTomlEnvironment(const QString& path)
             else if (key == "x") currentSignal->xExpr = tomlUnescape(value);
             else if (key == "color") currentSignal->colorName = tomlUnescape(value);
             else if (key == "manual_color") currentSignal->manualColor = tomlBool(value, false);
+            else if (key == "hidden") currentSignal->hidden = tomlBool(value, false);
         }
     }
 
@@ -1025,6 +1026,7 @@ bool writeEnvironmentToml(const LayoutConfig& config, const QString& path, QStri
                 writeTomlString(out, "x", sig.xExpr);
                 writeTomlString(out, "color", sig.colorName);
                 writeTomlBool(out, "manual_color", sig.manualColor);
+                writeTomlBool(out, "hidden", sig.hidden);
                 out << '\n';
             }
         }
