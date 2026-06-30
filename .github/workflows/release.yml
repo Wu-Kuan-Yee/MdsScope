@@ -5,30 +5,69 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      target:
+        description: "Package target"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - all
+          - ubuntu24.04
+          - ubuntu26.04
+          - windows
 
 permissions:
   contents: write
 
 jobs:
+  package-plan:
+    name: Select packages
+    runs-on: ubuntu-26.04
+    outputs:
+      deb_matrix: ${{ steps.plan.outputs.deb_matrix }}
+      windows: ${{ steps.plan.outputs.windows }}
+
+    steps:
+      - name: Build package plan
+        id: plan
+        shell: bash
+        env:
+          TARGET: ${{ inputs.target || 'all' }}
+        run: |
+          case "$TARGET" in
+            all)
+              deb_matrix='{"include":[{"arch":"amd64","runner":"ubuntu-26.04","package":"ubuntu26.04"},{"arch":"arm64","runner":"ubuntu-26.04-arm","package":"ubuntu26.04"},{"arch":"amd64","runner":"ubuntu-24.04","package":"ubuntu24.04"},{"arch":"arm64","runner":"ubuntu-24.04-arm","package":"ubuntu24.04"}]}'
+              windows=true
+              ;;
+            ubuntu24.04)
+              deb_matrix='{"include":[{"arch":"amd64","runner":"ubuntu-24.04","package":"ubuntu24.04"},{"arch":"arm64","runner":"ubuntu-24.04-arm","package":"ubuntu24.04"}]}'
+              windows=false
+              ;;
+            ubuntu26.04)
+              deb_matrix='{"include":[{"arch":"amd64","runner":"ubuntu-26.04","package":"ubuntu26.04"},{"arch":"arm64","runner":"ubuntu-26.04-arm","package":"ubuntu26.04"}]}'
+              windows=false
+              ;;
+            windows)
+              deb_matrix='{"include":[]}'
+              windows=true
+              ;;
+            *)
+              echo "Unknown package target: $TARGET" >&2
+              exit 1
+              ;;
+          esac
+          echo "deb_matrix=$deb_matrix" >> "$GITHUB_OUTPUT"
+          echo "windows=$windows" >> "$GITHUB_OUTPUT"
+
   deb:
     name: Build DEB (${{ matrix.package }} ${{ matrix.arch }})
+    needs: package-plan
+    if: ${{ needs.package-plan.outputs.deb_matrix != '{"include":[]}' }}
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - arch: amd64
-            runner: ubuntu-26.04
-            package: ubuntu26.04
-          - arch: arm64
-            runner: ubuntu-26.04-arm
-            package: ubuntu26.04
-          - arch: amd64
-            runner: ubuntu-24.04
-            package: ubuntu24.04
-          - arch: arm64
-            runner: ubuntu-24.04-arm
-            package: ubuntu24.04
+      matrix: ${{ fromJSON(needs.package-plan.outputs.deb_matrix) }}
 
     steps:
       - name: Checkout
@@ -59,6 +98,8 @@ jobs:
 
   windows:
     name: Build Windows portable zip
+    needs: package-plan
+    if: ${{ needs.package-plan.outputs.windows == 'true' }}
     runs-on: windows-latest
 
     steps:
