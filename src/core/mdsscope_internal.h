@@ -89,10 +89,17 @@ constexpr int kNetworkTimeoutMs = 2500;
 
 struct FontSettings {
     QString family = QStringLiteral("Times New Roman");
+#ifdef Q_OS_WIN
+    int legendSize = 10;
+    int axisSize = 10;
+    int unitSize = 10;
+    int uiSize = 10;
+#else
     int legendSize = 14;
     int axisSize = 14;
     int unitSize = 14;
     int uiSize = 14;
+#endif
 };
 
 struct ApiLoginResult {

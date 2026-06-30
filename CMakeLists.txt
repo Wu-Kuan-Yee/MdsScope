@@ -54,6 +54,7 @@ add_executable(transfer
 )
 
 set_target_properties(transfer PROPERTIES AUTOMOC OFF)
+set_target_properties(MdsScope PROPERTIES WIN32_EXECUTABLE TRUE)
 
 target_include_directories(MdsScope PRIVATE
     src

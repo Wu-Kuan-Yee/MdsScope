@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   deb:
-    name: Build DEB (${{ matrix.arch }})
+    name: Build DEB (${{ matrix.package }} ${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -19,8 +19,16 @@ jobs:
         include:
           - arch: amd64
             runner: ubuntu-26.04
+            package: ubuntu26.04
           - arch: arm64
             runner: ubuntu-26.04-arm
+            package: ubuntu26.04
+          - arch: amd64
+            runner: ubuntu-24.04
+            package: ubuntu24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            package: ubuntu24.04
 
     steps:
       - name: Checkout
@@ -41,12 +49,12 @@ jobs:
         run: |
           cpack --config build/CPackConfig.cmake -G DEB
           arch="$(dpkg --print-architecture)"
-          mv build/*.deb "build/mdsscope-ubuntu26.04.${arch}.deb"
+          mv build/*.deb "build/mdsscope-${{ matrix.package }}.${arch}.deb"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: mdsscope-deb-${{ matrix.arch }}
+          name: mdsscope-deb-${{ matrix.package }}-${{ matrix.arch }}
           path: build/*.deb
 
   windows:
