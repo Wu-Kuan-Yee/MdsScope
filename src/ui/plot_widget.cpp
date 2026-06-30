@@ -595,7 +595,12 @@ QRect PlotWidget::zoomRubberBandDirtyRect(const QRectF& band) const
 
 QRectF PlotWidget::plotRect() const
 {
-    return rect().adjusted(2, 3, -3, -16);
+    const FontSettings& fonts = fontSettings();
+    QFont axisFont(fonts.family, fonts.axisSize + (largeDisplayMode_ ? 4 : 0));
+    axisFont.setPointSize(std::max(7, axisFont.pointSize()));
+    const QFontMetrics axisFm(axisFont);
+    const int bottomMargin = std::max(18, axisFm.height() + 6);
+    return rect().adjusted(2, 3, -3, -bottomMargin);
 }
 
 QRectF PlotWidget::dataBounds() const
@@ -1054,7 +1059,7 @@ void PlotWidget::renderBasePlot(QPainter& painter) const
     for (int i = 0; i < xTickCount; ++i) {
         const double xPixel = xTickPixels[i];
         painter.drawLine(QPointF(xPixel, pr.bottom()), QPointF(xPixel, pr.bottom() + 2));
-        QRectF textRect(xPixel - 38, pr.bottom() + 1, 76, 14);
+        QRectF textRect(xPixel - 38, pr.bottom() + 1, 76, axisLabelHeight);
         Qt::Alignment alignment = Qt::AlignHCenter | Qt::AlignVCenter;
         if (i == 0) {
             textRect.moveLeft(pr.left());
