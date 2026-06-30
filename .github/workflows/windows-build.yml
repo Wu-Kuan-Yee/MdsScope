@@ -31,3 +31,29 @@ jobs:
 
       - name: Build
         run: cmake --build build
+
+      - name: Package portable zip
+        shell: pwsh
+        run: |
+          $stage = Join-Path $env:GITHUB_WORKSPACE "build\windows-package\MdsScope"
+          New-Item -ItemType Directory -Force $stage | Out-Null
+
+          Copy-Item "build\MdsScope.exe" $stage
+          Copy-Item "build\transfer.exe" $stage
+
+          windeployqt --release --compiler-runtime --no-translations --dir $stage (Join-Path $stage "MdsScope.exe")
+
+          Copy-Item "environment" (Join-Path $stage "environment") -Recurse
+          Copy-Item "source_index" (Join-Path $stage "source_index") -Recurse
+          Copy-Item "APIurl" $stage
+          Copy-Item "COPYING" $stage
+          Copy-Item "README.md" $stage
+          Copy-Item "mdsscope.svg" $stage
+
+          Compress-Archive -Path (Join-Path $stage "*") -DestinationPath "build\mdsscope-windows-x64.zip" -Force
+
+      - name: Upload portable zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: mdsscope-windows-x64
+          path: build/mdsscope-windows-x64.zip

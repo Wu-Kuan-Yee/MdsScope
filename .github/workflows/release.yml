@@ -49,21 +49,76 @@ jobs:
           name: mdsscope-deb-${{ matrix.arch }}
           path: build/*.deb
 
+  windows:
+    name: Build Windows portable zip
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.8.3"
+          host: windows
+          target: desktop
+          arch: win64_msvc2022_64
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Package portable zip
+        shell: pwsh
+        run: |
+          $stage = Join-Path $env:GITHUB_WORKSPACE "build\windows-package\MdsScope"
+          New-Item -ItemType Directory -Force $stage | Out-Null
+
+          Copy-Item "build\MdsScope.exe" $stage
+          Copy-Item "build\transfer.exe" $stage
+
+          windeployqt --release --compiler-runtime --no-translations --dir $stage (Join-Path $stage "MdsScope.exe")
+
+          Copy-Item "environment" (Join-Path $stage "environment") -Recurse
+          Copy-Item "source_index" (Join-Path $stage "source_index") -Recurse
+          Copy-Item "APIurl" $stage
+          Copy-Item "COPYING" $stage
+          Copy-Item "README.md" $stage
+          Copy-Item "mdsscope.svg" $stage
+
+          Compress-Archive -Path (Join-Path $stage "*") -DestinationPath "build\mdsscope-windows-x64.zip" -Force
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mdsscope-windows-x64
+          path: build/mdsscope-windows-x64.zip
+
   release:
-    needs: deb
+    needs:
+      - deb
+      - windows
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-26.04
 
     steps:
-      - name: Download DEB artifacts
+      - name: Download release artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
-          pattern: mdsscope-deb-*
+          pattern: mdsscope-*
           merge-multiple: true
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/*.deb
+          files: |
+            artifacts/*.deb
+            artifacts/*.zip
           generate_release_notes: true
