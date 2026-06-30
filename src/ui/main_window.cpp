@@ -1114,6 +1114,7 @@ bool layoutItemsMatchConfig(const QVector<QVector<LayoutCanvas::Item>>& layout, 
 MainWindow::MainWindow(QString rootPath, QWidget* parent)
     : QMainWindow(parent), rootPath_(std::move(rootPath))
 {
+    setWindowIcon(appIcon());
     environmentPath_ = appEnvironmentDir(rootPath_);
     ensureSourceIndexCache(rootPath_);
     exportBasePath_ = defaultExportBaseDir();

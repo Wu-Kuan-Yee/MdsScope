@@ -8,6 +8,7 @@
 #include <QDBusReply>
 #include <QDBusVariant>
 #include <QDir>
+#include <QFileInfo>
 #include <QMessageBox>
 #include <QPalette>
 #include <QStringList>
@@ -131,6 +132,28 @@ QDir runtimeRootDir()
     return QDir(QCoreApplication::applicationDirPath());
 }
 
+bool desktopFileIsInstalled(const QString& desktopFileName)
+{
+    const QString fileName = desktopFileName.endsWith(".desktop") ? desktopFileName : desktopFileName + ".desktop";
+    QStringList dataDirs;
+    const QString dataHome = qEnvironmentVariable("XDG_DATA_HOME");
+    dataDirs.push_back(dataHome.isEmpty() ? QDir::home().filePath(".local/share") : dataHome);
+
+    const QString dataDirsEnv = qEnvironmentVariable("XDG_DATA_DIRS");
+    if (dataDirsEnv.isEmpty()) {
+        dataDirs << "/usr/local/share" << "/usr/share";
+    } else {
+        dataDirs += dataDirsEnv.split(':', Qt::SkipEmptyParts);
+    }
+
+    for (const QString& dir : std::as_const(dataDirs)) {
+        if (QFileInfo::exists(QDir(QDir(dir).filePath("applications")).filePath(fileName))) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool ensureApiLoginBeforeMain(const QString& rootPath)
 {
     QHash<QString, QString> properties = readApiSettings(rootPath);
@@ -149,16 +172,22 @@ bool ensureApiLoginBeforeMain(const QString& rootPath)
     }
 
     LoginDialog dialog(rootPath);
+    dialog.setWindowIcon(appIcon());
     return dialog.exec() == QDialog::Accepted;
 }
 }
 
 int main(int argc, char* argv[])
 {
-    QApplication app(argc, argv);
-    SystemThemeWatcher themeWatcher(app);
-    QApplication::setApplicationName("MdsScope");
+    QApplication::setApplicationName("mdsscope");
+    QApplication::setApplicationDisplayName("MdsScope");
+    if (desktopFileIsInstalled("mdsscope")) {
+        QApplication::setDesktopFileName("mdsscope");
+    }
     QApplication::setOrganizationName("MdsScope");
+    QApplication app(argc, argv);
+    QApplication::setWindowIcon(appIcon());
+    SystemThemeWatcher themeWatcher(app);
     QThreadPool::globalInstance()->setMaxThreadCount(16);
     QThreadPool::globalInstance()->setExpiryTimeout(300000);
 

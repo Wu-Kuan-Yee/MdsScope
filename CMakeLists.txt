@@ -2,6 +2,14 @@ cmake_minimum_required(VERSION 3.16)
 
 project(MdsScope VERSION 1.0 LANGUAGES CXX)
 
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT AND UNIX AND NOT APPLE)
+    if("$ENV{USER}" STREQUAL "root" OR DEFINED ENV{SUDO_USER})
+        set(CMAKE_INSTALL_PREFIX "/usr/local" CACHE PATH "Install prefix" FORCE)
+    elseif(DEFINED ENV{HOME})
+        set(CMAKE_INSTALL_PREFIX "$ENV{HOME}/.local" CACHE PATH "Install prefix" FORCE)
+    endif()
+endif()
+
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -10,6 +18,16 @@ set(CMAKE_AUTOMOC ON)
 include(GNUInstallDirs)
 
 find_package(Qt6 6.4 REQUIRED COMPONENTS Core Widgets Network Concurrent DBus)
+
+configure_file(
+    cmake_uninstall.cmake.in
+    "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
+    @ONLY
+)
+
+add_custom_target(uninstall
+    COMMAND "${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
+)
 
 add_executable(MdsScope
     src/main.cpp
@@ -78,6 +96,16 @@ install(FILES
 install(FILES
     APIurl
     DESTINATION ${CMAKE_INSTALL_DATADIR}/mdsscope
+)
+
+install(FILES
+    mdsscope.svg
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps
+)
+
+install(FILES
+    mdsscope.desktop
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
 )
 
 install(FILES

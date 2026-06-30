@@ -696,6 +696,91 @@ QStringList uniformAxisValues(const QVector<double>& values)
     return labels;
 }
 
+static QPixmap appIconPixmap(int size)
+{
+    QPixmap pixmap(size, size);
+    pixmap.fill(Qt::transparent);
+
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    const double s = static_cast<double>(size);
+    const QRectF outer(s * 0.07, s * 0.07, s * 0.86, s * 0.86);
+
+    QPainterPath body;
+    body.addRoundedRect(outer, s * 0.18, s * 0.18);
+    QLinearGradient background(outer.topLeft(), outer.bottomRight());
+    background.setColorAt(0.0, QColor("#0f172a"));
+    background.setColorAt(0.55, QColor("#1e293b"));
+    background.setColorAt(1.0, QColor("#0b1120"));
+    painter.setPen(QPen(QColor("#334155"), std::max(1.0, s * 0.025)));
+    painter.setBrush(background);
+    painter.drawPath(body);
+
+    painter.save();
+    painter.setClipPath(body);
+
+    const QRectF plot(s * 0.20, s * 0.22, s * 0.61, s * 0.55);
+    painter.setPen(QPen(QColor(148, 163, 184, 58), std::max(1.0, s * 0.009)));
+    for (int i = 1; i <= 3; ++i) {
+        const double x = plot.left() + plot.width() * i / 4.0;
+        painter.drawLine(QPointF(x, plot.top()), QPointF(x, plot.bottom()));
+        const double y = plot.top() + plot.height() * i / 4.0;
+        painter.drawLine(QPointF(plot.left(), y), QPointF(plot.right(), y));
+    }
+
+    painter.setPen(QPen(QColor("#64748b"), std::max(1.0, s * 0.018), Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.drawLine(QPointF(plot.left(), plot.bottom()), QPointF(plot.right(), plot.bottom()));
+    painter.drawLine(QPointF(plot.left(), plot.top()), QPointF(plot.left(), plot.bottom()));
+
+    QPainterPath slowWave;
+    slowWave.moveTo(plot.left(), plot.center().y() + plot.height() * 0.13);
+    slowWave.cubicTo(plot.left() + plot.width() * 0.18, plot.top() + plot.height() * 0.08,
+                     plot.left() + plot.width() * 0.37, plot.bottom() - plot.height() * 0.08,
+                     plot.left() + plot.width() * 0.55, plot.center().y() + plot.height() * 0.02);
+    slowWave.cubicTo(plot.left() + plot.width() * 0.70, plot.top() + plot.height() * 0.12,
+                     plot.left() + plot.width() * 0.83, plot.bottom() - plot.height() * 0.17,
+                     plot.right(), plot.top() + plot.height() * 0.22);
+    painter.setPen(QPen(QColor("#22d3ee"), std::max(1.6, s * 0.05), Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.drawPath(slowWave);
+
+    QPainterPath fastWave;
+    fastWave.moveTo(plot.left() + plot.width() * 0.04, plot.bottom() - plot.height() * 0.18);
+    fastWave.lineTo(plot.left() + plot.width() * 0.19, plot.bottom() - plot.height() * 0.18);
+    fastWave.lineTo(plot.left() + plot.width() * 0.28, plot.top() + plot.height() * 0.20);
+    fastWave.lineTo(plot.left() + plot.width() * 0.39, plot.bottom() - plot.height() * 0.18);
+    fastWave.lineTo(plot.left() + plot.width() * 0.57, plot.bottom() - plot.height() * 0.18);
+    fastWave.lineTo(plot.left() + plot.width() * 0.68, plot.top() + plot.height() * 0.30);
+    fastWave.lineTo(plot.left() + plot.width() * 0.78, plot.bottom() - plot.height() * 0.18);
+    fastWave.lineTo(plot.right() - plot.width() * 0.04, plot.bottom() - plot.height() * 0.18);
+    painter.setPen(QPen(QColor("#f97316"), std::max(1.4, s * 0.036), Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.drawPath(fastWave);
+
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor("#f8fafc"));
+    painter.drawEllipse(QPointF(plot.left() + plot.width() * 0.55, plot.center().y() + plot.height() * 0.02),
+                         s * 0.035,
+                         s * 0.035);
+    painter.setBrush(QColor("#f97316"));
+    painter.drawEllipse(QPointF(plot.left() + plot.width() * 0.68, plot.top() + plot.height() * 0.30),
+                         s * 0.03,
+                         s * 0.03);
+    painter.restore();
+
+    painter.setPen(QPen(QColor(255, 255, 255, 42), std::max(1.0, s * 0.014)));
+    painter.setBrush(Qt::NoBrush);
+    painter.drawRoundedRect(outer.adjusted(s * 0.035, s * 0.035, -s * 0.035, -s * 0.035), s * 0.13, s * 0.13);
+    return pixmap;
+}
+
+QIcon appIcon()
+{
+    QIcon icon;
+    for (int size : {16, 24, 32, 48, 64, 128, 256}) {
+        icon.addPixmap(appIconPixmap(size));
+    }
+    return icon;
+}
+
 QIcon gearIcon()
 {
     QPixmap pixmap(22, 22);

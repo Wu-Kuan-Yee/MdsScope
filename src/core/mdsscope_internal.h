@@ -33,6 +33,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLabel>
+#include <QLinearGradient>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMenu>
@@ -138,6 +139,7 @@ int colorIndexForName(const QString& colorName, int fallback);
 void normalizePresetColors(QVector<SignalSpec>& specs);
 QString compactAxisValue(double value);
 QStringList uniformAxisValues(const QVector<double>& values);
+QIcon appIcon();
 QIcon gearIcon();
 QIcon fontIcon();
 QIcon saveIcon();
