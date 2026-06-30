@@ -71,7 +71,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install dependencies
         run: |
@@ -91,7 +91,7 @@ jobs:
           mv build/*.deb "build/mdsscope-${{ matrix.package }}.${arch}.deb"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mdsscope-deb-${{ matrix.package }}-${{ matrix.arch }}
           path: build/*.deb
@@ -104,24 +104,21 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Qt
-        uses: jurplel/install-qt-action@v4
+        uses: jurplel/install-qt-action@v4.3.1
         with:
           version: "6.8.3"
           host: windows
           target: desktop
           arch: win64_msvc2022_64
 
-      - name: Setup MSVC
-        uses: ilammy/msvc-dev-cmd@v1
-
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64
 
       - name: Build
-        run: cmake --build build
+        run: cmake --build build --config Release
 
       - name: Package portable zip
         shell: pwsh
@@ -129,8 +126,8 @@ jobs:
           $stage = Join-Path $env:GITHUB_WORKSPACE "build\windows-package\MdsScope"
           New-Item -ItemType Directory -Force $stage | Out-Null
 
-          Copy-Item "build\MdsScope.exe" $stage
-          Copy-Item "build\transfer.exe" $stage
+          Copy-Item "build\Release\MdsScope.exe" $stage
+          Copy-Item "build\Release\transfer.exe" $stage
 
           windeployqt --release --compiler-runtime --no-translations --dir $stage (Join-Path $stage "MdsScope.exe")
 
@@ -144,7 +141,7 @@ jobs:
           Compress-Archive -Path $stage -DestinationPath "build\mdsscope-windows-x64.zip" -Force
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mdsscope-windows-x64
           path: build/mdsscope-windows-x64.zip
@@ -158,14 +155,14 @@ jobs:
 
     steps:
       - name: Download release artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: artifacts
           pattern: mdsscope-*
           merge-multiple: true
 
       - name: Create GitHub release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             artifacts/*.deb

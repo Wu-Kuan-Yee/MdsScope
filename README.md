@@ -22,6 +22,7 @@ configuration, MDSIP defaults, login flow, and HTTP metadata API target EAST.
 - Apply shot numbers globally across panels.
 - EAST HTTP metadata support for latest shot and top-bar shot summary.
 - Follow the system light/dark preference on GNOME via the desktop portal.
+- Run on Linux and Windows desktop environments.
 
 ## Requirements
 
@@ -29,10 +30,12 @@ MdsScope requires:
 
 - CMake 3.16 or newer
 - A C++23 compiler
-- Qt 6.4 or newer with Core, Widgets, Network, Concurrent, and DBus
+- Qt 6.4 or newer with Core, Widgets, Network, and Concurrent
+- Qt 6 DBus on Linux
 
-MdsScope is currently developed and tested for Linux desktop environments.
-macOS and Windows are not currently supported.
+MdsScope is currently developed and tested for Linux and Windows desktop
+environments. Windows support targets Windows 10/11 with MSVC 2022 and Qt 6.
+Windows 7 is not supported.
 
 The current development machine uses:
 
@@ -59,6 +62,9 @@ Fedora:
 ```bash
 sudo dnf install gcc-c++ cmake qt6-qtbase-devel
 ```
+
+Windows source builds require Visual Studio 2022 with the C++ desktop workload,
+CMake, and a matching Qt 6 MSVC build.
 
 ## Build and Install
 
@@ -90,6 +96,13 @@ For development without installing, run the build-tree binaries directly:
 ```bash
 ./build/MdsScope
 ./build/transfer --help
+```
+
+On Windows with Visual Studio 2022:
+
+```powershell
+cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+cmake --build build --config Release
 ```
 
 ## Configuration
