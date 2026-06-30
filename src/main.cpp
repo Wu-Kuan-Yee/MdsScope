@@ -14,8 +14,10 @@
 #include <QMessageBox>
 #include <QPalette>
 #include <QProcess>
+#include <QSettings>
 #include <QStringList>
 #include <QThreadPool>
+#include <QTimer>
 
 #include <algorithm>
 
@@ -75,7 +77,6 @@ void applySystemColorScheme(QApplication& app, uint scheme)
     app.setPalette(scheme == 1 ? darkPalette() : lightPalette());
 }
 
-#ifdef Q_OS_LINUX
 class SystemThemeWatcher final : public QObject {
     Q_OBJECT
 
@@ -83,24 +84,84 @@ public:
     explicit SystemThemeWatcher(QApplication& app)
         : QObject(&app), app_(app)
     {
-        applySystemColorScheme(app_, readPortalColorScheme());
+        applyIfChanged(readCurrentColorScheme());
+#ifdef Q_OS_LINUX
         QDBusConnection::sessionBus().connect(QStringLiteral("org.freedesktop.portal.Desktop"),
                                               QStringLiteral("/org/freedesktop/portal/desktop"),
                                               QStringLiteral("org.freedesktop.portal.Settings"),
                                               QStringLiteral("SettingChanged"),
                                               this,
                                               SLOT(settingChanged(QString,QString,QDBusVariant)));
+#endif
+        connect(&pollTimer_, &QTimer::timeout, this, [this] {
+            applyIfChanged(readCurrentColorScheme());
+        });
+        pollTimer_.start(3000);
     }
 
+#ifdef Q_OS_LINUX
 private slots:
     void settingChanged(const QString& group, const QString& key, const QDBusVariant& value)
     {
         if (group == QStringLiteral("org.freedesktop.appearance") && key == QStringLiteral("color-scheme")) {
-            applySystemColorScheme(app_, value.variant().toUInt());
+            applyIfChanged(resolveColorScheme(value.variant().toUInt()));
         }
     }
+#endif
 
 private:
+#ifdef Q_OS_LINUX
+    static QString processOutput(const QString& program, const QStringList& arguments)
+    {
+        QProcess process;
+        process.setProgram(program);
+        process.setArguments(arguments);
+        process.start();
+        if (!process.waitForFinished(500)) {
+            return {};
+        }
+        return QString::fromUtf8(process.readAllStandardOutput()).trimmed().toLower();
+    }
+
+    static uint schemeFromText(const QString& text)
+    {
+        if (text.contains(QStringLiteral("dark"))) {
+            return 1;
+        }
+        if (text.contains(QStringLiteral("light"))) {
+            return 2;
+        }
+        return 0;
+    }
+
+    static uint readKdeColorScheme()
+    {
+        for (const QString& tool : {QStringLiteral("kreadconfig6"), QStringLiteral("kreadconfig5")}) {
+            uint scheme = schemeFromText(processOutput(tool,
+                                                       {QStringLiteral("--file"),
+                                                        QStringLiteral("kdeglobals"),
+                                                        QStringLiteral("--group"),
+                                                        QStringLiteral("General"),
+                                                        QStringLiteral("--key"),
+                                                        QStringLiteral("ColorScheme")}));
+            if (scheme != 0) {
+                return scheme;
+            }
+
+            scheme = schemeFromText(processOutput(tool,
+                                                  {QStringLiteral("--file"),
+                                                   QStringLiteral("kdeglobals"),
+                                                   QStringLiteral("--group"),
+                                                   QStringLiteral("KDE"),
+                                                   QStringLiteral("--key"),
+                                                   QStringLiteral("LookAndFeelPackage")}));
+            if (scheme != 0) {
+                return scheme;
+            }
+        }
+        return 0;
+    }
+
     static uint readFallbackColorScheme()
     {
         const QString gtkTheme = qEnvironmentVariable("GTK_THEME").toLower();
@@ -108,34 +169,28 @@ private:
             return 1;
         }
 
-        QProcess process;
-        process.setProgram(QStringLiteral("gsettings"));
-        process.setArguments({QStringLiteral("get"),
-                              QStringLiteral("org.gnome.desktop.interface"),
-                              QStringLiteral("color-scheme")});
-        process.start();
-        if (process.waitForFinished(500)) {
-            const QString output = QString::fromUtf8(process.readAllStandardOutput()).trimmed().toLower();
-            if (output.contains(QStringLiteral("prefer-dark"))) {
-                return 1;
-            }
-            if (output.contains(QStringLiteral("prefer-light"))) {
-                return 2;
-            }
+        QString output = processOutput(QStringLiteral("gsettings"),
+                                       {QStringLiteral("get"),
+                                        QStringLiteral("org.gnome.desktop.interface"),
+                                        QStringLiteral("color-scheme")});
+        if (output.contains(QStringLiteral("prefer-dark"))) {
+            return 1;
+        }
+        if (output.contains(QStringLiteral("prefer-light"))) {
+            return 2;
         }
 
-        process.setProgram(QStringLiteral("gsettings"));
-        process.setArguments({QStringLiteral("get"),
-                              QStringLiteral("org.gnome.desktop.interface"),
-                              QStringLiteral("gtk-theme")});
-        process.start();
-        if (process.waitForFinished(500)) {
-            const QString output = QString::fromUtf8(process.readAllStandardOutput()).trimmed().toLower();
-            if (output.contains(QStringLiteral("dark"))) {
-                return 1;
-            }
+        output = processOutput(QStringLiteral("gsettings"),
+                               {QStringLiteral("get"),
+                                QStringLiteral("org.gnome.desktop.interface"),
+                                QStringLiteral("gtk-theme")});
+        uint scheme = schemeFromText(output);
+        if (scheme != 0) {
+            return scheme;
         }
-        return 2;
+
+        scheme = readKdeColorScheme();
+        return scheme != 0 ? scheme : 2;
     }
 
     static uint readPortalColorScheme()
@@ -149,16 +204,60 @@ private:
                                                              QStringLiteral("color-scheme"));
         if (reply.isValid()) {
             const uint scheme = reply.value().variant().toUInt();
-            if (scheme == 1 || scheme == 2) {
-                return scheme;
-            }
+            return resolveColorScheme(scheme);
         }
         return readFallbackColorScheme();
     }
+#endif
+
+#ifdef Q_OS_WIN
+    static uint readWindowsColorScheme()
+    {
+        QSettings settings(QStringLiteral("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize"),
+                           QSettings::NativeFormat);
+        return settings.value(QStringLiteral("AppsUseLightTheme"), 1).toInt() == 0 ? 1 : 2;
+    }
+#endif
+
+    static uint resolveColorScheme(uint scheme)
+    {
+        if (scheme == 1 || scheme == 2) {
+            return scheme;
+        }
+#ifdef Q_OS_LINUX
+        return readFallbackColorScheme();
+#elif defined(Q_OS_WIN)
+        return readWindowsColorScheme();
+#else
+        return 2;
+#endif
+    }
+
+    static uint readCurrentColorScheme()
+    {
+#ifdef Q_OS_LINUX
+        return readPortalColorScheme();
+#elif defined(Q_OS_WIN)
+        return readWindowsColorScheme();
+#else
+        return 2;
+#endif
+    }
+
+    void applyIfChanged(uint scheme)
+    {
+        scheme = resolveColorScheme(scheme);
+        if (scheme == currentScheme_) {
+            return;
+        }
+        currentScheme_ = scheme;
+        applySystemColorScheme(app_, scheme);
+    }
 
     QApplication& app_;
+    QTimer pollTimer_;
+    uint currentScheme_ = 0;
 };
-#endif
 
 QDir runtimeRootDir()
 {
@@ -236,11 +335,7 @@ int main(int argc, char* argv[])
     QApplication::setOrganizationName("MdsScope");
     QApplication app(argc, argv);
     QApplication::setWindowIcon(appIcon());
-#ifdef Q_OS_LINUX
     SystemThemeWatcher themeWatcher(app);
-#else
-    app.setPalette(lightPalette());
-#endif
     QThreadPool::globalInstance()->setMaxThreadCount(16);
     QThreadPool::globalInstance()->setExpiryTimeout(300000);
 
