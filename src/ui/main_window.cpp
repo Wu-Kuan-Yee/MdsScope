@@ -446,6 +446,18 @@ private:
         completer->setFilterMode(Qt::MatchContains);
         completer->setCompletionMode(QCompleter::PopupCompletion);
         completer->setMaxVisibleItems(16);
+        QAbstractItemView* popup = completer->popup();
+        popup->setMouseTracking(true);
+        popup->viewport()->setMouseTracking(true);
+        popup->setAttribute(Qt::WA_Hover, true);
+        popup->viewport()->setAttribute(Qt::WA_Hover, true);
+        popup->setSelectionBehavior(QAbstractItemView::SelectRows);
+        popup->setStyleSheet(
+            "QAbstractItemView { outline: 0; }"
+            "QAbstractItemView::item { padding: 2px 6px; }"
+            "QAbstractItemView::item:hover, QAbstractItemView::item:selected {"
+            " background: palette(highlight); color: palette(highlighted-text);"
+            "}");
         return completer;
     }
 

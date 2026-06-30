@@ -6,6 +6,7 @@
 
 #include <QAction>
 #include <QApplication>
+#include <QAbstractItemView>
 #include <QBoxLayout>
 #include <QKeyEvent>
 #include <QKeySequence>
