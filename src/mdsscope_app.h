@@ -43,12 +43,20 @@ enum class DataReadMode {
     Full,
 };
 
+enum class ThemeMode {
+    Auto = 0,
+    Light = 1,
+    Dark = 2,
+};
+
 int runMdsScopeBenchmark(const QString& configPath,
                          DataReadMode readMode = DataReadMode::Thin,
                          const QString& shotOverride = {},
                          bool summaryOnly = false,
                          bool prewarm = false);
 void shutdownMdsScopeWorkers();
+ThemeMode mdsScopeThemeMode();
+void setMdsScopeThemeMode(ThemeMode mode);
 
 struct SignalSpec {
     QString shot;
@@ -255,6 +263,9 @@ class MainWindow final : public QMainWindow {
 public:
     explicit MainWindow(QString rootPath, QWidget* parent = nullptr);
 
+protected:
+    void changeEvent(QEvent* event) override;
+
 private:
     void buildUi();
     void loadDefaultEnvironment(bool useLatestWhenNoCurrentShot = false);
@@ -342,6 +353,7 @@ private:
     QLineEdit* shotEdit_ = nullptr;
     QComboBox* dataModeCombo_ = nullptr;
     QAction* loginAction_ = nullptr;
+    QToolButton* aboutButton_ = nullptr;
     QToolButton* zoomButton_ = nullptr;
     QToolButton* pointButton_ = nullptr;
     QVector<QVector<PlotWidget*>> plotWidgets_;

@@ -823,17 +823,17 @@ QIcon gearIcon()
 
 QIcon fontIcon()
 {
-    QPixmap pixmap(22, 22);
+    QPixmap pixmap(28, 28);
     pixmap.fill(Qt::transparent);
     QPainter painter(&pixmap);
     painter.setRenderHint(QPainter::Antialiasing, true);
-    painter.setPen(QPen(QColor("#475569"), 1.6));
+    painter.setPen(QPen(QColor("#475569"), 1.9));
     painter.setBrush(Qt::NoBrush);
-    painter.drawRect(QRectF(2.5, 2.5, 17.0, 17.0));
-    QFont iconFont(QStringLiteral("Times New Roman"), 15, QFont::Bold);
+    painter.drawRoundedRect(QRectF(2.3, 2.3, 23.4, 23.4), 2.2, 2.2);
+    QFont iconFont(QStringLiteral("Times New Roman"), 22, QFont::Bold);
     painter.setFont(iconFont);
     painter.setPen(QColor("#2563eb"));
-    painter.drawText(pixmap.rect().adjusted(0, -1, 0, 0), Qt::AlignCenter, "A");
+    painter.drawText(pixmap.rect().adjusted(0, -2, 0, 2), Qt::AlignCenter, "A");
     return QIcon(pixmap);
 }
 
@@ -899,7 +899,7 @@ QIcon modeIcon(InteractionMode mode, bool active)
     pixmap.fill(Qt::transparent);
     QPainter painter(&pixmap);
     painter.setRenderHint(QPainter::Antialiasing, true);
-    const QColor color = active ? QColor("#2563eb") : QColor("#9ca3af");
+    const QColor color = active ? QColor("#38bdf8") : QColor("#9ca3af");
     painter.setPen(QPen(color, 2.3));
     painter.setBrush(Qt::NoBrush);
     if (mode == InteractionMode::Zoom) {

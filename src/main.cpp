@@ -23,6 +23,10 @@
 #include <algorithm>
 
 namespace {
+class SystemThemeWatcher;
+
+SystemThemeWatcher* gThemeWatcher = nullptr;
+
 QPalette lightPalette()
 {
     QPalette palette;
@@ -94,24 +98,43 @@ QString applicationStyleSheet(const QPalette& palette)
                "  background: %1;"
                "  color: %2;"
                "}"
-               "QPushButton, QToolButton {"
+               "QPushButton {"
                "  background: %3;"
                "  color: %4;"
                "  border: 1px solid %5;"
                "  border-radius: 4px;"
                "}"
-               "QPushButton:hover, QToolButton:hover {"
+               "QPushButton:hover {"
                "  background: %6;"
                "  border-color: %7;"
                "}"
-               "QPushButton:pressed, QToolButton:pressed, QToolButton:checked {"
+               "QPushButton:pressed {"
                "  background: %6;"
                "  border-color: %7;"
                "}"
-               "QPushButton:disabled, QToolButton:disabled {"
+               "QPushButton:disabled {"
                "  background: %6;"
                "  color: %8;"
                "  border-color: %5;"
+               "}"
+               "QToolButton {"
+               "  background: transparent;"
+               "  color: %4;"
+               "  border: 1px solid transparent;"
+               "  border-radius: 4px;"
+               "}"
+               "QToolButton:hover, QToolButton:pressed {"
+               "  background: %6;"
+               "  border-color: transparent;"
+               "}"
+               "QToolButton:checked {"
+               "  background: transparent;"
+               "  border-color: transparent;"
+               "}"
+               "QToolButton:disabled {"
+               "  background: transparent;"
+               "  color: %8;"
+               "  border-color: transparent;"
                "}"
                "QLineEdit, QComboBox {"
                "  background: %9;"
@@ -158,6 +181,39 @@ QString applicationStyleSheet(const QPalette& palette)
              cssColor(palette, QPalette::Disabled, QPalette::Text));
 }
 
+constexpr const char* kThemeModeSetting = "ui/themeMode";
+constexpr const char* kThemeModeProperty = "mdsscope.themeMode";
+
+ThemeMode normalizedThemeMode(int value)
+{
+    switch (value) {
+    case static_cast<int>(ThemeMode::Light):
+        return ThemeMode::Light;
+    case static_cast<int>(ThemeMode::Dark):
+        return ThemeMode::Dark;
+    default:
+        return ThemeMode::Auto;
+    }
+}
+
+ThemeMode readStoredThemeMode()
+{
+    return normalizedThemeMode(QSettings().value(QString::fromLatin1(kThemeModeSetting),
+                                                 static_cast<int>(ThemeMode::Auto))
+                                   .toInt());
+}
+
+uint schemeForThemeMode(ThemeMode mode, uint systemScheme)
+{
+    if (mode == ThemeMode::Dark) {
+        return 1;
+    }
+    if (mode == ThemeMode::Light) {
+        return 2;
+    }
+    return systemScheme == 1 ? 1 : 2;
+}
+
 void applySystemColorScheme(QApplication& app, uint scheme)
 {
     const QPalette palette = scheme == 1 ? darkPalette() : lightPalette();
@@ -172,7 +228,10 @@ public:
     explicit SystemThemeWatcher(QApplication& app)
         : QObject(&app), app_(app)
     {
-        applyIfChanged(readCurrentColorScheme());
+        gThemeWatcher = this;
+        currentMode_ = readStoredThemeMode();
+        currentScheme_ = resolveColorScheme(readCurrentColorScheme());
+        applyCurrentTheme();
 #ifdef Q_OS_LINUX
         QDBusConnection::sessionBus().connect(QStringLiteral("org.freedesktop.portal.Desktop"),
                                               QStringLiteral("/org/freedesktop/portal/desktop"),
@@ -182,9 +241,32 @@ public:
                                               SLOT(settingChanged(QString,QString,QDBusVariant)));
 #endif
         connect(&pollTimer_, &QTimer::timeout, this, [this] {
-            applyIfChanged(readCurrentColorScheme());
+            setSystemScheme(readCurrentColorScheme());
         });
         pollTimer_.start(3000);
+    }
+
+    ~SystemThemeWatcher() override
+    {
+        if (gThemeWatcher == this) {
+            gThemeWatcher = nullptr;
+        }
+    }
+
+    ThemeMode themeMode() const
+    {
+        return currentMode_;
+    }
+
+    void setThemeMode(ThemeMode mode)
+    {
+        mode = normalizedThemeMode(static_cast<int>(mode));
+        if (mode == currentMode_) {
+            return;
+        }
+        currentMode_ = mode;
+        QSettings().setValue(QString::fromLatin1(kThemeModeSetting), static_cast<int>(mode));
+        applyCurrentTheme();
     }
 
 #ifdef Q_OS_LINUX
@@ -192,7 +274,7 @@ private slots:
     void settingChanged(const QString& group, const QString& key, const QDBusVariant& value)
     {
         if (group == QStringLiteral("org.freedesktop.appearance") && key == QStringLiteral("color-scheme")) {
-            applyIfChanged(resolveColorScheme(value.variant().toUInt()));
+            setSystemScheme(resolveColorScheme(value.variant().toUInt()));
         }
     }
 #endif
@@ -332,19 +414,28 @@ private:
 #endif
     }
 
-    void applyIfChanged(uint scheme)
+    void setSystemScheme(uint scheme)
     {
         scheme = resolveColorScheme(scheme);
         if (scheme == currentScheme_) {
             return;
         }
         currentScheme_ = scheme;
-        applySystemColorScheme(app_, scheme);
+        if (currentMode_ == ThemeMode::Auto) {
+            applyCurrentTheme();
+        }
+    }
+
+    void applyCurrentTheme()
+    {
+        app_.setProperty(kThemeModeProperty, static_cast<int>(currentMode_));
+        applySystemColorScheme(app_, schemeForThemeMode(currentMode_, currentScheme_));
     }
 
     QApplication& app_;
     QTimer pollTimer_;
     uint currentScheme_ = 0;
+    ThemeMode currentMode_ = ThemeMode::Auto;
 };
 
 QDir runtimeRootDir()
@@ -410,6 +501,28 @@ bool ensureApiLoginBeforeMain(const QString& rootPath)
     dialog.setWindowIcon(appIcon());
     return dialog.exec() == QDialog::Accepted;
 }
+}
+
+ThemeMode mdsScopeThemeMode()
+{
+    if (gThemeWatcher) {
+        return gThemeWatcher->themeMode();
+    }
+    const QVariant value = qApp ? qApp->property(kThemeModeProperty) : QVariant();
+    if (value.isValid()) {
+        return normalizedThemeMode(value.toInt());
+    }
+    return readStoredThemeMode();
+}
+
+void setMdsScopeThemeMode(ThemeMode mode)
+{
+    mode = normalizedThemeMode(static_cast<int>(mode));
+    if (gThemeWatcher) {
+        gThemeWatcher->setThemeMode(mode);
+        return;
+    }
+    QSettings().setValue(QString::fromLatin1(kThemeModeSetting), static_cast<int>(mode));
 }
 
 int main(int argc, char* argv[])

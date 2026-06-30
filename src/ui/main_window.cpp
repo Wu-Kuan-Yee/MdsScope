@@ -10,6 +10,218 @@ void setLabelTextIfChanged(QLabel* label, const QString& text)
     }
 }
 
+QString themeModeLabel(ThemeMode mode)
+{
+    switch (mode) {
+    case ThemeMode::Light:
+        return QStringLiteral("Light");
+    case ThemeMode::Dark:
+        return QStringLiteral("Dark");
+    case ThemeMode::Auto:
+    default:
+        return QStringLiteral("Auto");
+    }
+}
+
+class ThemeModeButton final : public QWidget {
+public:
+    explicit ThemeModeButton(QWidget* parent = nullptr)
+        : QWidget(parent)
+    {
+        setObjectName("themeModeButton");
+        setFixedSize(92, 34);
+        setCursor(Qt::PointingHandCursor);
+        setFocusPolicy(Qt::NoFocus);
+        animation_.setDuration(150);
+        animation_.setEasingCurve(QEasingCurve::OutCubic);
+        connect(&animation_, &QVariantAnimation::valueChanged, this, [this](const QVariant& value) {
+            thumbPosition_ = value.toReal();
+            update();
+        });
+        setMode(mdsScopeThemeMode(), false);
+    }
+
+    void setMode(ThemeMode mode, bool animated = true)
+    {
+        if (mode_ == mode && animated) {
+            return;
+        }
+        mode_ = mode;
+        setToolTip(QStringLiteral("Theme: %1").arg(themeModeLabel(mode)));
+        const qreal target = positionForMode(mode);
+        animation_.stop();
+        if (animated) {
+            animation_.setStartValue(thumbPosition_);
+            animation_.setEndValue(target);
+            animation_.start();
+        } else {
+            thumbPosition_ = target;
+            update();
+        }
+    }
+
+protected:
+    void paintEvent(QPaintEvent*) override
+    {
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing);
+
+        const QPalette pal = palette();
+        const QColor track = pal.color(QPalette::AlternateBase);
+        const QColor border = pal.color(QPalette::Mid);
+        const QColor quiet = pal.color(QPalette::Disabled, QPalette::WindowText);
+        const QColor sunActive("#f59e0b");
+        const QColor autoActive("#22c55e");
+        const QColor moonActive("#60a5fa");
+        const QColor thumb = pal.color(QPalette::Button);
+
+        const QRectF outer = rect().adjusted(1, 2, -1, -2);
+        const qreal radius = outer.height() / 2.0;
+        painter.setPen(QPen(border, 1));
+        painter.setBrush(track);
+        painter.drawRoundedRect(outer, radius, radius);
+
+        const qreal segmentWidth = outer.width() / 3.0;
+        const qreal knobSize = outer.height() - 4;
+        const qreal knobX = outer.left() + thumbPosition_ * segmentWidth + (segmentWidth - knobSize) / 2.0;
+        const QRectF knob(knobX, outer.top() + 2, knobSize, knobSize);
+        painter.setPen(QPen(border, 1));
+        painter.setBrush(thumb);
+        painter.drawEllipse(knob);
+
+        const QPointF lightCenter(outer.left() + segmentWidth * 0.5, outer.center().y());
+        const QPointF autoCenter(outer.left() + segmentWidth * 1.5, outer.center().y());
+        const QPointF darkCenter(outer.left() + segmentWidth * 2.5, outer.center().y());
+        drawSun(&painter, lightCenter, mode_ == ThemeMode::Light ? sunActive : quiet, mode_ == ThemeMode::Light);
+        drawSystemIcon(&painter, autoCenter, mode_ == ThemeMode::Auto ? autoActive : quiet);
+        drawMoon(&painter, darkCenter, mode_ == ThemeMode::Dark ? moonActive : quiet);
+    }
+
+    void mousePressEvent(QMouseEvent* event) override
+    {
+        if (event->button() != Qt::LeftButton) {
+            QWidget::mousePressEvent(event);
+            return;
+        }
+        dragging_ = true;
+        applyModeForX(event->position().x());
+        event->accept();
+    }
+
+    void mouseMoveEvent(QMouseEvent* event) override
+    {
+        if (dragging_) {
+            applyModeForX(event->position().x());
+            event->accept();
+            return;
+        }
+        QWidget::mouseMoveEvent(event);
+    }
+
+    void mouseReleaseEvent(QMouseEvent* event) override
+    {
+        if (event->button() == Qt::LeftButton && dragging_) {
+            dragging_ = false;
+            applyModeForX(event->position().x());
+            event->accept();
+            return;
+        }
+        QWidget::mouseReleaseEvent(event);
+    }
+
+    void changeEvent(QEvent* event) override
+    {
+        if (event->type() == QEvent::PaletteChange || event->type() == QEvent::FontChange) {
+            update();
+        }
+        QWidget::changeEvent(event);
+    }
+
+private:
+    static qreal positionForMode(ThemeMode mode)
+    {
+        switch (mode) {
+        case ThemeMode::Light:
+            return 0.0;
+        case ThemeMode::Dark:
+            return 2.0;
+        case ThemeMode::Auto:
+        default:
+            return 1.0;
+        }
+    }
+
+    static ThemeMode modeForX(qreal x, qreal width)
+    {
+        if (x < width / 3.0) {
+            return ThemeMode::Light;
+        }
+        if (x > width * 2.0 / 3.0) {
+            return ThemeMode::Dark;
+        }
+        return ThemeMode::Auto;
+    }
+
+    void applyModeForX(qreal x)
+    {
+        const ThemeMode mode = modeForX(x, width());
+        if (mode == mode_) {
+            return;
+        }
+        setMdsScopeThemeMode(mode);
+        setMode(mode);
+    }
+
+    static void drawSun(QPainter* painter, const QPointF& center, const QColor& color, bool filled)
+    {
+        painter->save();
+        painter->setPen(QPen(color, 1.7, Qt::SolidLine, Qt::RoundCap));
+        painter->setBrush(filled ? color : Qt::NoBrush);
+        painter->drawEllipse(center, 4.6, 4.6);
+        constexpr qreal pi = 3.14159265358979323846;
+        for (int i = 0; i < 8; ++i) {
+            const qreal angle = (pi / 4.0) * i;
+            const QPointF inner(center.x() + std::cos(angle) * 7.8, center.y() + std::sin(angle) * 7.8);
+            const QPointF outer(center.x() + std::cos(angle) * 10.4, center.y() + std::sin(angle) * 10.4);
+            painter->drawLine(inner, outer);
+        }
+        painter->restore();
+    }
+
+    static void drawMoon(QPainter* painter, const QPointF& center, const QColor& color)
+    {
+        painter->save();
+        painter->setPen(Qt::NoPen);
+        painter->setBrush(color);
+        QPainterPath moon;
+        moon.moveTo(center.x() + 3.5, center.y() - 8.7);
+        moon.cubicTo(center.x() - 5.8, center.y() - 6.0,
+                     center.x() - 6.3, center.y() + 6.1,
+                     center.x() + 3.4, center.y() + 8.7);
+        moon.cubicTo(center.x() - 0.9, center.y() + 4.7,
+                     center.x() - 0.9, center.y() - 4.7,
+                     center.x() + 3.5, center.y() - 8.7);
+        painter->drawPath(moon);
+        painter->restore();
+    }
+
+    static void drawSystemIcon(QPainter* painter, const QPointF& center, const QColor& color)
+    {
+        painter->save();
+        painter->setPen(QPen(color, 1.7, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        painter->setBrush(Qt::NoBrush);
+        painter->drawRoundedRect(QRectF(center.x() - 8.0, center.y() - 6.8, 16.0, 10.8), 2.0, 2.0);
+        painter->drawLine(QPointF(center.x(), center.y() + 4.2), QPointF(center.x(), center.y() + 7.6));
+        painter->drawLine(QPointF(center.x() - 5.2, center.y() + 7.6), QPointF(center.x() + 5.2, center.y() + 7.6));
+        painter->restore();
+    }
+
+    QVariantAnimation animation_;
+    ThemeMode mode_ = ThemeMode::Auto;
+    qreal thumbPosition_ = 0.5;
+    bool dragging_ = false;
+};
+
 bool loadedSignalMatchesConfig(const LayoutConfig& config, const LoadedSignal& item)
 {
     if (item.column < 0 || item.row < 0 || item.signal < 0
@@ -1119,21 +1331,21 @@ QIcon infoIcon()
     painter.setRenderHint(QPainter::Antialiasing, true);
 
     const bool dark = QApplication::palette().color(QPalette::Window).lightness() < 128;
-    const QColor fill = dark ? QColor("#3f3f46") : QColor("#f8fafc");
-    const QColor border = dark ? QColor("#71717a") : QColor("#64748b");
-    const QColor glyph = dark ? QColor("#f8fafc") : QColor("#334155");
-    const QColor highlight = dark ? QColor("#60a5fa") : QColor("#2563eb");
+    const QColor fill = Qt::transparent;
+    const QColor border = dark ? QColor("#cbd5e1") : QColor("#475569");
+    const QColor glyph = dark ? QColor("#cbd5e1") : QColor("#475569");
+    const QColor highlight = dark ? QColor("#e5e7eb") : QColor("#334155");
 
-    painter.setPen(QPen(border, 1.7));
+    painter.setPen(QPen(border, 1.8));
     painter.setBrush(fill);
-    painter.drawEllipse(QRectF(3.3, 3.3, 21.4, 21.4));
+    painter.drawEllipse(QRectF(1.9, 1.9, 24.2, 24.2));
 
     painter.setPen(Qt::NoPen);
     painter.setBrush(highlight);
-    painter.drawEllipse(QPointF(14.0, 9.2), 1.55, 1.55);
+    painter.drawEllipse(QPointF(14.0, 8.3), 1.9, 1.9);
 
     painter.setBrush(glyph);
-    painter.drawRoundedRect(QRectF(12.75, 12.0, 2.5, 8.6), 1.25, 1.25);
+    painter.drawRoundedRect(QRectF(12.45, 11.6, 3.1, 10.4), 1.55, 1.55);
     return QIcon(pixmap);
 }
 
@@ -1227,45 +1439,46 @@ struct AboutColors {
 
 AboutColors aboutColors()
 {
-    const bool dark = QApplication::palette().color(QPalette::Window).lightness() < 128;
-    if (dark) {
+    const QPalette pal = QApplication::palette();
+    const bool dark = pal.color(QPalette::Window).lightness() < 128;
+    if (!dark) {
         return AboutColors{
-            QStringLiteral("#242424"),
-            QStringLiteral("#303033"),
-            QStringLiteral("#46464a"),
-            QStringLiteral("#3a3a3f"),
-            QStringLiteral("#45454a"),
             QStringLiteral("#f8fafc"),
-            QStringLiteral("#ffffff"),
+            QStringLiteral("#f3f4f6"),
             QStringLiteral("#d1d5db"),
-            QStringLiteral("#45454a"),
-            QStringLiteral("#5f6068"),
-            QStringLiteral("#52525b"),
-            QStringLiteral("#73737d"),
-            QStringLiteral("#3a3a3f"),
-            QStringLiteral("#52525b"),
-            QStringLiteral("#a1a1aa"),
+            QStringLiteral("#e5e7eb"),
+            QStringLiteral("#d1d5db"),
+            QStringLiteral("#111827"),
+            QStringLiteral("#0f172a"),
+            QStringLiteral("#64748b"),
+            QStringLiteral("#f3f4f6"),
             QStringLiteral("#cbd5e1"),
+            QStringLiteral("#e5e7eb"),
+            QStringLiteral("#94a3b8"),
+            QStringLiteral("#e5e7eb"),
+            QStringLiteral("#cbd5e1"),
+            QStringLiteral("#64748b"),
+            QStringLiteral("#475569"),
         };
     }
 
     return AboutColors{
-        QStringLiteral("#f5f7fb"),
-        QStringLiteral("#ffffff"),
-        QStringLiteral("#d7dde8"),
-        QStringLiteral("#f1f5f9"),
-        QStringLiteral("#e5e7eb"),
-        QStringLiteral("#111827"),
-        QStringLiteral("#0f172a"),
-        QStringLiteral("#475569"),
-        QStringLiteral("#f3f4f6"),
-        QStringLiteral("#cbd5e1"),
-        QStringLiteral("#e5e7eb"),
-        QStringLiteral("#94a3b8"),
-        QStringLiteral("#e5e7eb"),
-        QStringLiteral("#cbd5e1"),
-        QStringLiteral("#64748b"),
-        QStringLiteral("#475569"),
+        pal.color(QPalette::Window).name(QColor::HexRgb),
+        pal.color(QPalette::AlternateBase).name(QColor::HexRgb),
+        pal.color(QPalette::Mid).name(QColor::HexRgb),
+        pal.color(QPalette::Button).name(QColor::HexRgb),
+        pal.color(QPalette::Mid).name(QColor::HexRgb),
+        pal.color(QPalette::WindowText).name(QColor::HexRgb),
+        pal.color(QPalette::Text).name(QColor::HexRgb),
+        pal.color(QPalette::Disabled, QPalette::WindowText).name(QColor::HexRgb),
+        pal.color(QPalette::Button).name(QColor::HexRgb),
+        pal.color(QPalette::Mid).name(QColor::HexRgb),
+        pal.color(QPalette::Midlight).name(QColor::HexRgb),
+        pal.color(QPalette::Highlight).name(QColor::HexRgb),
+        pal.color(QPalette::AlternateBase).name(QColor::HexRgb),
+        pal.color(QPalette::Mid).name(QColor::HexRgb),
+        pal.color(QPalette::Disabled, QPalette::ButtonText).name(QColor::HexRgb),
+        pal.color(QPalette::Disabled, QPalette::WindowText).name(QColor::HexRgb),
     };
 }
 
@@ -1277,10 +1490,17 @@ QString aboutDialogStyleSheet()
         "  background: %1;"
         "  color: %6;"
         "}"
+        "QLabel {"
+        "  background: transparent;"
+        "}"
         "QWidget#aboutHeader {"
         "  background: %2;"
         "  border: 1px solid %3;"
         "  border-radius: 10px;"
+        "}"
+        "QWidget#aboutHeader QWidget {"
+        "  background: transparent;"
+        "  border: none;"
         "}"
         "QWidget#aboutIconBadge {"
         "  background: %4;"
@@ -1291,6 +1511,10 @@ QString aboutDialogStyleSheet()
         "  background: %2;"
         "  border: 1px solid %3;"
         "  border-radius: 10px;"
+        "}"
+        "QWidget#aboutCard QWidget {"
+        "  background: transparent;"
+        "  border: none;"
         "}"
         "QWidget#aboutRow {"
         "  background: transparent;"
@@ -1701,6 +1925,14 @@ MainWindow::MainWindow(QString rootPath, QWidget* parent)
     loadDefaultEnvironment(true);
 }
 
+void MainWindow::changeEvent(QEvent* event)
+{
+    if (event->type() == QEvent::PaletteChange && aboutButton_) {
+        aboutButton_->setIcon(infoIcon());
+    }
+    QMainWindow::changeEvent(event);
+}
+
 void MainWindow::schedulePointSync(PlotWidget* source, double x)
 {
     pendingPointX_ = x;
@@ -1833,13 +2065,14 @@ void MainWindow::buildUi()
         topLayout->addWidget(label);
     }
     topLayout->addStretch(1);
-    auto* aboutButton = new QToolButton(topControls);
-    aboutButton->setObjectName("aboutButton");
-    aboutButton->setIcon(infoIcon());
-    aboutButton->setIconSize(QSize(28, 28));
-    aboutButton->setFixedSize(34, 34);
-    aboutButton->setToolTip("About MdsScope");
-    topLayout->addWidget(aboutButton);
+    topLayout->addWidget(new ThemeModeButton(topControls));
+    aboutButton_ = new QToolButton(topControls);
+    aboutButton_->setObjectName("aboutButton");
+    aboutButton_->setIcon(infoIcon());
+    aboutButton_->setIconSize(QSize(28, 28));
+    aboutButton_->setFixedSize(34, 34);
+    aboutButton_->setToolTip("About MdsScope");
+    topLayout->addWidget(aboutButton_);
     toolbar->addWidget(topControls);
 
     auto* bottom = new QWidget(this);
@@ -1897,7 +2130,7 @@ void MainWindow::buildUi()
     connect(stop, &QPushButton::clicked, this, [this] { setStatus("Stop requested"); });
     connect(shotEdit_, &QLineEdit::returnPressed, this, &MainWindow::applyShot);
     connect(dataModeCombo_, &QComboBox::currentIndexChanged, this, [this] { refreshData(); });
-    connect(aboutButton, &QToolButton::clicked, this, &MainWindow::openAboutDialog);
+    connect(aboutButton_, &QToolButton::clicked, this, &MainWindow::openAboutDialog);
 }
 
 void MainWindow::loadDefaultEnvironment(bool useLatestWhenNoCurrentShot)

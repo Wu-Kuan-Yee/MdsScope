@@ -21,6 +21,7 @@
 #include <QDir>
 #include <QDrag>
 #include <QElapsedTimer>
+#include <QEasingCurve>
 #include <QEvent>
 #include <QEventLoop>
 #include <QFile>
@@ -74,6 +75,7 @@
 #include <QToolBar>
 #include <QToolButton>
 #include <QUrl>
+#include <QVariantAnimation>
 #include <QFontComboBox>
 #include <QVBoxLayout>
 #include <QWheelEvent>
