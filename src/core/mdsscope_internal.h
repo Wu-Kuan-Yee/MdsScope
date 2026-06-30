@@ -17,6 +17,7 @@
 #include <QCryptographicHash>
 #include <QDataStream>
 #include <QDateTime>
+#include <QDesktopServices>
 #include <QDir>
 #include <QDrag>
 #include <QElapsedTimer>
@@ -25,6 +26,7 @@
 #include <QFile>
 #include <QFileDialog>
 #include <QFormLayout>
+#include <QFrame>
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
@@ -49,6 +51,7 @@
 #include <QPaintEvent>
 #include <QPainterPath>
 #include <QPointer>
+#include <QProcess>
 #include <QPushButton>
 #include <QRandomGenerator>
 #include <QRadioButton>
@@ -63,12 +66,14 @@
 #include <QStyle>
 #include <QStandardPaths>
 #include <QStringListModel>
+#include <QSysInfo>
 #include <QTcpSocket>
 #include <QTextStream>
 #include <QThreadPool>
 #include <QTimer>
 #include <QToolBar>
 #include <QToolButton>
+#include <QUrl>
 #include <QFontComboBox>
 #include <QVBoxLayout>
 #include <QWheelEvent>
@@ -86,6 +91,14 @@
 
 constexpr int kMdsPort = 8000;
 constexpr int kNetworkTimeoutMs = 2500;
+
+#ifndef MDSSCOPE_VERSION
+#define MDSSCOPE_VERSION "unknown"
+#endif
+
+#ifndef MDSSCOPE_GIT_VERSION
+#define MDSSCOPE_GIT_VERSION "unknown"
+#endif
 
 struct FontSettings {
     QString family = QStringLiteral("Times New Roman");

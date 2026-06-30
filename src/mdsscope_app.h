@@ -271,6 +271,7 @@ private:
     void stepShot(int delta);
     void latestShot();
     void openLoginDialog();
+    void openAboutDialog();
     void applyLoginSuccessStatus(const QString& statusText);
     void updateLoginActionIcon();
     void fetchLatestShotAsync();

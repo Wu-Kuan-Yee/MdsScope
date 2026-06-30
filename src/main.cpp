@@ -13,6 +13,7 @@
 #include <QFileInfo>
 #include <QMessageBox>
 #include <QPalette>
+#include <QProcess>
 #include <QStringList>
 #include <QThreadPool>
 
@@ -100,6 +101,43 @@ private slots:
     }
 
 private:
+    static uint readFallbackColorScheme()
+    {
+        const QString gtkTheme = qEnvironmentVariable("GTK_THEME").toLower();
+        if (gtkTheme.contains(QStringLiteral("dark"))) {
+            return 1;
+        }
+
+        QProcess process;
+        process.setProgram(QStringLiteral("gsettings"));
+        process.setArguments({QStringLiteral("get"),
+                              QStringLiteral("org.gnome.desktop.interface"),
+                              QStringLiteral("color-scheme")});
+        process.start();
+        if (process.waitForFinished(500)) {
+            const QString output = QString::fromUtf8(process.readAllStandardOutput()).trimmed().toLower();
+            if (output.contains(QStringLiteral("prefer-dark"))) {
+                return 1;
+            }
+            if (output.contains(QStringLiteral("prefer-light"))) {
+                return 2;
+            }
+        }
+
+        process.setProgram(QStringLiteral("gsettings"));
+        process.setArguments({QStringLiteral("get"),
+                              QStringLiteral("org.gnome.desktop.interface"),
+                              QStringLiteral("gtk-theme")});
+        process.start();
+        if (process.waitForFinished(500)) {
+            const QString output = QString::fromUtf8(process.readAllStandardOutput()).trimmed().toLower();
+            if (output.contains(QStringLiteral("dark"))) {
+                return 1;
+            }
+        }
+        return 2;
+    }
+
     static uint readPortalColorScheme()
     {
         QDBusInterface settings(QStringLiteral("org.freedesktop.portal.Desktop"),
@@ -109,7 +147,13 @@ private:
         const QDBusReply<QDBusVariant> reply = settings.call(QStringLiteral("Read"),
                                                              QStringLiteral("org.freedesktop.appearance"),
                                                              QStringLiteral("color-scheme"));
-        return reply.isValid() ? reply.value().variant().toUInt() : 2;
+        if (reply.isValid()) {
+            const uint scheme = reply.value().variant().toUInt();
+            if (scheme == 1 || scheme == 2) {
+                return scheme;
+            }
+        }
+        return readFallbackColorScheme();
     }
 
     QApplication& app_;
@@ -185,6 +229,7 @@ int main(int argc, char* argv[])
 {
     QApplication::setApplicationName("mdsscope");
     QApplication::setApplicationDisplayName("MdsScope");
+    QApplication::setApplicationVersion(QStringLiteral(MDSSCOPE_VERSION));
     if (desktopFileIsInstalled("mdsscope")) {
         QApplication::setDesktopFileName("mdsscope");
     }
