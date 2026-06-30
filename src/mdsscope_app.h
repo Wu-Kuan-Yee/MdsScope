@@ -284,6 +284,7 @@ private:
     void applyLoadedSignal(const LoadedSignal& item);
     void applyLoadedSignals(const QVector<LoadedSignal>& loaded);
     void applyPanelLoadedSignals(const QVector<LoadedSignal>& loaded);
+    void rememberLoadedSourceSignal(const LoadedSignal& item);
     void addPlotBelow();
     void deleteCurrentPlot();
     void addSignalToCurrentPlot();

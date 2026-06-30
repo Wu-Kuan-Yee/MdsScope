@@ -12,6 +12,7 @@
 #include <QComboBox>
 #include <QColorDialog>
 #include <QCheckBox>
+#include <QCompleter>
 #include <QCryptographicHash>
 #include <QDataStream>
 #include <QDateTime>
@@ -59,6 +60,7 @@
 #include <QStatusBar>
 #include <QStyle>
 #include <QStandardPaths>
+#include <QStringListModel>
 #include <QTcpSocket>
 #include <QTextStream>
 #include <QThreadPool>
@@ -107,6 +109,9 @@ void traceMdsLine(const QString& line);
 QString appConfigDir();
 QString appCacheDir();
 QString appEnvironmentDir(const QString& rootPath);
+QString appSourceIndexDir(const QString& rootPath);
+bool ensureSourceIndexCache(const QString& rootPath);
+bool addSourceIndexSignal(const QString& tree, const QString& signal);
 QString defaultExportBaseDir();
 QString uiSettingsPath(const QString& rootPath);
 FontSettings& fontSettings();

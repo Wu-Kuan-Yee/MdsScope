@@ -255,11 +255,16 @@ private:
 
 class DataSourceDialog final : public QDialog {
 public:
-    explicit DataSourceDialog(const PlotSpec& base, const QString& currentShot, QWidget* parent = nullptr)
+    explicit DataSourceDialog(const PlotSpec& base,
+                              const QString& currentShot,
+                              const QString& sourceIndexDir,
+                              QWidget* parent = nullptr)
         : QDialog(parent)
         , defaultShot_(currentShot.trimmed().isEmpty() ? base.shot.trimmed() : currentShot.trimmed())
+        , sourceIndexDir_(sourceIndexDir)
     {
         setWindowTitle("Data Source Setup");
+        treeModel_ = new QStringListModel(readSourceIndexLines(QDir(sourceIndexDir_).filePath("trees.txt")), this);
         auto* mainLayout = new QVBoxLayout(this);
 
         rowsHost_ = new QWidget(this);
@@ -357,6 +362,9 @@ private:
         QLineEdit* tree = nullptr;
         QLineEdit* signal = nullptr;
         QLineEdit* server = nullptr;
+        QCompleter* treeCompleter = nullptr;
+        QStringListModel* signalModel = nullptr;
+        QCompleter* signalCompleter = nullptr;
         QPushButton* colorButton = nullptr;
         QCheckBox* hidden = nullptr;
         QPushButton* deleteButton = nullptr;
@@ -373,6 +381,9 @@ private:
         row->tree = new QLineEdit(sig.experiment, rowsHost_);
         row->signal = new QLineEdit(sig.yExpr, rowsHost_);
         row->server = new QLineEdit(sig.serverIp, rowsHost_);
+        row->treeCompleter = makeCompleter(treeModel_, row->tree);
+        row->signalModel = new QStringListModel(row->signal);
+        row->signalCompleter = makeCompleter(row->signalModel, row->signal);
         row->colorButton = new QPushButton(rowsHost_);
         row->hidden = new QCheckBox(rowsHost_);
         row->deleteButton = new QPushButton("Delete", rowsHost_);
@@ -383,6 +394,9 @@ private:
         row->shot->setMinimumWidth(72);
         row->signal->setMinimumWidth(150);
         row->server->setMinimumWidth(120);
+        row->tree->setCompleter(row->treeCompleter);
+        row->signal->setCompleter(row->signalCompleter);
+        updateSignalCompleter(row);
         updateColorButton(row);
 
         const int gridRow = rows_.size() + 1;
@@ -403,6 +417,9 @@ private:
                 updateColorButton(row);
             }
         });
+        connect(row->tree, &QLineEdit::textChanged, this, [this, row] {
+            updateSignalCompleter(row);
+        });
         connect(row->deleteButton, &QPushButton::clicked, this, [row] {
             row->deleted = true;
             for (QWidget* widget : {static_cast<QWidget*>(row->shot),
@@ -417,6 +434,70 @@ private:
         });
     }
 
+    static QCompleter* makeCompleter(const QStringList& values, QObject* parent)
+    {
+        return makeCompleter(new QStringListModel(values, parent), parent);
+    }
+
+    static QCompleter* makeCompleter(QStringListModel* model, QObject* parent)
+    {
+        auto* completer = new QCompleter(model, parent);
+        completer->setCaseSensitivity(Qt::CaseInsensitive);
+        completer->setFilterMode(Qt::MatchContains);
+        completer->setCompletionMode(QCompleter::PopupCompletion);
+        completer->setMaxVisibleItems(16);
+        return completer;
+    }
+
+    static QString sourceIndexFileName(QString tree)
+    {
+        tree = tree.trimmed().toLower();
+        tree.replace(QRegularExpression("[^a-z0-9_-]+"), "_");
+        return tree.isEmpty() ? QString() : tree + QStringLiteral(".txt");
+    }
+
+    static QStringList readSourceIndexLines(const QString& path)
+    {
+        QStringList values;
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            return values;
+        }
+        QSet<QString> seen;
+        QTextStream in(&file);
+        while (!in.atEnd()) {
+            const QString line = in.readLine().trimmed();
+            const QString key = line.toLower();
+            if (!line.isEmpty() && !seen.contains(key)) {
+                values.push_back(line);
+                seen.insert(key);
+            }
+        }
+        values.sort(Qt::CaseInsensitive);
+        return values;
+    }
+
+    QStringList signalNamesForTree(const QString& tree)
+    {
+        const QString key = tree.trimmed().toLower();
+        if (key.isEmpty()) {
+            return {};
+        }
+        if (!signalCache_.contains(key)) {
+            const QString path = QDir(QDir(sourceIndexDir_).filePath("signals")).filePath(sourceIndexFileName(tree));
+            signalCache_.insert(key, readSourceIndexLines(path));
+        }
+        return signalCache_.value(key);
+    }
+
+    void updateSignalCompleter(Row* row)
+    {
+        if (!row || !row->signalModel) {
+            return;
+        }
+        row->signalModel->setStringList(signalNamesForTree(row->tree->text()));
+    }
+
     static void updateColorButton(Row* row)
     {
         row->colorButton->setFixedSize(36, 20);
@@ -426,8 +507,11 @@ private:
     }
 
     QString defaultShot_;
+    QString sourceIndexDir_;
     QWidget* rowsHost_ = nullptr;
     QGridLayout* rowsLayout_ = nullptr;
+    QStringListModel* treeModel_ = nullptr;
+    QHash<QString, QStringList> signalCache_;
     QVector<Row*> rows_;
 };
 
@@ -1007,6 +1091,7 @@ MainWindow::MainWindow(QString rootPath, QWidget* parent)
     : QMainWindow(parent), rootPath_(std::move(rootPath))
 {
     environmentPath_ = appEnvironmentDir(rootPath_);
+    ensureSourceIndexCache(rootPath_);
     exportBasePath_ = defaultExportBaseDir();
     loadFontSettings(rootPath_);
     buildUi();
@@ -2190,6 +2275,7 @@ void MainWindow::applyLoadedSignal(const LoadedSignal& item)
         ++streamedFailed_;
     } else {
         ++streamedOk_;
+        rememberLoadedSourceSignal(item);
     }
     const int streamedTotal = streamedOk_ + streamedFailed_;
     if (streamedTotal == 1 || streamedTotal % 8 == 0) {
@@ -2231,6 +2317,7 @@ void MainWindow::applyLoadedSignals(const QVector<LoadedSignal>& loaded)
                 ++failed;
             } else {
                 ++ok;
+                rememberLoadedSourceSignal(item);
             }
         }
     }
@@ -2251,11 +2338,25 @@ void MainWindow::applyPanelLoadedSignals(const QVector<LoadedSignal>& loaded)
         plotWidgets_[item.column][item.row]->setSeries(item.signal, item.series);
         if (item.series.hasData()) {
             ++ok;
+            rememberLoadedSourceSignal(item);
         } else {
             ++failed;
         }
     }
     setStatus(QString("Panel refresh done: %1 signals loaded, %2 failed").arg(ok).arg(failed));
+}
+
+void MainWindow::rememberLoadedSourceSignal(const LoadedSignal& item)
+{
+    if (!item.series.hasData()
+        || item.column < 0 || item.row < 0 || item.signal < 0
+        || item.column >= config_.columns.size()
+        || item.row >= config_.columns[item.column].size()
+        || item.signal >= config_.columns[item.column][item.row].signalSpecs.size()) {
+        return;
+    }
+    const SignalSpec& sig = config_.columns[item.column][item.row].signalSpecs[item.signal];
+    addSourceIndexSignal(sig.experiment, sig.yExpr);
 }
 
 PlotSpec MainWindow::defaultPlotFromSelection() const
@@ -2397,7 +2498,7 @@ void MainWindow::dataSourceSetupForCurrentPanel()
 
     PlotSpec& plot = config_.columns[selectedColumn_][selectedRow_];
     const QString currentShot = shotEdit_ ? shotEdit_->text().trimmed() : plot.shot;
-    DataSourceDialog dialog(plot, currentShot, this);
+    DataSourceDialog dialog(plot, currentShot, appSourceIndexDir(rootPath_), this);
     if (dialog.exec() != QDialog::Accepted) {
         return;
     }

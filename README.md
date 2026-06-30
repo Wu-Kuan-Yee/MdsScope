@@ -125,6 +125,24 @@ Login credentials and tokens are cached under:
 The cache file is not plaintext; it stores the username, password, and token in
 an encrypted local cache bound to the current machine/user.
 
+Tree-bound signal indexes are installed under:
+
+```text
+~/opt/mdsscope/share/mdsscope/source_index/
+  trees.txt
+  signals/<tree>.txt
+```
+
+On startup, MdsScope seeds and updates the user cache at
+`~/.cache/mdsscope/source_index/` from the installed index while preserving
+locally discovered entries. If a user-entered tree/signal is not already in the
+cache, MdsScope adds it only after that signal has been read successfully.
+Failed reads are treated as invalid input and are not cached.
+
+The Data Source Setup dialog uses this cache for case-insensitive tree and
+signal completion. Signal candidates are scoped to the tree entered on the same
+row.
+
 On first run, MdsScope creates `~/.config/mdsscope/environment/` and copies
 template `*.toml` and `*.webscp` files from the source tree or installed
 `share/mdsscope/environment/` directory when the user environment directory is

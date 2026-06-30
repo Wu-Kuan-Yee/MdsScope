@@ -79,3 +79,14 @@ install(FILES
     APIurl
     DESTINATION ${CMAKE_INSTALL_DATADIR}/mdsscope
 )
+
+install(FILES
+    source_index/trees.txt
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/mdsscope/source_index
+)
+
+install(DIRECTORY
+    source_index/signals
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/mdsscope/source_index
+    FILES_MATCHING PATTERN "*.txt"
+)
