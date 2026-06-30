@@ -267,6 +267,7 @@ private:
     void latestShot();
     void openLoginDialog();
     void applyLoginSuccessStatus(const QString& statusText);
+    void updateLoginActionIcon();
     void fetchLatestShotAsync();
     void updateShotControlsFromConfig(const QString& preferredShot = {});
     void setAllPlotShots(const QString& shot);
@@ -333,6 +334,7 @@ private:
     QLabel* timeInfoLabel_ = nullptr;
     QLineEdit* shotEdit_ = nullptr;
     QComboBox* dataModeCombo_ = nullptr;
+    QAction* loginAction_ = nullptr;
     QToolButton* zoomButton_ = nullptr;
     QToolButton* pointButton_ = nullptr;
     QVector<QVector<PlotWidget*>> plotWidgets_;

@@ -574,17 +574,17 @@ QIcon gearIcon()
     QPainterPath teeth;
     for (int i = 0; i < 8; ++i) {
         const double angle = (M_PI * 2.0 * i / 8.0) + M_PI / 8.0;
-        const QPointF outer(center.x() + std::cos(angle) * 8.0,
-                            center.y() + std::sin(angle) * 8.0);
-        QRectF tooth(outer.x() - 1.6, outer.y() - 1.6, 3.2, 3.2);
+        const QPointF outer(center.x() + std::cos(angle) * 8.7,
+                            center.y() + std::sin(angle) * 8.7);
+        QRectF tooth(outer.x() - 1.8, outer.y() - 1.8, 3.6, 3.6);
         teeth.addEllipse(tooth);
     }
-    painter.setPen(QPen(QColor("#475569"), 1.6));
+    painter.setPen(QPen(QColor("#475569"), 1.7));
     painter.setBrush(QColor("#64748b"));
     painter.drawPath(teeth);
     painter.setBrush(Qt::NoBrush);
-    painter.drawEllipse(center, 6.2, 6.2);
-    painter.drawEllipse(center, 2.2, 2.2);
+    painter.drawEllipse(center, 6.9, 6.9);
+    painter.drawEllipse(center, 2.5, 2.5);
     return QIcon(pixmap);
 }
 
@@ -594,13 +594,13 @@ QIcon fontIcon()
     pixmap.fill(Qt::transparent);
     QPainter painter(&pixmap);
     painter.setRenderHint(QPainter::Antialiasing, true);
-    painter.setPen(QPen(QColor("#475569"), 1.5));
+    painter.setPen(QPen(QColor("#475569"), 1.6));
     painter.setBrush(Qt::NoBrush);
-    painter.drawRect(QRectF(3.5, 3.5, 15.0, 15.0));
-    QFont iconFont(QStringLiteral("Times New Roman"), 13, QFont::Bold);
+    painter.drawRect(QRectF(2.5, 2.5, 17.0, 17.0));
+    QFont iconFont(QStringLiteral("Times New Roman"), 15, QFont::Bold);
     painter.setFont(iconFont);
     painter.setPen(QColor("#2563eb"));
-    painter.drawText(pixmap.rect().adjusted(0, 0, 0, -1), Qt::AlignCenter, "A");
+    painter.drawText(pixmap.rect().adjusted(0, -1, 0, 0), Qt::AlignCenter, "A");
     return QIcon(pixmap);
 }
 
@@ -610,41 +610,79 @@ QIcon saveIcon()
     pixmap.fill(Qt::transparent);
     QPainter painter(&pixmap);
     painter.setRenderHint(QPainter::Antialiasing, true);
-    painter.setPen(QPen(QColor("#334155"), 1.5));
+    painter.setPen(QPen(QColor("#334155"), 1.6));
     painter.setBrush(QColor("#e2e8f0"));
-    painter.drawRoundedRect(QRectF(4.0, 3.0, 14.0, 16.0), 1.5, 1.5);
+    painter.drawRoundedRect(QRectF(2.5, 2.0, 17.0, 18.5), 1.8, 1.8);
     painter.setBrush(QColor("#475569"));
-    painter.drawRect(QRectF(6.0, 5.0, 9.0, 5.0));
+    painter.drawRect(QRectF(5.0, 4.5, 11.0, 5.8));
     painter.setBrush(QColor("#ffffff"));
-    painter.drawRect(QRectF(7.0, 13.0, 8.0, 4.0));
+    painter.drawRect(QRectF(6.0, 13.2, 10.0, 5.2));
     painter.setPen(QPen(QColor("#94a3b8"), 1.0));
-    painter.drawLine(QPointF(8.0, 15.0), QPointF(14.0, 15.0));
+    painter.drawLine(QPointF(7.8, 15.3), QPointF(14.2, 15.3));
+    painter.drawLine(QPointF(7.8, 17.0), QPointF(14.2, 17.0));
     return QIcon(pixmap);
 }
 
-QIcon modeIcon(InteractionMode mode, bool active)
+QIcon loginIcon(bool loggedIn)
 {
     QPixmap pixmap(22, 22);
     pixmap.fill(Qt::transparent);
     QPainter painter(&pixmap);
     painter.setRenderHint(QPainter::Antialiasing, true);
+
+    const QColor frame = loggedIn ? QColor("#15803d") : QColor("#64748b");
+    const QColor fill = loggedIn ? QColor("#dcfce7") : QColor("#e2e8f0");
+    const QColor person = loggedIn ? QColor("#16a34a") : QColor("#94a3b8");
+
+    painter.setPen(QPen(frame, 1.5));
+    painter.drawLine(QPointF(6.5, 1.3), QPointF(11.0, 4.0));
+    painter.drawLine(QPointF(15.5, 1.3), QPointF(11.0, 4.0));
+
+    painter.setPen(QPen(frame, 1.6));
+    painter.setBrush(fill);
+    painter.drawRoundedRect(QRectF(1.5, 3.5, 19.0, 17.7), 2.0, 2.0);
+
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(frame);
+    painter.drawRoundedRect(QRectF(6.7, 2.7, 8.6, 2.7), 0.9, 0.9);
+
+    painter.setBrush(person);
+    painter.drawEllipse(QPointF(11.0, 10.3), 3.2, 3.2);
+
+    QPainterPath shoulders;
+    shoulders.moveTo(4.2, 18.0);
+    shoulders.cubicTo(5.3, 13.1, 16.7, 13.1, 17.8, 18.0);
+    shoulders.lineTo(17.8, 19.2);
+    shoulders.lineTo(4.2, 19.2);
+    shoulders.closeSubpath();
+    painter.drawPath(shoulders);
+
+    return QIcon(pixmap);
+}
+
+QIcon modeIcon(InteractionMode mode, bool active)
+{
+    QPixmap pixmap(24, 24);
+    pixmap.fill(Qt::transparent);
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing, true);
     const QColor color = active ? QColor("#2563eb") : QColor("#9ca3af");
-    painter.setPen(QPen(color, 2.2));
+    painter.setPen(QPen(color, 2.3));
     painter.setBrush(Qt::NoBrush);
     if (mode == InteractionMode::Zoom) {
-        painter.drawEllipse(QRectF(4, 4, 10, 10));
-        painter.drawLine(QPointF(13, 13), QPointF(18, 18));
-        painter.drawLine(QPointF(6.5, 9), QPointF(11.5, 9));
-        painter.drawLine(QPointF(9, 6.5), QPointF(9, 11.5));
+        painter.drawEllipse(QRectF(4.0, 4.0, 11.8, 11.8));
+        painter.drawLine(QPointF(14.5, 14.5), QPointF(19.8, 19.8));
+        painter.drawLine(QPointF(7.2, 9.9), QPointF(12.6, 9.9));
+        painter.drawLine(QPointF(9.9, 7.2), QPointF(9.9, 12.6));
     } else if (mode == InteractionMode::Point) {
-        painter.drawLine(QPointF(11, 3), QPointF(11, 19));
-        painter.drawLine(QPointF(3, 11), QPointF(19, 11));
+        painter.drawLine(QPointF(12.0, 3.8), QPointF(12.0, 20.2));
+        painter.drawLine(QPointF(3.8, 12.0), QPointF(20.2, 12.0));
         painter.setBrush(color);
-        painter.drawEllipse(QPointF(11, 11), 2.6, 2.6);
+        painter.drawEllipse(QPointF(12.0, 12.0), 2.9, 2.9);
     } else {
         painter.setPen(color);
         QFont iconFont = painter.font();
-        iconFont.setPointSize(16);
+        iconFont.setPointSize(17);
         painter.setFont(iconFont);
         painter.drawText(pixmap.rect(), Qt::AlignCenter, QString::fromUtf8("✋"));
     }

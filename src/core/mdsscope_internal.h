@@ -135,6 +135,7 @@ QStringList uniformAxisValues(const QVector<double>& values);
 QIcon gearIcon();
 QIcon fontIcon();
 QIcon saveIcon();
+QIcon loginIcon(bool loggedIn);
 QIcon modeIcon(InteractionMode mode, bool active);
 LayoutConfig parseEnvironment(const QString& path);
 bool writeEnvironmentToml(const LayoutConfig& config, const QString& path, QString* error = nullptr);

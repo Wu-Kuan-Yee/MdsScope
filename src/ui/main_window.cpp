@@ -1107,7 +1107,8 @@ void MainWindow::buildUi()
     addAction(saveAction);
     toolbar->addAction(style()->standardIcon(QStyle::SP_DialogSaveButton), "Export data", this, &MainWindow::openExportDataDialog);
     toolbar->addAction(style()->standardIcon(QStyle::SP_BrowserReload), "Refresh", this, &MainWindow::refreshData);
-    toolbar->addAction(style()->standardIcon(QStyle::SP_DialogApplyButton), "Login", this, &MainWindow::openLoginDialog);
+    loginAction_ = toolbar->addAction(loginIcon(false), "Login", this, &MainWindow::openLoginDialog);
+    updateLoginActionIcon();
     toolbar->addSeparator();
     toolbar->addAction(gearIcon(), "Layout setup", this, &MainWindow::openLayoutSetupDialog);
     toolbar->addSeparator();
@@ -1164,14 +1165,14 @@ void MainWindow::buildUi()
     bottom->setStyleSheet(
         "QPushButton { padding: 1px 8px; min-height: 18px; }"
         "QLineEdit { min-height: 18px; padding: 0px 2px; }"
-        "QToolButton { margin: 0px; padding: 3px; min-width: 34px; min-height: 32px; border: 1px solid transparent; }"
+        "QToolButton { margin: 0px; padding: 1px; min-width: 30px; min-height: 28px; border: 1px solid transparent; }"
         "QToolButton:checked { border: 1px solid palette(highlight); background: palette(alternate-base); }");
     zoomButton_ = new QToolButton(bottom);
     pointButton_ = new QToolButton(bottom);
     for (QToolButton* button : {zoomButton_, pointButton_}) {
         button->setCheckable(true);
         button->setAutoExclusive(true);
-        button->setIconSize(QSize(26, 26));
+        button->setIconSize(QSize(24, 24));
         button->setToolButtonStyle(Qt::ToolButtonIconOnly);
     }
     zoomButton_->setToolTip("Zoom / Move (Ctrl+Z): drag to zoom, middle-drag or Shift-drag to move");
@@ -1701,6 +1702,7 @@ void MainWindow::openLoginDialog()
 
 void MainWindow::applyLoginSuccessStatus(const QString& statusText)
 {
+    updateLoginActionIcon();
     latestShot_.clear();
     pendingTopSummaryShot_.clear();
     topSummaryShot_.clear();
@@ -1711,6 +1713,19 @@ void MainWindow::applyLoginSuccessStatus(const QString& statusText)
     ++topSummaryGeneration_;
     updateTopInfoLabels();
     setStatus(statusText);
+}
+
+void MainWindow::updateLoginActionIcon()
+{
+    if (!loginAction_) {
+        return;
+    }
+
+    CachedAuth auth;
+    const bool loggedIn = loadCachedAuth(&auth)
+        && !auth.token.trimmed().isEmpty()
+        && !tokenExpiresSoon(auth.token);
+    loginAction_->setIcon(loginIcon(loggedIn));
 }
 
 void MainWindow::fetchLatestShotAsync()
