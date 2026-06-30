@@ -17,7 +17,10 @@ set(CMAKE_AUTOMOC ON)
 
 include(GNUInstallDirs)
 
-find_package(Qt6 6.4 REQUIRED COMPONENTS Core Widgets Network Concurrent DBus)
+find_package(Qt6 6.4 REQUIRED COMPONENTS Core Widgets Network Concurrent)
+if(UNIX AND NOT APPLE)
+    find_package(Qt6 6.4 REQUIRED COMPONENTS DBus)
+endif()
 
 configure_file(
     cmake_uninstall.cmake.in
@@ -71,7 +74,6 @@ target_link_libraries(MdsScope PRIVATE
     Qt6::Widgets
     Qt6::Network
     Qt6::Concurrent
-    Qt6::DBus
 )
 
 target_link_libraries(transfer PRIVATE
@@ -79,8 +81,12 @@ target_link_libraries(transfer PRIVATE
     Qt6::Widgets
     Qt6::Network
     Qt6::Concurrent
-    Qt6::DBus
 )
+
+if(UNIX AND NOT APPLE)
+    target_link_libraries(MdsScope PRIVATE Qt6::DBus)
+    target_link_libraries(transfer PRIVATE Qt6::DBus)
+endif()
 
 install(TARGETS MdsScope transfer
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}

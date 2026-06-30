@@ -7,7 +7,7 @@ void traceMdsLine(const QString& line)
     }
     static QMutex mutex;
     QMutexLocker locker(&mutex);
-    QFile file("/tmp/mdsscope_mds_trace.log");
+    QFile file(QDir::temp().filePath("mdsscope_mds_trace.log"));
     if (file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
         file.write(line.toUtf8());
         file.write("\n");
@@ -16,12 +16,22 @@ void traceMdsLine(const QString& line)
 
 QString appConfigDir()
 {
+#ifdef Q_OS_WIN
+    const QString path = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+    return path.isEmpty() ? QDir::home().filePath("AppData/Local/MdsScope") : path;
+#else
     return QDir::home().filePath(".config/mdsscope");
+#endif
 }
 
 QString appCacheDir()
 {
+#ifdef Q_OS_WIN
+    const QString path = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
+    return path.isEmpty() ? QDir::home().filePath("AppData/Local/MdsScope/cache") : path;
+#else
     return QDir::home().filePath(".cache/mdsscope");
+#endif
 }
 
 static void copyFileIfMissing(const QString& source, const QString& target)
@@ -376,12 +386,18 @@ QString authCachePath()
 QByteArray localAuthKey()
 {
     QByteArray material;
+#ifdef Q_OS_WIN
+    material += qgetenv("COMPUTERNAME");
+    material += '|';
+    material += qgetenv("USERNAME");
+#else
     QFile machineId("/etc/machine-id");
     if (machineId.open(QIODevice::ReadOnly | QIODevice::Text)) {
         material += machineId.readAll().trimmed();
     }
     material += '|';
     material += qgetenv("USER");
+#endif
     material += '|';
     material += QDir::homePath().toUtf8();
     material += "|MdsScope EAST auth cache";

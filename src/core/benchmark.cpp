@@ -10,7 +10,7 @@ int runMdsScopeBenchmark(const QString& configPath,
     QTextStream out(stdout);
     QTextStream err(stderr);
 
-    const QString tracePath = "/tmp/mdsscope_mds_trace.log";
+    const QString tracePath = QDir::temp().filePath("mdsscope_mds_trace.log");
     QFile::remove(tracePath);
     qputenv("MDSSCOPE_MDS_TRACE", "1");
 

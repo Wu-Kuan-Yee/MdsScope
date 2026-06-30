@@ -3,10 +3,12 @@
 
 #include <QApplication>
 #include <QCoreApplication>
+#ifdef Q_OS_LINUX
 #include <QDBusConnection>
 #include <QDBusInterface>
 #include <QDBusReply>
 #include <QDBusVariant>
+#endif
 #include <QDir>
 #include <QFileInfo>
 #include <QMessageBox>
@@ -72,6 +74,7 @@ void applySystemColorScheme(QApplication& app, uint scheme)
     app.setPalette(scheme == 1 ? darkPalette() : lightPalette());
 }
 
+#ifdef Q_OS_LINUX
 class SystemThemeWatcher final : public QObject {
     Q_OBJECT
 
@@ -111,6 +114,7 @@ private:
 
     QApplication& app_;
 };
+#endif
 
 QDir runtimeRootDir()
 {
@@ -187,7 +191,11 @@ int main(int argc, char* argv[])
     QApplication::setOrganizationName("MdsScope");
     QApplication app(argc, argv);
     QApplication::setWindowIcon(appIcon());
+#ifdef Q_OS_LINUX
     SystemThemeWatcher themeWatcher(app);
+#else
+    app.setPalette(lightPalette());
+#endif
     QThreadPool::globalInstance()->setMaxThreadCount(16);
     QThreadPool::globalInstance()->setExpiryTimeout(300000);
 
