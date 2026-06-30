@@ -257,9 +257,12 @@ public:
 
 private:
     void buildUi();
+    void loadDefaultEnvironment(bool useLatestWhenNoCurrentShot = false);
     void loadEnvironmentList(bool useLatestWhenNoCurrentShot = false);
     void loadSelectedEnvironment();
     void openEnvironmentFile();
+    QString rememberedFileDialogDir() const;
+    void rememberFileDialogDir(const QString& path);
     bool loadEnvironmentFile(const QString& path, bool useLatestWhenNoCurrentShot = false);
     void rebuildGrid();
     void selectPlot(int column, int row);

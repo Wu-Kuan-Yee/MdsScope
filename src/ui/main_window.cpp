@@ -1148,15 +1148,7 @@ MainWindow::MainWindow(QString rootPath, QWidget* parent)
             setStatus("MDS connections ready");
         }
     });
-    const QString defaultTomlConfig = QDir(environmentPath_).filePath("init.toml");
-    const QString defaultWebscpConfig = QDir(environmentPath_).filePath("init.webscp");
-    if (QFileInfo::exists(defaultTomlConfig)) {
-        loadEnvironmentFile(defaultTomlConfig, true);
-    } else if (QFileInfo::exists(defaultWebscpConfig)) {
-        loadEnvironmentFile(defaultWebscpConfig, true);
-    } else {
-        loadEnvironmentList(true);
-    }
+    loadDefaultEnvironment(true);
 }
 
 void MainWindow::schedulePointSync(PlotWidget* source, double x)
@@ -1331,6 +1323,19 @@ void MainWindow::buildUi()
     connect(dataModeCombo_, &QComboBox::currentIndexChanged, this, [this] { refreshData(); });
 }
 
+void MainWindow::loadDefaultEnvironment(bool useLatestWhenNoCurrentShot)
+{
+    const QString defaultTomlConfig = QDir(environmentPath_).filePath("init.toml");
+    const QString defaultWebscpConfig = QDir(environmentPath_).filePath("init.webscp");
+    if (QFileInfo::exists(defaultTomlConfig)) {
+        loadEnvironmentFile(defaultTomlConfig, useLatestWhenNoCurrentShot);
+    } else if (QFileInfo::exists(defaultWebscpConfig)) {
+        loadEnvironmentFile(defaultWebscpConfig, useLatestWhenNoCurrentShot);
+    } else {
+        loadEnvironmentList(useLatestWhenNoCurrentShot);
+    }
+}
+
 void MainWindow::loadEnvironmentList(bool useLatestWhenNoCurrentShot)
 {
     QDir dir(environmentPath_);
@@ -1347,6 +1352,27 @@ void MainWindow::loadSelectedEnvironment()
     openEnvironmentFile();
 }
 
+QString MainWindow::rememberedFileDialogDir() const
+{
+    QSettings settings(uiSettingsPath(rootPath_), QSettings::IniFormat);
+    const QString savedPath = settings.value("files/last_dir").toString().trimmed();
+    return !savedPath.isEmpty() && QDir(savedPath).exists()
+               ? QDir(savedPath).absolutePath()
+               : environmentPath_;
+}
+
+void MainWindow::rememberFileDialogDir(const QString& path)
+{
+    QFileInfo info(path);
+    const QString dirPath = info.isDir() ? info.absoluteFilePath() : info.absolutePath();
+    if (dirPath.isEmpty()) {
+        return;
+    }
+    const QString selectedPath = QDir(dirPath).absolutePath();
+    QSettings settings(uiSettingsPath(rootPath_), QSettings::IniFormat);
+    settings.setValue("files/last_dir", selectedPath);
+}
+
 void MainWindow::openEnvironmentFile()
 {
     QSettings settings(uiSettingsPath(rootPath_), QSettings::IniFormat);
@@ -1355,9 +1381,10 @@ void MainWindow::openEnvironmentFile()
     const QString webscpFilter = "Legacy WebScope Config (*.webscp)";
     const QString filters = allFilter + ";;" + tomlFilter + ";;" + webscpFilter + ";;All Files (*)";
     QString selectedFilter = settings.value("files/open_filter", allFilter).toString();
-    const QString path = QFileDialog::getOpenFileName(this, "Open MdsScope Config", environmentPath_, filters, &selectedFilter);
+    const QString path = QFileDialog::getOpenFileName(this, "Open MdsScope Config", rememberedFileDialogDir(), filters, &selectedFilter);
     if (!path.isEmpty()) {
         settings.setValue("files/open_filter", selectedFilter);
+        rememberFileDialogDir(path);
         loadEnvironmentFile(path);
     }
 }
@@ -2809,14 +2836,15 @@ void MainWindow::saveCurrentEnvironment()
 
 void MainWindow::saveCurrentEnvironmentAs()
 {
-    const QString path = QFileDialog::getSaveFileName(this, "Save MdsScope Config", environmentPath_, "MdsScope Config (*.toml)");
+    const QString path = QFileDialog::getSaveFileName(this, "Save MdsScope Config", rememberedFileDialogDir(), "MdsScope Config (*.toml)");
     if (path.isEmpty()) {
         return;
     }
     if (saveEnvironmentFile(path)) {
         const QFileInfo info(path);
         config_.filePath = info.suffix().isEmpty() ? path + ".toml" : path;
-        loadEnvironmentList();
+        rememberFileDialogDir(config_.filePath);
+        loadEnvironmentFile(config_.filePath);
         setStatus("Saved " + QFileInfo(config_.filePath).fileName());
     }
 }

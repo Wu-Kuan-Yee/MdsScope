@@ -148,6 +148,11 @@ template `*.toml` and `*.webscp` files from the source tree or installed
 `share/mdsscope/environment/` directory when the user environment directory is
 empty.
 
+Opening or saving a configuration in another directory remembers that directory
+for future Open/Save dialogs. The remembered dialog directory is stored in
+`~/.config/mdsscope/mdsscope_ui.ini`. Startup still loads from the default
+environment directory.
+
 MdsScope supports two configuration formats:
 
 - `*.toml`: the recommended native MdsScope format
