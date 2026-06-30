@@ -2,6 +2,7 @@
 #include "mdsscope_internal.h"
 
 #include <QApplication>
+#include <QColor>
 #include <QCoreApplication>
 #ifdef Q_OS_LINUX
 #include <QDBusConnection>
@@ -72,9 +73,96 @@ QPalette darkPalette()
     return palette;
 }
 
+QString cssColor(const QPalette& palette, QPalette::ColorRole role)
+{
+    return palette.color(role).name(QColor::HexRgb);
+}
+
+QString cssColor(const QPalette& palette, QPalette::ColorGroup group, QPalette::ColorRole role)
+{
+    return palette.color(group, role).name(QColor::HexRgb);
+}
+
+QString applicationStyleSheet(const QPalette& palette)
+{
+    return QStringLiteral(
+               "QMainWindow, QDialog, QWidget {"
+               "  background: %1;"
+               "  color: %2;"
+               "}"
+               "QToolBar, QStatusBar {"
+               "  background: %1;"
+               "  color: %2;"
+               "}"
+               "QPushButton, QToolButton {"
+               "  background: %3;"
+               "  color: %4;"
+               "  border: 1px solid %5;"
+               "  border-radius: 4px;"
+               "}"
+               "QPushButton:hover, QToolButton:hover {"
+               "  background: %6;"
+               "  border-color: %7;"
+               "}"
+               "QPushButton:pressed, QToolButton:pressed, QToolButton:checked {"
+               "  background: %6;"
+               "  border-color: %7;"
+               "}"
+               "QPushButton:disabled, QToolButton:disabled {"
+               "  background: %6;"
+               "  color: %8;"
+               "  border-color: %5;"
+               "}"
+               "QLineEdit, QComboBox {"
+               "  background: %9;"
+               "  color: %10;"
+               "  border: 1px solid %5;"
+               "  border-radius: 3px;"
+               "  selection-background-color: %7;"
+               "  selection-color: %11;"
+               "}"
+               "QLineEdit:focus, QComboBox:focus {"
+               "  border-color: %7;"
+               "}"
+               "QLineEdit:disabled, QComboBox:disabled {"
+               "  background: %6;"
+               "  color: %12;"
+               "}"
+               "QComboBox QAbstractItemView {"
+               "  background: %9;"
+               "  color: %10;"
+               "  border: 1px solid %5;"
+               "  selection-background-color: %7;"
+               "  selection-color: %11;"
+               "}"
+               "QMenu {"
+               "  background: %9;"
+               "  color: %10;"
+               "  border: 1px solid %5;"
+               "}"
+               "QMenu::item:selected {"
+               "  background: %7;"
+               "  color: %11;"
+               "}")
+        .arg(cssColor(palette, QPalette::Window),
+             cssColor(palette, QPalette::WindowText),
+             cssColor(palette, QPalette::Button),
+             cssColor(palette, QPalette::ButtonText),
+             cssColor(palette, QPalette::Mid),
+             cssColor(palette, QPalette::AlternateBase),
+             cssColor(palette, QPalette::Highlight),
+             cssColor(palette, QPalette::Disabled, QPalette::ButtonText),
+             cssColor(palette, QPalette::Base),
+             cssColor(palette, QPalette::Text),
+             cssColor(palette, QPalette::HighlightedText),
+             cssColor(palette, QPalette::Disabled, QPalette::Text));
+}
+
 void applySystemColorScheme(QApplication& app, uint scheme)
 {
-    app.setPalette(scheme == 1 ? darkPalette() : lightPalette());
+    const QPalette palette = scheme == 1 ? darkPalette() : lightPalette();
+    app.setPalette(palette);
+    app.setStyleSheet(applicationStyleSheet(palette));
 }
 
 class SystemThemeWatcher final : public QObject {
