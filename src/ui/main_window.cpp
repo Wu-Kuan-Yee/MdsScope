@@ -41,6 +41,7 @@ QString signalRefreshSignature(const SignalSpec& sig)
         sig.colorName,
         sig.manualColor ? QStringLiteral("manual-color") : QStringLiteral("auto-color"),
         sig.hidden ? QStringLiteral("hidden") : QStringLiteral("shown"),
+        sig.fullData ? QStringLiteral("full") : QStringLiteral("thin"),
     }.join(QChar(0x1f));
 }
 
@@ -86,7 +87,8 @@ bool signalDataSourceEqual(const SignalSpec& lhs, const SignalSpec& rhs)
            && lhs.xExpr == rhs.xExpr
            && lhs.experiment == rhs.experiment
            && lhs.serverIp == rhs.serverIp
-           && lhs.hidden == rhs.hidden;
+           && lhs.hidden == rhs.hidden
+           && lhs.fullData == rhs.fullData;
 }
 
 bool signalDataSourcesEqual(const QVector<SignalSpec>& lhs, const QVector<SignalSpec>& rhs)
@@ -278,7 +280,8 @@ public:
         rowsLayout_->addWidget(new QLabel("Server IP", rowsHost_), 0, 3);
         rowsLayout_->addWidget(new QLabel("Color", rowsHost_), 0, 4);
         rowsLayout_->addWidget(new QLabel("Hide", rowsHost_), 0, 5);
-        rowsLayout_->addWidget(new QLabel("", rowsHost_), 0, 6);
+        rowsLayout_->addWidget(new QLabel("Data", rowsHost_), 0, 6);
+        rowsLayout_->addWidget(new QLabel("", rowsHost_), 0, 7);
         mainLayout->addWidget(rowsHost_);
 
         QString defaultTree;
@@ -351,6 +354,7 @@ public:
             sig.colorName = row->color.name();
             sig.manualColor = row->manualColor;
             sig.hidden = row->hidden->isChecked();
+            sig.fullData = row->dataMode->currentData().toInt() == static_cast<int>(DataReadMode::Full);
             out.push_back(std::move(sig));
         }
         return out;
@@ -367,6 +371,7 @@ private:
         QCompleter* signalCompleter = nullptr;
         QPushButton* colorButton = nullptr;
         QCheckBox* hidden = nullptr;
+        QComboBox* dataMode = nullptr;
         QPushButton* deleteButton = nullptr;
         QColor color;
         QString xExpr;
@@ -386,14 +391,19 @@ private:
         row->signalCompleter = makeCompleter(row->signalModel, row->signal);
         row->colorButton = new QPushButton(rowsHost_);
         row->hidden = new QCheckBox(rowsHost_);
+        row->dataMode = new QComboBox(rowsHost_);
         row->deleteButton = new QPushButton("Delete", rowsHost_);
         row->manualColor = sig.manualColor;
         row->color = QColor(row->manualColor && !sig.colorName.isEmpty() ? sig.colorName : colorForIndex(colorIndex));
         row->xExpr = sig.xExpr;
         row->hidden->setChecked(sig.hidden);
+        row->dataMode->addItem("Thin", static_cast<int>(DataReadMode::Thin));
+        row->dataMode->addItem("Full", static_cast<int>(DataReadMode::Full));
+        row->dataMode->setCurrentIndex(sig.fullData ? 1 : 0);
         row->shot->setMinimumWidth(72);
         row->signal->setMinimumWidth(150);
         row->server->setMinimumWidth(120);
+        row->dataMode->setMinimumWidth(72);
         row->tree->setCompleter(row->treeCompleter);
         row->signal->setCompleter(row->signalCompleter);
         updateSignalCompleter(row);
@@ -406,7 +416,8 @@ private:
         rowsLayout_->addWidget(row->server, gridRow, 3);
         rowsLayout_->addWidget(row->colorButton, gridRow, 4);
         rowsLayout_->addWidget(row->hidden, gridRow, 5, Qt::AlignCenter);
-        rowsLayout_->addWidget(row->deleteButton, gridRow, 6);
+        rowsLayout_->addWidget(row->dataMode, gridRow, 6);
+        rowsLayout_->addWidget(row->deleteButton, gridRow, 7);
         rows_.push_back(row);
 
         connect(row->colorButton, &QPushButton::clicked, this, [this, row] {
@@ -428,6 +439,7 @@ private:
                                     static_cast<QWidget*>(row->server),
                                     static_cast<QWidget*>(row->colorButton),
                                     static_cast<QWidget*>(row->hidden),
+                                    static_cast<QWidget*>(row->dataMode),
                                     static_cast<QWidget*>(row->deleteButton)}) {
                 widget->hide();
             }

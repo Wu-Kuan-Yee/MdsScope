@@ -190,6 +190,7 @@ x = ""
 color = "#2364aa"
 manual_color = false
 hidden = false
+full = true
 ```
 
 The native TOML format intentionally does not store a normal panel shot number.
@@ -202,6 +203,11 @@ configuration, but MdsScope skips data loading, plotting, point readouts,
 axis-range calculation, export, and benchmark work for those curves. Legacy
 `.webscp` files do not carry this setting; converted signals default to
 `hidden = false`.
+
+Signals default to thin data loading. Add `full = true` under an individual
+`[[panels.signals]]` entry to load that curve in full mode while the rest of the
+configuration stays thin. Legacy `.webscp` files do not carry this setting;
+converting TOML to `.webscp` intentionally omits it.
 
 When converting from legacy `.webscp`, MdsScope treats the most common
 `shot_txt` value as the old default shot and omits it from TOML. If a panel or

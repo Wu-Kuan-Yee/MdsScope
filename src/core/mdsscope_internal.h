@@ -149,3 +149,4 @@ void writeLine(QTextStream& out, const QString& key, const QString& value);
 QString escapedMdsExpr(QString expr);
 QString normalizedMdsSignal(QString expr);
 QString effectiveSignalShot(const PlotSpec& plot, const SignalSpec& sig);
+DataReadMode effectiveSignalReadMode(DataReadMode globalMode, const SignalSpec& sig);

@@ -11,6 +11,7 @@ class MdsIpClient {
         QString shot;
         PlotSpec plot;
         SignalSpec sig;
+        DataReadMode readMode = DataReadMode::Thin;
         int maxPoints = 2000;
     };
 
@@ -112,9 +113,10 @@ public:
                     request.plot = plot;
                     request.plot.shot = shot;
                     request.sig = sig;
+                    request.readMode = effectiveSignalReadMode(readMode_, sig);
                     request.maxPoints = maxPointsForSignal(plot, sig);
                     requestsByLoadedIndex.insert(loadedIndex, request);
-                    groups[groupKey(request.plot, sig)].push_back(std::move(request));
+                    groups[groupKey(request)].push_back(std::move(request));
                 }
             }
         }
@@ -168,8 +170,9 @@ public:
                     request.plot = plot;
                     request.plot.shot = shot;
                     request.sig = sig;
+                    request.readMode = effectiveSignalReadMode(readMode_, sig);
                     request.maxPoints = maxPointsForSignal(plot, sig);
-                    groups[groupKey(request.plot, sig)].push_back(std::move(request));
+                    groups[groupKey(request)].push_back(std::move(request));
                 }
             }
         }
@@ -214,6 +217,8 @@ public:
         request.plot.shot = shot;
         request.shot = shot;
         request.sig = sig;
+        request.readMode = effectiveSignalReadMode(readMode_, sig);
+        request.maxPoints = maxPointsForSignal(plot, sig);
         QVector<NativeRequest> requests = {request};
         QVector<LoadedSignal> loaded(1);
         loaded[0].series = result;
@@ -260,13 +265,15 @@ private:
         QSemaphore* semaphore_ = nullptr;
     };
 
-    static QString groupKey(const PlotSpec& plot, const SignalSpec& sig)
+    static QString groupKey(const NativeRequest& request)
     {
-        QString server = sig.serverIp.trimmed();
+        QString server = request.sig.serverIp.trimmed();
         if (!server.contains(':')) {
             server += ":8000";
         }
-        return server + "|" + sig.experiment.trimmed() + "|" + plot.shot.trimmed();
+        return server + "|"
+               + request.sig.experiment.trimmed() + "|"
+               + request.plot.shot.trimmed();
     }
 
     static int maxPointsForSignal(const PlotSpec& plot, const SignalSpec& sig)
@@ -635,48 +642,62 @@ private:
                          .arg(firstPlot.shot)
                          .arg(requests.size()));
 
-        const QHash<QString, UniformTimebase> timebaseCache = kEnableEastTimebasePrefetch
-                                                                  ? prefetchEastTimebases(socket, requests)
+        QVector<NativeRequest> thinRequests;
+        thinRequests.reserve(requests.size());
+        for (const NativeRequest& request : requests) {
+            if (request.readMode == DataReadMode::Thin) {
+                thinRequests.push_back(request);
+            }
+        }
+
+        const QHash<QString, UniformTimebase> timebaseCache = kEnableEastTimebasePrefetch && !thinRequests.isEmpty()
+                                                                  ? prefetchEastTimebases(socket, thinRequests)
                                                                   : QHash<QString, UniformTimebase>{};
 
         QSet<int> fetchedIndexes;
-        if (kEnableEastThinPipeline && readMode_ == DataReadMode::Thin && kUseServerSideThin) {
-            QVector<SignalFetchResult> pipelinedEastResults = fetchEastThinPipelinedOnOpenSocket(socket, requests, &error);
+        if (kEnableEastThinPipeline && !thinRequests.isEmpty() && kUseServerSideThin) {
+            QVector<SignalFetchResult> pipelinedEastResults = fetchEastThinPipelinedOnOpenSocket(socket, thinRequests, &error);
             if (!pipelinedEastResults.isEmpty()) {
                 for (const SignalFetchResult& result : pipelinedEastResults) {
                     fetchedIndexes.insert(result.loadedIndex);
                 }
-                emitResults(requests, pipelinedEastResults);
+                emitResults(thinRequests, pipelinedEastResults);
                 results += pipelinedEastResults;
             }
         }
 
-        if (kEnablePipelinedDirectFetch && readMode_ == DataReadMode::Thin && !kUseServerSideThin && !kEnableMultiSignalBatch) {
-            QVector<SignalFetchResult> pipelinedResults = fetchDirectPipelinedOnOpenSocket(socket, requests, timebaseCache, &error);
-            if (pipelinedResults.size() == requests.size()) {
-                emitResults(requests, pipelinedResults);
-                return pipelinedResults;
+        if (kEnablePipelinedDirectFetch && !thinRequests.isEmpty() && !kUseServerSideThin && !kEnableMultiSignalBatch) {
+            QVector<SignalFetchResult> pipelinedResults = fetchDirectPipelinedOnOpenSocket(socket, thinRequests, timebaseCache, &error);
+            if (pipelinedResults.size() == thinRequests.size()) {
+                emitResults(thinRequests, pipelinedResults);
+                if (thinRequests.size() == requests.size()) {
+                    return pipelinedResults;
+                }
+                for (const SignalFetchResult& result : pipelinedResults) {
+                    fetchedIndexes.insert(result.loadedIndex);
+                }
+                results += pipelinedResults;
             }
         }
 
-        if (kEnableMultiSignalBatch && readMode_ == DataReadMode::Thin && requests.size() > 1) {
-            QVector<SignalFetchResult> batchResults = fetchThinBatchOnOpenSocket(socket, requests, &error);
+        if (kEnableMultiSignalBatch && thinRequests.size() > 1) {
+            QVector<SignalFetchResult> batchResults = fetchThinBatchOnOpenSocket(socket, thinRequests, &error);
             if (!batchResults.isEmpty()) {
                 for (const SignalFetchResult& result : batchResults) {
                     fetchedIndexes.insert(result.loadedIndex);
                 }
-                emitResults(requests, batchResults);
+                emitResults(thinRequests, batchResults);
                 results += batchResults;
             }
         }
 
-        if (kEnableEastTimeContextBatch && readMode_ == DataReadMode::Thin && kUseServerSideThin) {
-            QVector<SignalFetchResult> contextResults = fetchEastTimeContextBatchOnOpenSocket(socket, requests, fetchedIndexes, &error);
+        if (kEnableEastTimeContextBatch && !thinRequests.isEmpty() && kUseServerSideThin) {
+            QVector<SignalFetchResult> contextResults = fetchEastTimeContextBatchOnOpenSocket(socket, thinRequests, fetchedIndexes, &error);
             if (!contextResults.isEmpty()) {
                 for (const SignalFetchResult& result : contextResults) {
                     fetchedIndexes.insert(result.loadedIndex);
                 }
-                emitResults(requests, contextResults);
+                emitResults(thinRequests, contextResults);
                 results += contextResults;
             }
         }
@@ -689,7 +710,13 @@ private:
             QString signalError;
             SignalFetchResult result;
             result.loadedIndex = request.loadedIndex;
-            result.series = fetchSignalOnOpenSocket(socket, request.plot, request.sig, request.maxPoints, &timebaseCache, &signalError);
+            result.series = fetchSignalOnOpenSocket(socket,
+                                                    request.plot,
+                                                    request.sig,
+                                                    request.readMode,
+                                                    request.maxPoints,
+                                                    &timebaseCache,
+                                                    &signalError);
             emitResult(request, result);
             results.push_back(std::move(result));
         }
@@ -1224,13 +1251,14 @@ private:
     SignalSeries fetchSignalOnOpenSocket(QTcpSocket& socket,
                                          const PlotSpec& plot,
                                          const SignalSpec& sig,
+                                         DataReadMode readMode,
                                          int maxPoints,
                                          const QHash<QString, UniformTimebase>* timebaseCache,
                                          QString* error) const
     {
         QElapsedTimer timer;
         timer.start();
-        SignalSeries result = fetchSignalOnOpenSocketImpl(socket, plot, sig, maxPoints, timebaseCache, error);
+        SignalSeries result = fetchSignalOnOpenSocketImpl(socket, plot, sig, readMode, maxPoints, timebaseCache, error);
         traceMdsLine(QString("signal_ms=%1 shot=%2 tree=%3 y=%4 points=%5 error=%6")
                          .arg(timer.elapsed())
                          .arg(plot.shot)
@@ -1244,6 +1272,7 @@ private:
     SignalSeries fetchSignalOnOpenSocketImpl(QTcpSocket& socket,
                                              const PlotSpec& plot,
                                              const SignalSpec& sig,
+                                             DataReadMode readMode,
                                              int maxPoints,
                                              const QHash<QString, UniformTimebase>* timebaseCache,
                                              QString* error) const
@@ -1254,17 +1283,17 @@ private:
         ThinSampling sampling;
         UniformTimebase fastTimebase;
         const QString xExpr = sig.xExpr.trimmed();
-        const bool serverSideThin = readMode_ == DataReadMode::Thin && kUseServerSideThin;
+        const bool serverSideThin = readMode == DataReadMode::Thin && kUseServerSideThin;
         SignalSpec fastSig = sig;
         const ScaledSignalExpr scaledExpr = scaledSimpleSignalExpr(sig.yExpr);
         if (scaledExpr.valid) {
             fastSig.yExpr = scaledExpr.baseExpr;
         }
         int fullExpectedPoints = 0;
-        if (readMode_ == DataReadMode::Full) {
+        if (readMode == DataReadMode::Full) {
             fullExpectedPoints = fullPointCountBestEffort(socket, fastSig.yExpr);
         }
-        if (readMode_ == DataReadMode::Full && xExpr.isEmpty() && scaledExpr.valid && isEastTimebaseCandidate(plot.shot, fastSig)) {
+        if (readMode == DataReadMode::Full && xExpr.isEmpty() && scaledExpr.valid && isEastTimebaseCandidate(plot.shot, fastSig)) {
             QString localError;
             const UniformTimebase timebase = eastUniformTimebase(socket, plot.shot, fastSig, &localError);
             if (timebase.valid) {
@@ -1337,7 +1366,7 @@ private:
             }
         }
         const int sampleStep = serverSideThin ? sampling.step : 1;
-        const int displayMaxPoints = readMode_ == DataReadMode::Thin ? maxPoints : 0;
+        const int displayMaxPoints = readMode == DataReadMode::Thin ? maxPoints : 0;
         if (kEnableCombinedSignalFetch && sampleStep > 1) {
             const QString xSource = sig.xExpr.trimmed().isEmpty()
                                         ? QString("dim_of(%1)").arg(sig.yExpr)
@@ -1359,7 +1388,7 @@ private:
                                   ? QString("( _jscope_0 = (data(%1)[1:*:%2]), fs_float(_jscope_0))").arg(sig.yExpr).arg(sampleStep)
                                   : QString("( _jscope_0 = (%1), fs_float(_jscope_0))").arg(sig.yExpr);
 
-        if (readMode_ == DataReadMode::Thin && xExpr.isEmpty()) {
+        if (readMode == DataReadMode::Thin && xExpr.isEmpty()) {
             UniformTimebase timebase = fastTimebase;
             if (timebaseCache) {
                 const UniformTimebase cached = timebaseCache->value(eastTimebaseKey(plot.shot, sig));
@@ -1390,7 +1419,7 @@ private:
         }
 
         std::unique_ptr<SemaphoreGuard> fullFallbackGuard;
-        if (readMode_ == DataReadMode::Full) {
+        if (readMode == DataReadMode::Full) {
             QElapsedTimer waitTimer;
             waitTimer.start();
             fullFallbackGuard = fullLargeDownloadGuard(sig, fullExpectedPoints);

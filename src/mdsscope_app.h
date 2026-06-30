@@ -59,6 +59,7 @@ struct SignalSpec {
     QString colorName;
     bool manualColor = false;
     bool hidden = false;
+    bool fullData = false;
 };
 
 struct PlotSpec {

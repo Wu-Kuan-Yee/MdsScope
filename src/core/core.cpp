@@ -1008,6 +1008,8 @@ LayoutConfig parseTomlEnvironment(const QString& path)
             else if (key == "color") currentSignal->colorName = tomlUnescape(value);
             else if (key == "manual_color") currentSignal->manualColor = tomlBool(value, false);
             else if (key == "hidden") currentSignal->hidden = tomlBool(value, false);
+            else if (key == "full") currentSignal->fullData = tomlBool(value, false);
+            else if (key == "read_mode") currentSignal->fullData = tomlUnescape(value).compare("full", Qt::CaseInsensitive) == 0;
         }
     }
 
@@ -1159,6 +1161,9 @@ bool writeEnvironmentToml(const LayoutConfig& config, const QString& path, QStri
                 writeTomlString(out, "color", sig.colorName);
                 writeTomlBool(out, "manual_color", sig.manualColor);
                 writeTomlBool(out, "hidden", sig.hidden);
+                if (sig.fullData) {
+                    writeTomlBool(out, "full", true);
+                }
                 out << '\n';
             }
         }
@@ -1191,4 +1196,9 @@ QString effectiveSignalShot(const PlotSpec& plot, const SignalSpec& sig)
 {
     const QString shot = sig.shot.trimmed();
     return shot.isEmpty() ? plot.shot.trimmed() : shot;
+}
+
+DataReadMode effectiveSignalReadMode(DataReadMode globalMode, const SignalSpec& sig)
+{
+    return globalMode == DataReadMode::Full || sig.fullData ? DataReadMode::Full : DataReadMode::Thin;
 }
