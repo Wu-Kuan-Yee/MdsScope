@@ -222,8 +222,8 @@ if(APPLE)
     install(DIRECTORY
         source_index/signals
         DESTINATION ${CMAKE_INSTALL_DATADIR}/mdsscope/source_index
-        FILES_MATCHING PATTERN "*.txt"
         COMPONENT tools
+        FILES_MATCHING PATTERN "*.txt"
     )
 else()
     install(TARGETS MdsScope transfer
