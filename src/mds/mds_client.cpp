@@ -536,6 +536,7 @@ private:
             if (!canReuseSocket) {
                 resetConnection(cached);
                 cached->socket = std::make_unique<QTcpSocket>();
+                cached->socket->setProxy(QNetworkProxy::NoProxy);
                 stageTimer.restart();
                 cached->socket->connectToHost(serverHost(firstSig.serverIp), serverPort(firstSig.serverIp));
                 if (!cached->socket->waitForConnected(kNetworkTimeoutMs)) {

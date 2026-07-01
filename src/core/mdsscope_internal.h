@@ -49,6 +49,7 @@
 #include <QMimeData>
 #include <QMutex>
 #include <QNetworkAccessManager>
+#include <QNetworkProxy>
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QPainter>
@@ -95,7 +96,11 @@
 #include <vector>
 
 constexpr int kMdsPort = 8000;
+#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+constexpr int kNetworkTimeoutMs = 8000;
+#else
 constexpr int kNetworkTimeoutMs = 2500;
+#endif
 
 #ifndef MDSSCOPE_VERSION
 #define MDSSCOPE_VERSION "unknown"
