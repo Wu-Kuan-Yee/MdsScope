@@ -96,24 +96,15 @@ Install the macOS app:
 cmake --install build --prefix "$HOME/Applications" --component app
 ```
 
-Install the command-line tools to the default prefix (`$HOME/.local` for
-non-root users):
+Install the command-line tools:
 
 ```bash
 cmake --install build --component tools
 ```
 
-This gives:
-
-```text
-$HOME/.local/bin/MdsScope
-$HOME/.local/bin/transfer
-```
-
-The `app` component installs `MdsScope.app`; the `tools` component installs the
-`MdsScope` and `transfer` command-line executables.
-
-Linux uses `mdsscope.desktop`; macOS uses `MdsScope.app`.
+The app command installs `MdsScope.app`; the tools command installs `MdsScope`
+and `transfer` to the default command-line prefix (`$HOME/.local` for non-root
+users).
 
 Uninstall a CMake install:
 
