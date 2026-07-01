@@ -15,10 +15,12 @@
 #endif
 #include <QDir>
 #include <QFileInfo>
+#include <QGuiApplication>
 #include <QMessageBox>
 #include <QPalette>
 #include <QProcess>
 #include <QSettings>
+#include <QStyleHints>
 #include <QStringList>
 #include <QThreadPool>
 #include <QTimer>
@@ -301,6 +303,18 @@ private:
 #endif
 
 #ifdef Q_OS_LINUX
+    static uint readQtColorScheme()
+    {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+        if (auto* hints = QGuiApplication::styleHints()) {
+            if (hints->colorScheme() == Qt::ColorScheme::Dark) {
+                return 1;
+            }
+        }
+#endif
+        return 0;
+    }
+
     static uint schemeFromText(const QString& text)
     {
         if (text.contains(QStringLiteral("dark"))) {
@@ -314,7 +328,13 @@ private:
 
     static uint portalColorScheme(uint scheme)
     {
-        return scheme == 1 ? 1 : 2;
+        if (scheme == 1) {
+            return 1;
+        }
+        if (scheme == 2) {
+            return 2;
+        }
+        return 0;
     }
 
     static uint readKdeColorScheme()
@@ -347,6 +367,11 @@ private:
 
     static uint readFallbackColorScheme()
     {
+        uint scheme = readQtColorScheme();
+        if (scheme != 0) {
+            return scheme;
+        }
+
         const QString gtkTheme = qEnvironmentVariable("GTK_THEME").toLower();
         if (gtkTheme.contains(QStringLiteral("dark"))) {
             return 1;
@@ -367,7 +392,7 @@ private:
                                {QStringLiteral("get"),
                                 QStringLiteral("org.gnome.desktop.interface"),
                                 QStringLiteral("gtk-theme")});
-        uint scheme = schemeFromText(output);
+        scheme = schemeFromText(output);
         if (scheme != 0) {
             return scheme;
         }
@@ -431,7 +456,8 @@ private:
     static uint readCurrentColorScheme()
     {
 #ifdef Q_OS_LINUX
-        return readPortalColorScheme();
+        const uint qtScheme = readQtColorScheme();
+        return qtScheme != 0 ? qtScheme : readPortalColorScheme();
 #elif defined(Q_OS_MACOS) || defined(Q_OS_MAC)
         return readMacColorScheme();
 #elif defined(Q_OS_WIN)
