@@ -94,6 +94,18 @@ cmake --install build --prefix "$HOME/Applications"
 Use `/Applications` instead of `$HOME/Applications` for a system-wide macOS
 install. Linux uses `mdsscope.desktop`; macOS uses `MdsScope.app`.
 
+Uninstall a CMake install:
+
+```bash
+cmake --build build --target uninstall
+```
+
+Remove a user-installed macOS app bundle:
+
+```bash
+rm -rf "$HOME/Applications/MdsScope.app"
+```
+
 ## Configuration
 
 ### Environment Files
