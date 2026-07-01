@@ -2516,6 +2516,22 @@ void MainWindow::openCustomizeDialog()
     FontSettings& fonts = fontSettings();
     QDialog dialog(this);
     dialog.setWindowTitle("Customize Fonts");
+    if (QApplication::palette().color(QPalette::Window).lightness() >= 128) {
+        dialog.setStyleSheet(
+            "QDialog { background: #f6f6f6; color: #111827; }"
+            "QLabel { background: transparent; color: #111827; }"
+            "QSpinBox, QFontComboBox {"
+            "  background: #ffffff;"
+            "  color: #111827;"
+            "  border: 1px solid #cbd5e1;"
+            "  border-radius: 3px;"
+            "  padding: 3px 6px;"
+            "  selection-background-color: #2563eb;"
+            "  selection-color: #ffffff;"
+            "}"
+            "QSpinBox:focus, QFontComboBox:focus { border-color: #2563eb; }"
+            "QSpinBox::up-button, QSpinBox::down-button { background: transparent; border: none; width: 16px; }");
+    }
     auto* layout = new QFormLayout(&dialog);
     auto* family = new QFontComboBox(&dialog);
     family->setCurrentFont(QFont(fonts.family));
