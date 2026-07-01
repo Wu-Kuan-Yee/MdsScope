@@ -468,6 +468,12 @@ private:
 QDir runtimeRootDir()
 {
     QDir dir(QCoreApplication::applicationDirPath());
+#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+    QDir bundleResources(dir);
+    if (bundleResources.cdUp() && bundleResources.cd("Resources") && bundleResources.exists("environment")) {
+        return bundleResources;
+    }
+#endif
     for (int i = 0; i < 4 && !dir.exists("environment"); ++i) {
         dir.cdUp();
     }

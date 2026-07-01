@@ -104,6 +104,49 @@ add_executable(transfer
 set_target_properties(transfer PROPERTIES AUTOMOC OFF)
 set_target_properties(MdsScope PROPERTIES WIN32_EXECUTABLE TRUE)
 
+if(APPLE)
+    file(GLOB MDS_SCOPE_SOURCE_INDEX_SIGNALS CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/source_index/signals/*.txt"
+    )
+    set(MDS_SCOPE_MACOS_ICON "${CMAKE_CURRENT_SOURCE_DIR}/mdsscope.icns")
+    set(MDS_SCOPE_MACOS_ENVIRONMENT_FILES
+        "${CMAKE_CURRENT_SOURCE_DIR}/environment/init.toml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/environment/init.webscp"
+    )
+    set(MDS_SCOPE_MACOS_RESOURCE_FILES
+        "${MDS_SCOPE_MACOS_ICON}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/APIurl"
+        "${CMAKE_CURRENT_SOURCE_DIR}/source_index/trees.txt"
+        ${MDS_SCOPE_MACOS_ENVIRONMENT_FILES}
+        ${MDS_SCOPE_SOURCE_INDEX_SIGNALS}
+    )
+    target_sources(MdsScope PRIVATE ${MDS_SCOPE_MACOS_RESOURCE_FILES})
+    set_source_files_properties("${MDS_SCOPE_MACOS_ICON}" PROPERTIES
+        MACOSX_PACKAGE_LOCATION "Resources"
+    )
+    set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/APIurl" PROPERTIES
+        MACOSX_PACKAGE_LOCATION "Resources"
+    )
+    set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/source_index/trees.txt" PROPERTIES
+        MACOSX_PACKAGE_LOCATION "Resources/source_index"
+    )
+    set_source_files_properties(${MDS_SCOPE_MACOS_ENVIRONMENT_FILES} PROPERTIES
+        MACOSX_PACKAGE_LOCATION "Resources/environment"
+    )
+    set_source_files_properties(${MDS_SCOPE_SOURCE_INDEX_SIGNALS} PROPERTIES
+        MACOSX_PACKAGE_LOCATION "Resources/source_index/signals"
+    )
+    set_target_properties(MdsScope PROPERTIES
+        MACOSX_BUNDLE TRUE
+        MACOSX_BUNDLE_BUNDLE_NAME "MdsScope"
+        MACOSX_BUNDLE_GUI_IDENTIFIER "org.mdsscope.MdsScope"
+        MACOSX_BUNDLE_ICON_FILE "mdsscope.icns"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+        MACOSX_BUNDLE_BUNDLE_VERSION "${MDS_SCOPE_GIT_VERSION}"
+        MACOSX_BUNDLE_COPYRIGHT "Copyright 2026 Weikang Wang"
+    )
+endif()
+
 target_include_directories(MdsScope PRIVATE
     src
     src/core
@@ -142,42 +185,53 @@ if(UNIX AND NOT APPLE)
     target_link_libraries(transfer PRIVATE Qt6::DBus)
 endif()
 
-install(TARGETS MdsScope transfer
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-    BUNDLE DESTINATION .
-)
+if(APPLE)
+    install(TARGETS MdsScope
+        BUNDLE DESTINATION .
+    )
+    install(TARGETS transfer
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    )
+else()
+    install(TARGETS MdsScope transfer
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        BUNDLE DESTINATION .
+    )
 
-install(FILES
-    environment/init.toml
-    environment/init.webscp
-    DESTINATION ${CMAKE_INSTALL_DATADIR}/mdsscope/environment
-)
+    install(FILES
+        environment/init.toml
+        environment/init.webscp
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/mdsscope/environment
+    )
 
-install(FILES
-    APIurl
-    DESTINATION ${CMAKE_INSTALL_DATADIR}/mdsscope
-)
+    install(FILES
+        APIurl
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/mdsscope
+    )
 
-install(FILES
-    mdsscope.svg
-    DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps
-)
+    if(UNIX)
+        install(FILES
+            mdsscope.svg
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps
+        )
 
-install(FILES
-    mdsscope.desktop
-    DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
-)
+        install(FILES
+            mdsscope.desktop
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
+        )
+    endif()
 
-install(FILES
-    source_index/trees.txt
-    DESTINATION ${CMAKE_INSTALL_DATADIR}/mdsscope/source_index
-)
+    install(FILES
+        source_index/trees.txt
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/mdsscope/source_index
+    )
 
-install(DIRECTORY
-    source_index/signals
-    DESTINATION ${CMAKE_INSTALL_DATADIR}/mdsscope/source_index
-    FILES_MATCHING PATTERN "*.txt"
-)
+    install(DIRECTORY
+        source_index/signals
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/mdsscope/source_index
+        FILES_MATCHING PATTERN "*.txt"
+    )
+endif()
 
 set(CPACK_PACKAGE_NAME "mdsscope")
 set(CPACK_PACKAGE_VENDOR "MdsScope")

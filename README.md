@@ -16,53 +16,41 @@ configuration, MDSIP defaults, login flow, and HTTP metadata API target EAST.
 - Switch between thin and full data read modes.
 - Apply shot numbers globally across panels.
 - EAST HTTP metadata support for latest shot and top-bar shot summary.
-- Follow the system light/dark preference on Linux and Windows, with a manual
-  Auto / Light / Dark theme switch.
+- Follow the system light/dark preference on Linux, macOS, and Windows, with a
+  manual Auto / Light / Dark theme switch.
 - About dialog with application, Git, Qt, system, source, and update-check
   information.
-- Run on Linux and Windows desktop environments.
+- Run on Linux, macOS, and Windows desktop environments.
 
 ## Requirements
-
-MdsScope requires:
 
 - CMake 3.16 or newer
 - A C++23 compiler
 - Qt 6.4 or newer with Core, Widgets, Network, and Concurrent
 - Qt 6 DBus on Linux
 
-MdsScope is currently developed and tested for Linux and Windows desktop
-environments. Windows support targets Windows 10/11 with MSVC 2022 and Qt 6.
-Windows 7 is not supported.
-
-The current development machine uses:
-
-```text
-GCC/G++ 15.2.0
-CMake 4.2.3
-Qt 6.10.2
-```
-
-Older compiler and Qt versions may work as long as they support C++23 and the
-required Qt 6 modules.
+MdsScope is currently developed and tested for Linux, macOS, and Windows
+desktop environments. Windows support targets Windows 10/11 with MSVC 2022 and
+Qt 6. Windows 7 is not supported.
 
 ### Dependency Installation
 
-Debian / Ubuntu:
+Ubuntu:
 
 ```bash
 sudo apt update
 sudo apt install build-essential cmake qt6-base-dev qt6-base-dev-tools
 ```
 
-Fedora:
+macOS:
 
 ```bash
-sudo dnf install gcc-c++ cmake qt6-qtbase-devel
+xcode-select --install
+brew install cmake qt
 ```
 
-Windows source builds require Visual Studio 2022 with the C++ desktop workload,
-CMake, and a matching Qt 6 MSVC build.
+Windows: install Visual Studio 2022 with the C++ desktop workload, CMake, and a
+matching Qt 6 MSVC build.
 
 ## Build and Install
 
@@ -73,117 +61,103 @@ Prebuilt release packages are published from Git tags:
 - Ubuntu packages: download the matching `.deb` package for the target Ubuntu
   release and CPU architecture, then install it with your preferred package
   tool.
+- macOS: no prebuilt disk image is currently published; build from source.
 
-The About dialog can check for newer GitHub releases and open the release page.
-
-To build from source:
+Linux source build:
 
 ```bash
 cmake -S . -B build
 cmake --build build -j
 cmake --install build
-```
-
-With the default user install prefix, this installs the application under
-`~/.local/bin` and desktop resources under `~/.local/share`. Run the installed
-application:
-
-```bash
 MdsScope
 ```
 
-Use `cmake --install build --prefix /path/to/prefix` when an explicit install
-location is needed.
+For non-root Linux source installs, the default prefix is `~/.local`; use
+`--prefix` only for a custom location.
 
-Run the converter:
-
-```bash
-~/opt/mdsscope/bin/transfer --help
-```
-
-For development without installing, run the build-tree binaries directly:
-
-```bash
-./build/MdsScope
-./build/transfer --help
-```
-
-On Windows with Visual Studio 2022:
+Windows source build:
 
 ```powershell
 cmake -S . -B build -G "Visual Studio 17 2022" -A x64
 cmake --build build --config Release
 ```
 
+macOS source build:
+
+```bash
+cmake -S . -B build -DCMAKE_PREFIX_PATH="$(brew --prefix qt)"
+cmake --build build -j
+open ./build/MdsScope.app
+cmake --install build --prefix "$HOME/Applications"
+```
+
+Use `/Applications` instead of `$HOME/Applications` for a system-wide macOS
+install. Linux uses `mdsscope.desktop`; macOS uses `MdsScope.app`.
+
 ## Configuration
 
 ### Environment Files
 
-MdsScope uses two environment directories with different roles:
+Installed templates and signal indexes are read from the application resources:
 
 ```text
-~/opt/mdsscope/share/mdsscope/environment/
+Linux source install: ~/.local/share/mdsscope/
+Linux package install: /usr/share/mdsscope/
+macOS app bundle:     MdsScope.app/Contents/Resources/
+Windows portable:     extracted package directory
 ```
 
-This is the installed template/default configuration directory. It is copied
-from the repository `environment/` directory during `cmake --install`. Treat it
-as application data; upgrades may replace it.
+These locations contain:
 
 ```text
-~/.config/mdsscope/environment/
+environment/
+source_index/
 ```
 
-This is the user configuration directory. The GUI loads from and saves to this
-directory by default.
-
-MdsScope keeps user-editable files under:
+User-editable configuration is stored separately:
 
 ```text
-~/.config/mdsscope/
-  mdsscope_ui.ini
-  environment/
+Linux: ~/.config/mdsscope/
+macOS: ~/Library/Application Support/mdsscope/
+Windows: %LOCALAPPDATA%\MdsScope\
 ```
 
-Login credentials and tokens are cached under:
+Cache data is stored separately:
 
 ```text
-~/.cache/mdsscope/auth.cache
+Linux: ~/.cache/mdsscope/
+macOS: ~/Library/Caches/mdsscope/
+Windows: %LOCALAPPDATA%\MdsScope\cache\
 ```
 
-The cache file is not plaintext; it stores the username, password, and token in
-an encrypted local cache bound to the current machine/user.
+The placeholders `<config>` and `<cache>` below refer to these platform-specific
+directories.
 
-Tree-bound signal indexes are installed under:
-
-```text
-~/opt/mdsscope/share/mdsscope/source_index/
-  trees.txt
-  signals/<tree>.txt
-```
+`auth.cache` is not plaintext; it stores the username, password, and token in an
+encrypted local cache bound to the current machine/user.
 
 On startup, MdsScope seeds and updates the user cache at
-`~/.cache/mdsscope/source_index/` from the installed index while preserving
-locally discovered entries. If a user-entered tree/signal is not already in the
-cache, MdsScope adds it only after that signal has been read successfully.
-Failed reads are treated as invalid input and are not cached.
+`<cache>/source_index/` from the installed index while preserving locally
+discovered entries. If a user-entered tree/signal is not already in the cache,
+MdsScope adds it only after that signal has been read successfully. Failed reads
+are treated as invalid input and are not cached.
 
 The Data Source Setup dialog uses this cache for case-insensitive tree and
 signal completion. Signal candidates are scoped to the tree entered on the same
 row.
 
-On first run, MdsScope creates `~/.config/mdsscope/environment/` and copies
-template `*.toml` and `*.webscp` files from the source tree or installed
-`share/mdsscope/environment/` directory when the user environment directory is
-empty.
+On first run, MdsScope creates `<config>/environment/` and copies template
+`*.toml` and `*.webscp` files from the source tree or installed application
+resources when the user environment directory is empty.
 
 MdsScope supports two configuration formats:
 
 - `*.toml`: the recommended native MdsScope format
 - `*.webscp`: legacy WebScope-compatible format
 
-On startup, MdsScope loads `~/.config/mdsscope/environment/init.toml` first. If
-that file is missing, it tries `init.webscp`. If neither default file exists,
-the first `*.toml` or `*.webscp` file sorted by name is loaded.
+On startup, MdsScope loads `<config>/environment/init.toml` first. If that file
+is missing, it tries `init.webscp`. If neither default file exists, the first
+`*.toml` or `*.webscp` file sorted by name is loaded.
 
 When saving from the GUI, MdsScope writes both formats with the same base name:
 
@@ -244,38 +218,38 @@ signal clearly uses a different shot, that value is preserved as a signal-level
 Convert one file:
 
 ```bash
-./build/transfer ~/.config/mdsscope/environment/init.webscp
+./build/transfer "<config>/environment/init.webscp"
 ```
 
 Convert all `.webscp` files in one directory:
 
 ```bash
-./build/transfer ~/.config/mdsscope/environment
+./build/transfer "<config>/environment"
 ```
 
 Write converted TOML files to another directory:
 
 ```bash
-./build/transfer --out-dir converted ~/.config/mdsscope/environment
+./build/transfer --out-dir converted "<config>/environment"
 ```
 
 Convert recursively:
 
 ```bash
-./build/transfer --recursive ~/.config/mdsscope/environment
+./build/transfer --recursive "<config>/environment"
 ```
 
 ### EAST HTTP Metadata API
 
 The EAST HTTP metadata endpoint is stored in the repository `APIurl` file. The
-file is installed to `share/mdsscope/APIurl` by `cmake --install` and contains a
-comment citing the public reference for the EAST data-service workflow.
+file is installed with the application resources and contains a comment citing
+the public reference for the EAST data-service workflow.
 
 On startup, MdsScope reads `APIurl`, checks the local encrypted auth cache, and
 opens the login dialog before the main window if a valid token is not available.
 After successful login, MdsScope caches the returned token and the entered
-credentials in `~/.cache/mdsscope/auth.cache`. Later starts reuse the cached
-token, or refresh it automatically with cached credentials when it expires.
+credentials in `<cache>/auth.cache`. Later starts reuse the cached token, or
+refresh it automatically with cached credentials when it expires.
 
 The HTTP API is used for latest shot lookup and the top-bar `Ip`, `Pulse`, `It`,
 and `Time` summary. Plot data continues to come from EAST MDSIP.
@@ -283,16 +257,12 @@ and `Time` summary. Plot data continues to come from EAST MDSIP.
 ### Data Export
 
 Data export writes files under an `output/` subdirectory of the selected base
-directory. The default base directory is:
+directory. The default export locations are:
 
 ```text
-~/Downloads/mdsscope
-```
-
-So the default export location is:
-
-```text
-~/Downloads/mdsscope/output/
+Linux:   ~/Downloads/mdsscope/output/
+macOS:   ~/Downloads/mdsscope/output/
+Windows: %USERPROFILE%\Downloads\mdsscope\output\  (usual location)
 ```
 
 ## Benchmark Mode
