@@ -216,6 +216,20 @@ Panels use the current shot shown in the MdsScope UI. The `shot` field under
 `[[panels.signals]]` is only for an explicit per-signal shot override, for
 example when comparing one signal against another shot.
 
+Shot fields and the bottom-bar Shot input support single shots, semicolon lists,
+ranges, and mixed list/range expressions:
+
+```text
+143850
+143850;143851;143853
+143850-143858
+143850-143858;143865
+```
+
+These expressions are expanded only at runtime for plotting, export, prewarm,
+and benchmark data loading. MdsScope keeps the saved TOML and `.webscp`
+configuration compact instead of writing one curve entry per expanded shot.
+
 Signals can be hidden with `hidden = true`. Hidden signals stay in the panel
 configuration, but MdsScope skips data loading, plotting, point readouts,
 axis-range calculation, export, and benchmark work for those curves. Legacy

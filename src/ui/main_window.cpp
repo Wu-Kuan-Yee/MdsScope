@@ -576,7 +576,7 @@ public:
                 continue;
             }
             const QString shot = row->shot->text().trimmed();
-            sig.shot = shot == defaultShot_ ? QString() : shot;
+            sig.shot = shotCoveredByDefault(shot) ? QString() : shot;
             sig.xExpr = row->xExpr;
             sig.experiment = row->tree->text().trimmed();
             sig.serverIp = row->server->text().trimmed();
@@ -673,6 +673,29 @@ private:
                 widget->hide();
             }
         });
+    }
+
+    bool shotCoveredByDefault(const QString& shot) const
+    {
+        const QString trimmedShot = shot.trimmed();
+        const QString trimmedDefault = defaultShot_.trimmed();
+        if (trimmedShot.isEmpty() || trimmedShot == trimmedDefault) {
+            return true;
+        }
+
+        const QStringList rowShots = expandedShotList(trimmedShot);
+        const QStringList defaultShots = expandedShotList(trimmedDefault);
+        if (rowShots.isEmpty() || defaultShots.isEmpty()) {
+            return false;
+        }
+
+        const QSet<QString> defaultSet(defaultShots.cbegin(), defaultShots.cend());
+        for (const QString& rowShot : rowShots) {
+            if (!defaultSet.contains(rowShot)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     static QCompleter* makeCompleter(const QStringList& values, QObject* parent)
@@ -2121,7 +2144,17 @@ void MainWindow::buildUi()
     bottomLayout->addWidget(pointButton_);
     bottomLayout->addWidget(new QLabel("Shot", bottom));
     shotEdit_ = new QLineEdit(bottom);
-    shotEdit_->setFixedWidth(105);
+    auto resizeShotEdit = [this] {
+        if (!shotEdit_) {
+            return;
+        }
+        const QFontMetrics fm(shotEdit_->font());
+        const int textWidth = fm.horizontalAdvance(shotEdit_->text().trimmed().isEmpty()
+                                                       ? QStringLiteral("143850-143858")
+                                                       : shotEdit_->text().trimmed());
+        shotEdit_->setFixedWidth(std::clamp(textWidth + 32, 105, 260));
+    };
+    resizeShotEdit();
     bottomLayout->addWidget(shotEdit_);
     auto* apply = new QPushButton("Apply", bottom);
     auto* prev = new QPushButton("Prev", bottom);
@@ -2145,6 +2178,7 @@ void MainWindow::buildUi()
     connect(latest, &QPushButton::clicked, this, &MainWindow::latestShot);
     connect(stop, &QPushButton::clicked, this, [this] { setStatus("Stop requested"); });
     connect(shotEdit_, &QLineEdit::returnPressed, this, &MainWindow::applyShot);
+    connect(shotEdit_, &QLineEdit::textChanged, this, [resizeShotEdit] { resizeShotEdit(); });
     connect(dataModeCombo_, &QComboBox::currentIndexChanged, this, [this] { refreshData(); });
     connect(aboutButton_, &QToolButton::clicked, this, &MainWindow::openAboutDialog);
 }
@@ -2284,19 +2318,20 @@ void MainWindow::rebuildGrid()
     if (globalPointOverlay_) {
         globalPointOverlay_->clearReadouts();
     }
+    syncDisplayConfig();
     plotWidgets_.clear();
-    plotWidgets_.resize(config_.columns.size());
+    plotWidgets_.resize(displayConfig_.columns.size());
 
-    for (int c = 0; c < config_.columns.size(); ++c) {
+    for (int c = 0; c < displayConfig_.columns.size(); ++c) {
         auto* columnHost = new QWidget(gridHost_);
         columnHost->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
         auto* columnLayout = new QVBoxLayout(columnHost);
         columnLayout->setContentsMargins(0, 0, 0, 0);
         columnLayout->setSpacing(0);
-        plotWidgets_[c].resize(config_.columns[c].size());
-        for (int r = 0; r < config_.columns[c].size(); ++r) {
+        plotWidgets_[c].resize(displayConfig_.columns[c].size());
+        for (int r = 0; r < displayConfig_.columns[c].size(); ++r) {
             auto* plot = new PlotWidget(columnHost);
-            plot->setSpec(config_.columns[c][r]);
+            plot->setSpec(displayConfig_.columns[c][r]);
             plot->setLargeDisplayMode(false);
             if (zoomButton_ && zoomButton_->isChecked()) {
                 plot->setInteractionMode(InteractionMode::Zoom);
@@ -2353,6 +2388,18 @@ void MainWindow::rebuildGrid()
     }
     gridLayout_->setRowStretch(0, 1);
     gridHost_->updateGeometry();
+}
+
+void MainWindow::syncDisplayConfig()
+{
+    displayConfig_ = expandedShotLayout(config_);
+    for (int c = 0; c < plotWidgets_.size() && c < displayConfig_.columns.size(); ++c) {
+        for (int r = 0; r < plotWidgets_[c].size() && r < displayConfig_.columns[c].size(); ++r) {
+            if (plotWidgets_[c][r]) {
+                plotWidgets_[c][r]->setSpec(displayConfig_.columns[c][r]);
+            }
+        }
+    }
 }
 
 void MainWindow::selectPlot(int column, int row)
@@ -2782,13 +2829,7 @@ void MainWindow::setAllPlotShots(const QString& shot)
         }
     }
     if (changed) {
-        for (int c = 0; c < plotWidgets_.size(); ++c) {
-            for (int r = 0; r < plotWidgets_[c].size(); ++r) {
-                if (c < config_.columns.size() && r < config_.columns[c].size()) {
-                    plotWidgets_[c][r]->setSpec(config_.columns[c][r]);
-                }
-            }
-        }
+        syncDisplayConfig();
     }
     updateTopInfoLabels();
     setStatus(QString("ShotNo:%1").arg(shot));
@@ -2971,6 +3012,7 @@ void MainWindow::refreshData()
         setStatus("Connecting to MDS...");
         return;
     }
+    syncDisplayConfig();
     const DataReadMode readMode = dataModeCombo_ && dataModeCombo_->currentData().toInt() == static_cast<int>(DataReadMode::Full)
                                       ? DataReadMode::Full
                                       : DataReadMode::Thin;
@@ -3001,7 +3043,7 @@ void MainWindow::refreshData()
             plot->clearSeries();
         }
     }
-    const LayoutConfig snapshot = config_;
+    const LayoutConfig snapshot = displayConfig_;
     activeRefreshKey_ = key;
     queuedRefreshKey_.clear();
     streamedOk_ = 0;
@@ -3030,7 +3072,7 @@ void MainWindow::prewarmConnections(bool refreshAfter)
         return;
     }
 
-    const LayoutConfig snapshot = config_;
+    const LayoutConfig snapshot = expandedShotLayout(config_);
     setStatus("Connecting to MDS...");
     warmWatcher_.setFuture(QtConcurrent::run([snapshot] {
         warmMdsConnections(snapshot);
@@ -3097,9 +3139,10 @@ void MainWindow::refreshOne(int column, int row, int signal)
         return;
     }
 
-    LayoutConfig snapshot = config_;
-    const bool singleSignalRefresh = signal >= 0
-                                     && signal < config_.columns[column][row].signalSpecs.size();
+    syncDisplayConfig();
+    LayoutConfig snapshot = displayConfig_;
+    const bool singleSignalRefresh = false;
+    Q_UNUSED(signal);
     for (int c = 0; c < snapshot.columns.size(); ++c) {
         for (int r = 0; r < snapshot.columns[c].size(); ++r) {
             if (c == column && r == row) {
@@ -3108,10 +3151,6 @@ void MainWindow::refreshOne(int column, int row, int signal)
             snapshot.columns[c][r].signalSpecs.clear();
         }
     }
-    if (singleSignalRefresh) {
-        snapshot.columns[column][row].signalSpecs = {config_.columns[column][row].signalSpecs[signal]};
-    }
-
     if (!singleSignalRefresh) {
         plotWidgets_[column][row]->clearSeries();
     }
@@ -3120,15 +3159,9 @@ void MainWindow::refreshOne(int column, int row, int signal)
     setStatus(singleSignalRefresh
                   ? QString("Fetching signal data: col %1 row %2 source %3").arg(column + 1).arg(row + 1).arg(signal + 1)
                   : QString("Fetching panel data: col %1 row %2").arg(column + 1).arg(row + 1));
-    panelWatcher_.setFuture(QtConcurrent::run([snapshot, readMode, singleSignalRefresh, signal] {
+    panelWatcher_.setFuture(QtConcurrent::run([snapshot, readMode, singleSignalRefresh] {
         QVector<LoadedSignal> loaded = fetchMdsSignals(snapshot, readMode);
-        if (singleSignalRefresh) {
-            for (LoadedSignal& item : loaded) {
-                if (item.column >= 0 && item.row >= 0) {
-                    item.signal = signal;
-                }
-            }
-        }
+        Q_UNUSED(singleSignalRefresh);
         return loaded;
     }));
 }
@@ -3164,9 +3197,9 @@ void MainWindow::applyLoadedSignal(const LoadedSignal& item)
     if (item.column < 0 || item.row < 0 || item.column >= plotWidgets_.size() || item.row >= plotWidgets_[item.column].size()) {
         return;
     }
-    if (item.column >= config_.columns.size()
-        || item.row >= config_.columns[item.column].size()
-        || !loadedSignalMatchesConfig(config_, item)) {
+    if (item.column >= displayConfig_.columns.size()
+        || item.row >= displayConfig_.columns[item.column].size()
+        || !loadedSignalMatchesConfig(displayConfig_, item)) {
         return;
     }
 
@@ -3209,7 +3242,7 @@ void MainWindow::applyLoadedSignals(const QVector<LoadedSignal>& loaded)
     int failed = 0;
     for (const LoadedSignal& item : loaded) {
         if (item.column < plotWidgets_.size() && item.row < plotWidgets_[item.column].size()) {
-            if (!loadedSignalMatchesConfig(config_, item)) {
+            if (!loadedSignalMatchesConfig(displayConfig_, item)) {
                 continue;
             }
             plotWidgets_[item.column][item.row]->setSeries(item.signal, item.series);
@@ -3232,7 +3265,7 @@ void MainWindow::applyPanelLoadedSignals(const QVector<LoadedSignal>& loaded)
         if (item.column < 0 || item.row < 0
             || item.column >= plotWidgets_.size()
             || item.row >= plotWidgets_[item.column].size()
-            || !loadedSignalMatchesConfig(config_, item)) {
+            || !loadedSignalMatchesConfig(displayConfig_, item)) {
             continue;
         }
         plotWidgets_[item.column][item.row]->setSeries(item.signal, item.series);
@@ -3250,12 +3283,12 @@ void MainWindow::rememberLoadedSourceSignal(const LoadedSignal& item)
 {
     if (!item.series.hasData()
         || item.column < 0 || item.row < 0 || item.signal < 0
-        || item.column >= config_.columns.size()
-        || item.row >= config_.columns[item.column].size()
-        || item.signal >= config_.columns[item.column][item.row].signalSpecs.size()) {
+        || item.column >= displayConfig_.columns.size()
+        || item.row >= displayConfig_.columns[item.column].size()
+        || item.signal >= displayConfig_.columns[item.column][item.row].signalSpecs.size()) {
         return;
     }
-    const SignalSpec& sig = config_.columns[item.column][item.row].signalSpecs[item.signal];
+    const SignalSpec& sig = displayConfig_.columns[item.column][item.row].signalSpecs[item.signal];
     addSourceIndexSignal(sig.experiment, sig.yExpr);
 }
 
@@ -3333,8 +3366,8 @@ void MainWindow::addSignalToCurrentPlot()
     plot.shot = dialog.shot();
     plot.signalSpecs.push_back(sig);
     normalizePresetColors(plot.signalSpecs);
-    plotWidgets_[selectedColumn_][selectedRow_]->setSpec(plot);
-    refreshOne(selectedColumn_, selectedRow_, plot.signalSpecs.size() - 1);
+    syncDisplayConfig();
+    refreshOne(selectedColumn_, selectedRow_, -1);
 }
 
 void MainWindow::deleteSignalFromCurrentPlot()
@@ -3359,7 +3392,7 @@ void MainWindow::deleteSignalFromCurrentPlot()
     if (idx >= 0) {
         plot.signalSpecs.removeAt(idx);
         normalizePresetColors(plot.signalSpecs);
-        plotWidgets_[selectedColumn_][selectedRow_]->setSpec(plot);
+        syncDisplayConfig();
         refreshOne(selectedColumn_, selectedRow_, -1);
     }
 }
@@ -3381,7 +3414,7 @@ void MainWindow::panelSetupForCurrentPanel()
     }
 
     dialog.applyTo(&plot);
-    plotWidgets_[selectedColumn_][selectedRow_]->setSpec(plot);
+    syncDisplayConfig();
     updateTopInfoLabels();
     setStatus(QString("Updated panel setup: col %1 row %2").arg(selectedColumn_ + 1).arg(selectedRow_ + 1));
 }
@@ -3430,7 +3463,7 @@ void MainWindow::dataSourceSetupForCurrentPanel()
     PlotWidget* widget = plotWidgets_[selectedColumn_][selectedRow_];
     const bool restoreView = !dataSourceChanged && widget->hasView();
     const QRectF previousView = restoreView ? widget->currentView() : QRectF();
-    widget->setSpec(plot);
+    syncDisplayConfig();
     if (restoreView) {
         widget->applyView(previousView);
     }
@@ -3492,6 +3525,7 @@ void MainWindow::exportDataForPanels(const QVector<QPair<int, int>>& panels, con
             }
         }
     }
+    snapshot = expandedShotLayout(snapshot);
 
     const DataReadMode readMode = dataModeCombo_ && dataModeCombo_->currentData().toInt() == static_cast<int>(DataReadMode::Full)
                                       ? DataReadMode::Full

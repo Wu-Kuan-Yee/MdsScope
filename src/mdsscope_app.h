@@ -94,6 +94,9 @@ struct LayoutConfig {
     QVector<QVector<PlotSpec>> columns;
 };
 
+QStringList expandedShotList(const QString& expression);
+LayoutConfig expandedShotLayout(const LayoutConfig& config);
+
 struct SignalSeries {
     QString name;
     QString error;
@@ -338,11 +341,13 @@ private:
     PlotWidget* currentPlotWidget() const;
     void schedulePointSync(PlotWidget* source, double x);
     void scheduleTopInfoUpdate(const QString& shot);
+    void syncDisplayConfig();
 
     QString rootPath_;
     QString environmentPath_;
     QString exportBasePath_;
     LayoutConfig config_;
+    LayoutConfig displayConfig_;
     QListWidget* environmentList_ = nullptr;
     QWidget* gridHost_ = nullptr;
     QGridLayout* gridLayout_ = nullptr;

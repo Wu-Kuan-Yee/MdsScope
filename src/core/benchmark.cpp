@@ -28,6 +28,7 @@ int runMdsScopeBenchmark(const QString& configPath,
             }
         }
     }
+    config = expandedShotLayout(config);
     int plotCount = 0;
     int signalCount = 0;
     QSet<QString> groups;
