@@ -388,22 +388,123 @@ QString exportFileToken(QString text)
     return text;
 }
 
-QString uniqueExportPath(const QDir& dir, const QString& baseName)
+enum class ExportFormat {
+    Text,
+    Csv,
+    Tsv,
+    Json,
+};
+
+enum class ExportRange {
+    AllData,
+    CurrentView,
+    CustomXRange,
+};
+
+QString exportFormatExtension(ExportFormat format)
 {
-    QString path = dir.filePath(baseName + ".txt");
+    switch (format) {
+    case ExportFormat::Csv:
+        return QStringLiteral("csv");
+    case ExportFormat::Tsv:
+        return QStringLiteral("tsv");
+    case ExportFormat::Json:
+        return QStringLiteral("json");
+    case ExportFormat::Text:
+    default:
+        return QStringLiteral("txt");
+    }
+}
+
+QString exportFormatName(ExportFormat format)
+{
+    switch (format) {
+    case ExportFormat::Csv:
+        return QStringLiteral("CSV");
+    case ExportFormat::Tsv:
+        return QStringLiteral("TSV");
+    case ExportFormat::Json:
+        return QStringLiteral("JSON");
+    case ExportFormat::Text:
+    default:
+        return QStringLiteral("Text");
+    }
+}
+
+QString exportFormatSettingValue(ExportFormat format)
+{
+    switch (format) {
+    case ExportFormat::Csv:
+        return QStringLiteral("csv");
+    case ExportFormat::Tsv:
+        return QStringLiteral("tsv");
+    case ExportFormat::Json:
+        return QStringLiteral("json");
+    case ExportFormat::Text:
+    default:
+        return QStringLiteral("text");
+    }
+}
+
+ExportFormat exportFormatFromSetting(QString value)
+{
+    value = value.trimmed().toLower();
+    if (value == QStringLiteral("csv")) {
+        return ExportFormat::Csv;
+    }
+    if (value == QStringLiteral("tsv")) {
+        return ExportFormat::Tsv;
+    }
+    if (value == QStringLiteral("json")) {
+        return ExportFormat::Json;
+    }
+    return ExportFormat::Text;
+}
+
+QString uniqueExportPath(const QDir& dir, const QString& baseName, ExportFormat format)
+{
+    const QString extension = exportFormatExtension(format);
+    QString path = dir.filePath(baseName + "." + extension);
     if (!QFileInfo::exists(path)) {
         return path;
     }
     for (int i = 2; i < 10000; ++i) {
-        path = dir.filePath(QString("%1_%2.txt").arg(baseName).arg(i));
+        path = dir.filePath(QString("%1_%2.%3").arg(baseName).arg(i).arg(extension));
         if (!QFileInfo::exists(path)) {
             return path;
         }
     }
-    return dir.filePath(baseName + "_" + QString::number(QDateTime::currentMSecsSinceEpoch()) + ".txt");
+    return dir.filePath(baseName + "_" + QString::number(QDateTime::currentMSecsSinceEpoch()) + "." + extension);
 }
 
-bool writeSeriesTextFile(const QString& path, const SignalSeries& series, QString* error)
+QString exportRangeFileSuffix(bool useXRange, double xmin, double xmax)
+{
+    if (!useXRange) {
+        return {};
+    }
+    return QStringLiteral("x_%1_%2")
+        .arg(exportFileToken(QString::number(xmin, 'g', 12)),
+             exportFileToken(QString::number(xmax, 'g', 12)));
+}
+
+QString jsonString(const QString& value)
+{
+    const QByteArray json = QJsonDocument(QJsonArray{value}).toJson(QJsonDocument::Compact);
+    return QString::fromUtf8(json.mid(1, json.size() - 2));
+}
+
+bool pointInExportRange(double x, bool useXRange, double xmin, double xmax)
+{
+    return !useXRange || (x >= xmin && x <= xmax);
+}
+
+bool writeSeriesDataFile(const QString& path,
+                         const SignalSeries& series,
+                         ExportFormat format,
+                         bool useXRange,
+                         double xmin,
+                         double xmax,
+                         QString* error)
 {
     QFile file(path);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
@@ -413,19 +514,75 @@ bool writeSeriesTextFile(const QString& path, const SignalSeries& series, QStrin
         return false;
     }
     QTextStream out(&file);
-    out << "# x y\n";
-    if (!series.error.isEmpty()) {
-        out << "# error: " << series.error << '\n';
+    if (format == ExportFormat::Json) {
+        out << "{\n";
+        if (!series.error.isEmpty()) {
+            out << "  \"error\": " << jsonString(series.error) << ",\n";
+        }
+        out << "  \"points\": [\n";
+        bool first = true;
+        auto writeJsonPoint = [&out, &first](double x, double y) {
+            if (!first) {
+                out << ",\n";
+            }
+            first = false;
+            out << "    [" << QString::number(x, 'g', 17) << ", " << QString::number(y, 'g', 17) << "]";
+        };
+        if (series.hasUniformData()) {
+            for (int i = 0; i < series.uniformY.size(); ++i) {
+                const double x = series.uniformStart + static_cast<double>(i) * series.uniformStep;
+                if (pointInExportRange(x, useXRange, xmin, xmax)) {
+                    writeJsonPoint(x, series.uniformY[i]);
+                }
+            }
+        } else {
+            for (const QPointF& point : series.points) {
+                if (pointInExportRange(point.x(), useXRange, xmin, xmax)) {
+                    writeJsonPoint(point.x(), point.y());
+                }
+            }
+        }
+        out << "\n  ]\n}\n";
+        return true;
     }
+
+    if (format == ExportFormat::Csv) {
+        out << "x,y\n";
+    } else if (format == ExportFormat::Tsv) {
+        out << "x\ty\n";
+    } else {
+        out << "# x y\n";
+    }
+    if (!series.error.isEmpty()) {
+        if (format == ExportFormat::Csv) {
+            out << "# error," << series.error << '\n';
+        } else if (format == ExportFormat::Tsv) {
+            out << "# error\t" << series.error << '\n';
+        } else {
+            out << "# error: " << series.error << '\n';
+        }
+    }
+    auto writePoint = [&out, format](double x, double y) {
+        if (format == ExportFormat::Csv) {
+            out << QString::number(x, 'g', 17) << ',' << QString::number(y, 'g', 17) << '\n';
+        } else if (format == ExportFormat::Tsv) {
+            out << QString::number(x, 'g', 17) << '\t' << QString::number(y, 'g', 17) << '\n';
+        } else {
+            out << QString::number(x, 'g', 17) << ' ' << QString::number(y, 'g', 17) << '\n';
+        }
+    };
     if (series.hasUniformData()) {
         for (int i = 0; i < series.uniformY.size(); ++i) {
-            out << QString::number(series.uniformStart + static_cast<double>(i) * series.uniformStep, 'g', 17)
-                << ' ' << QString::number(series.uniformY[i], 'g', 9) << '\n';
+            const double x = series.uniformStart + static_cast<double>(i) * series.uniformStep;
+            if (pointInExportRange(x, useXRange, xmin, xmax)) {
+                writePoint(x, series.uniformY[i]);
+            }
         }
     } else {
         for (const QPointF& point : series.points) {
-            out << QString::number(point.x(), 'g', 17)
-                << ' ' << QString::number(point.y(), 'g', 17) << '\n';
+            if (pointInExportRange(point.x(), useXRange, xmin, xmax)) {
+                writePoint(point.x(), point.y());
+            }
         }
     }
     return true;
@@ -1275,14 +1432,51 @@ private:
 
 class ExportDataDialog final : public QDialog {
 public:
-    explicit ExportDataDialog(const LayoutConfig& config, const QString& defaultDir, QWidget* parent = nullptr)
+    explicit ExportDataDialog(const LayoutConfig& config,
+                              const QString& defaultDir,
+                              ExportFormat defaultFormat,
+                              QWidget* parent = nullptr,
+                              const PlotSpec* signalPlot = nullptr)
         : QDialog(parent)
     {
         setWindowTitle("Export Data");
         resize(900, 560);
         auto* mainLayout = new QHBoxLayout(this);
-        canvas_ = new LayoutCanvas(config, this, false);
-        mainLayout->addWidget(canvas_, 1);
+        if (signalPlot) {
+            signalMode_ = true;
+            signalList_ = new QListWidget(this);
+            signalList_->setSelectionMode(QAbstractItemView::NoSelection);
+            signalList_->setMinimumWidth(320);
+            signalList_->setMaximumWidth(420);
+            signalList_->setStyleSheet("QListWidget::indicator { width: 18px; height: 18px; }"
+                                       "QListWidget::item { padding: 6px 4px; }");
+            int visibleIndex = 0;
+            for (int i = 0; i < signalPlot->signalSpecs.size(); ++i) {
+                const SignalSpec& sig = signalPlot->signalSpecs[i];
+                if (sig.hidden) {
+                    continue;
+                }
+                QString label = normalizedMdsSignal(sig.yExpr);
+                if (label.isEmpty()) {
+                    label = QString("Signal %1").arg(++visibleIndex);
+                } else {
+                    ++visibleIndex;
+                }
+                const QString shot = effectiveSignalShot(*signalPlot, sig);
+                if (!shot.isEmpty()) {
+                    label += QString("  [%1]").arg(shot);
+                }
+                auto* item = new QListWidgetItem(label, signalList_);
+                item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
+                item->setCheckState(Qt::Checked);
+                item->setData(Qt::UserRole, i);
+                item->setSizeHint(QSize(0, 34));
+            }
+            mainLayout->addWidget(signalList_);
+        } else {
+            canvas_ = new LayoutCanvas(config, this, false);
+            mainLayout->addWidget(canvas_, 1);
+        }
 
         auto* side = new QWidget(this);
         auto* sideLayout = new QVBoxLayout(side);
@@ -1300,6 +1494,34 @@ public:
         row->addWidget(browse);
         sideLayout->addLayout(row);
 
+        format_ = new QComboBox(side);
+        format_->addItem("Text (*.txt)", static_cast<int>(ExportFormat::Text));
+        format_->addItem("CSV (*.csv)", static_cast<int>(ExportFormat::Csv));
+        format_->addItem("TSV (*.tsv)", static_cast<int>(ExportFormat::Tsv));
+        format_->addItem("JSON (*.json)", static_cast<int>(ExportFormat::Json));
+        const int defaultFormatIndex = format_->findData(static_cast<int>(defaultFormat));
+        format_->setCurrentIndex(defaultFormatIndex >= 0 ? defaultFormatIndex : 0);
+        sideLayout->addWidget(new QLabel("Format", side));
+        sideLayout->addWidget(format_);
+        sideLayout->addSpacing(10);
+
+        range_ = new QComboBox(side);
+        range_->addItem("All data", static_cast<int>(ExportRange::AllData));
+        range_->addItem("Current view", static_cast<int>(ExportRange::CurrentView));
+        range_->addItem("Custom X range", static_cast<int>(ExportRange::CustomXRange));
+        range_->setCurrentIndex(0);
+        sideLayout->addWidget(new QLabel("Range", side));
+        sideLayout->addWidget(range_);
+        auto* xRangeLayout = new QHBoxLayout;
+        xmin_ = new QLineEdit(side);
+        xmax_ = new QLineEdit(side);
+        xmin_->setPlaceholderText("X min");
+        xmax_->setPlaceholderText("X max");
+        xRangeLayout->addWidget(xmin_);
+        xRangeLayout->addWidget(xmax_);
+        sideLayout->addLayout(xRangeLayout);
+        sideLayout->addSpacing(10);
+
         auto* exportButton = new QPushButton("Export", side);
         auto* cancel = new QPushButton("Cancel", side);
         sideLayout->addStretch(1);
@@ -1313,15 +1535,42 @@ public:
                 outputDir_->setText(dir);
             }
         });
-        connect(selectAll, &QPushButton::clicked, canvas_, &LayoutCanvas::selectAllOriginalPanels);
-        connect(clear, &QPushButton::clicked, canvas_, &LayoutCanvas::clearSelectedPanels);
+        connect(selectAll, &QPushButton::clicked, this, [this] {
+            if (signalMode_) {
+                for (int i = 0; i < signalList_->count(); ++i) {
+                    signalList_->item(i)->setCheckState(Qt::Checked);
+                }
+            } else if (canvas_) {
+                canvas_->selectAllOriginalPanels();
+            }
+        });
+        connect(clear, &QPushButton::clicked, this, [this] {
+            if (signalMode_) {
+                for (int i = 0; i < signalList_->count(); ++i) {
+                    signalList_->item(i)->setCheckState(Qt::Unchecked);
+                }
+            } else if (canvas_) {
+                canvas_->clearSelectedPanels();
+            }
+        });
+        auto updateCustomRangeEnabled = [this] {
+            const bool custom = exportRange() == ExportRange::CustomXRange;
+            xmin_->setEnabled(custom);
+            xmax_->setEnabled(custom);
+        };
+        connect(range_, &QComboBox::currentIndexChanged, this, updateCustomRangeEnabled);
+        updateCustomRangeEnabled();
         connect(exportButton, &QPushButton::clicked, this, [this] {
-            if (selectedPanels().isEmpty()) {
-                QMessageBox::warning(this, "Export Data", "Select at least one panel.");
+            if (signalMode_ ? selectedSignals().isEmpty() : selectedPanels().isEmpty()) {
+                QMessageBox::warning(this, "Export Data", signalMode_ ? "Select at least one signal." : "Select at least one panel.");
                 return;
             }
             if (outputBaseDir().isEmpty()) {
                 QMessageBox::warning(this, "Export Data", "Choose an output directory.");
+                return;
+            }
+            if (exportRange() == ExportRange::CustomXRange && !customRangeValid()) {
+                QMessageBox::warning(this, "Export Data", "Enter a valid custom X range.");
                 return;
             }
             accept();
@@ -1331,7 +1580,25 @@ public:
 
     QVector<QPair<int, int>> selectedPanels() const
     {
+        if (!canvas_) {
+            return {};
+        }
         return canvas_->selectedOriginalPanels();
+    }
+
+    QVector<int> selectedSignals() const
+    {
+        QVector<int> selectedSignalIndexes;
+        if (!signalList_) {
+            return selectedSignalIndexes;
+        }
+        for (int i = 0; i < signalList_->count(); ++i) {
+            const QListWidgetItem* item = signalList_->item(i);
+            if (item->checkState() == Qt::Checked) {
+                selectedSignalIndexes.push_back(item->data(Qt::UserRole).toInt());
+            }
+        }
+        return selectedSignalIndexes;
     }
 
     QString outputBaseDir() const
@@ -1339,9 +1606,44 @@ public:
         return outputDir_->text().trimmed();
     }
 
+    ExportFormat exportFormat() const
+    {
+        return static_cast<ExportFormat>(format_->currentData().toInt());
+    }
+
+    ExportRange exportRange() const
+    {
+        return static_cast<ExportRange>(range_->currentData().toInt());
+    }
+
+    double customXMin() const
+    {
+        return xmin_->text().trimmed().toDouble();
+    }
+
+    double customXMax() const
+    {
+        return xmax_->text().trimmed().toDouble();
+    }
+
 private:
+    bool customRangeValid() const
+    {
+        bool minOk = false;
+        bool maxOk = false;
+        const double xmin = xmin_->text().trimmed().toDouble(&minOk);
+        const double xmax = xmax_->text().trimmed().toDouble(&maxOk);
+        return minOk && maxOk && std::isfinite(xmin) && std::isfinite(xmax) && xmin != xmax;
+    }
+
+    bool signalMode_ = false;
     LayoutCanvas* canvas_ = nullptr;
+    QListWidget* signalList_ = nullptr;
     QLineEdit* outputDir_ = nullptr;
+    QComboBox* format_ = nullptr;
+    QComboBox* range_ = nullptr;
+    QLineEdit* xmin_ = nullptr;
+    QLineEdit* xmax_ = nullptr;
 };
 
 bool layoutItemsMatchConfig(const QVector<QVector<LayoutCanvas::Item>>& layout, const LayoutConfig& config)
@@ -1931,7 +2233,9 @@ MainWindow::MainWindow(QString rootPath, QWidget* parent)
     setWindowIcon(appIcon());
     environmentPath_ = appEnvironmentDir(rootPath_);
     ensureSourceIndexCache(rootPath_);
-    exportBasePath_ = defaultExportBaseDir();
+    exportBasePath_ = QSettings(uiSettingsPath(rootPath_), QSettings::IniFormat)
+                          .value("export/base_dir", defaultExportBaseDir())
+                          .toString();
     loadFontSettings(rootPath_);
     buildUi();
     applyUiFont();
@@ -2152,7 +2456,7 @@ void MainWindow::buildUi()
         const int textWidth = fm.horizontalAdvance(shotEdit_->text().trimmed().isEmpty()
                                                        ? QStringLiteral("143850-143858")
                                                        : shotEdit_->text().trimmed());
-        shotEdit_->setFixedWidth(std::clamp(textWidth + 32, 105, 260));
+        shotEdit_->setFixedWidth(std::clamp(textWidth + 32, 105, 520));
     };
     resizeShotEdit();
     bottomLayout->addWidget(shotEdit_);
@@ -3477,12 +3781,20 @@ void MainWindow::dataSourceSetupForCurrentPanel()
 
 void MainWindow::openExportDataDialog()
 {
-    ExportDataDialog dialog(config_, exportBasePath_, this);
+    QSettings settings(uiSettingsPath(rootPath_), QSettings::IniFormat);
+    const ExportFormat defaultFormat = exportFormatFromSetting(settings.value("export/format", "text").toString());
+    ExportDataDialog dialog(config_, exportBasePath_, defaultFormat, this);
     if (dialog.exec() != QDialog::Accepted) {
         return;
     }
 
-    exportDataForPanels(dialog.selectedPanels(), dialog.outputBaseDir());
+    settings.setValue("export/format", exportFormatSettingValue(dialog.exportFormat()));
+    exportDataForPanels(dialog.selectedPanels(),
+                        dialog.outputBaseDir(),
+                        static_cast<int>(dialog.exportFormat()),
+                        static_cast<int>(dialog.exportRange()),
+                        dialog.customXMin(),
+                        dialog.customXMax());
 }
 
 void MainWindow::exportCurrentPanelData()
@@ -3490,14 +3802,47 @@ void MainWindow::exportCurrentPanelData()
     if (selectedColumn_ < 0 || selectedRow_ < 0) {
         return;
     }
-    const QString baseDirPath = QFileDialog::getExistingDirectory(this, "Export Base Directory", exportBasePath_);
-    if (baseDirPath.isEmpty()) {
+    if (selectedColumn_ >= config_.columns.size() || selectedRow_ >= config_.columns[selectedColumn_].size()) {
         return;
     }
-    exportDataForPanels({{selectedColumn_, selectedRow_}}, baseDirPath);
+    QSettings settings(uiSettingsPath(rootPath_), QSettings::IniFormat);
+    const ExportFormat defaultFormat = exportFormatFromSetting(settings.value("export/format", "text").toString());
+    LayoutConfig dialogConfig;
+    dialogConfig.columns = {{config_.columns[selectedColumn_][selectedRow_]}};
+    const QString currentShot = shotEdit_ ? shotEdit_->text().trimmed() : QString();
+    if (!currentShot.isEmpty()) {
+        dialogConfig.columns[0][0].shot = currentShot;
+    }
+    dialogConfig = expandedShotLayout(dialogConfig);
+    const PlotSpec& plot = dialogConfig.columns[0][0];
+    ExportDataDialog dialog(config_, exportBasePath_, defaultFormat, this, &plot);
+    if (dialog.exec() != QDialog::Accepted) {
+        return;
+    }
+
+    settings.setValue("export/format", exportFormatSettingValue(dialog.exportFormat()));
+    QSet<int> selectedSignalIndexes;
+    for (int signal : dialog.selectedSignals()) {
+        selectedSignalIndexes.insert(signal);
+    }
+    QHash<QString, QSet<int>> signalFilter;
+    signalFilter.insert(QStringLiteral("%1:%2").arg(selectedColumn_).arg(selectedRow_), selectedSignalIndexes);
+    exportDataForPanels({{selectedColumn_, selectedRow_}},
+                        dialog.outputBaseDir(),
+                        static_cast<int>(dialog.exportFormat()),
+                        static_cast<int>(dialog.exportRange()),
+                        dialog.customXMin(),
+                        dialog.customXMax(),
+                        signalFilter);
 }
 
-void MainWindow::exportDataForPanels(const QVector<QPair<int, int>>& panels, const QString& baseDirPath)
+void MainWindow::exportDataForPanels(const QVector<QPair<int, int>>& panels,
+                                     const QString& baseDirPath,
+                                     int exportFormat,
+                                     int exportRange,
+                                     double customXMin,
+                                     double customXMax,
+                                     const QHash<QString, QSet<int>>& signalFilter)
 {
     if (panels.isEmpty()) {
         QMessageBox::warning(this, "Export Data", "Select at least one panel.");
@@ -3507,11 +3852,29 @@ void MainWindow::exportDataForPanels(const QVector<QPair<int, int>>& panels, con
         QMessageBox::warning(this, "Export Data", "Choose an output directory.");
         return;
     }
+    exportBasePath_ = QDir(baseDirPath.trimmed()).absolutePath();
+    QSettings settings(uiSettingsPath(rootPath_), QSettings::IniFormat);
+    settings.setValue("export/base_dir", exportBasePath_);
+    settings.setValue("export/format", exportFormatSettingValue(static_cast<ExportFormat>(exportFormat)));
 
     LayoutConfig snapshot = config_;
     QSet<QPair<int, int>> selected;
+    QHash<QString, QRectF> viewRanges;
+    const ExportRange rangeMode = static_cast<ExportRange>(exportRange);
+    const bool useCurrentView = rangeMode == ExportRange::CurrentView;
+    const bool useCustomRange = rangeMode == ExportRange::CustomXRange && std::isfinite(customXMin) && std::isfinite(customXMax);
+    if (useCustomRange && customXMin > customXMax) {
+        std::swap(customXMin, customXMax);
+    }
     for (const auto& panel : panels) {
         selected.insert(panel);
+        if (useCurrentView
+            && panel.first >= 0 && panel.first < plotWidgets_.size()
+            && panel.second >= 0 && panel.second < plotWidgets_[panel.first].size()
+            && plotWidgets_[panel.first][panel.second]) {
+            viewRanges.insert(QStringLiteral("%1:%2").arg(panel.first).arg(panel.second),
+                              plotWidgets_[panel.first][panel.second]->currentView());
+        }
     }
     const QString currentShot = shotEdit_ ? shotEdit_->text().trimmed() : QString();
     for (int c = 0; c < snapshot.columns.size(); ++c) {
@@ -3526,13 +3889,40 @@ void MainWindow::exportDataForPanels(const QVector<QPair<int, int>>& panels, con
         }
     }
     snapshot = expandedShotLayout(snapshot);
+    for (int c = 0; c < snapshot.columns.size(); ++c) {
+        for (int r = 0; r < snapshot.columns[c].size(); ++r) {
+            const QString filterKey = QStringLiteral("%1:%2").arg(c).arg(r);
+            if (!signalFilter.contains(filterKey)) {
+                continue;
+            }
+            const QSet<int> selectedSignals = signalFilter.value(filterKey);
+            QVector<SignalSpec> filteredSignals;
+            filteredSignals.reserve(selectedSignals.size());
+            for (int i = 0; i < snapshot.columns[c][r].signalSpecs.size(); ++i) {
+                if (selectedSignals.contains(i)) {
+                    filteredSignals.push_back(snapshot.columns[c][r].signalSpecs[i]);
+                }
+            }
+            snapshot.columns[c][r].signalSpecs = std::move(filteredSignals);
+        }
+    }
 
     const DataReadMode readMode = dataModeCombo_ && dataModeCombo_->currentData().toInt() == static_cast<int>(DataReadMode::Full)
                                       ? DataReadMode::Full
                                       : DataReadMode::Thin;
+    const ExportFormat format = static_cast<ExportFormat>(exportFormat);
     setStatus(QString("Exporting data from %1 panels...").arg(panels.size()));
     QPointer<MainWindow> self(this);
-    QThreadPool::globalInstance()->start([self, snapshot, baseDirPath = baseDirPath.trimmed(), readMode] {
+    QThreadPool::globalInstance()->start([self,
+                                          snapshot,
+                                          baseDirPath = baseDirPath.trimmed(),
+                                          readMode,
+                                          format,
+                                          useCurrentView,
+                                          useCustomRange,
+                                          customXMin,
+                                          customXMax,
+                                          viewRanges] {
         QStringList errors;
         int written = 0;
         QDir baseDir(baseDirPath);
@@ -3560,9 +3950,33 @@ void MainWindow::exportDataForPanels(const QVector<QPair<int, int>>& panels, con
                 const QString shot = exportFileToken(item.shot.isEmpty() ? effectiveSignalShot(plot, sig) : item.shot);
                 const QString tree = exportFileToken(sig.experiment);
                 const QString signal = exportFileToken(normalizedMdsSignal(sig.yExpr));
-                const QString path = uniqueExportPath(outputDir, QString("%1-%2-%3").arg(shot, tree, signal));
+                const QRectF viewRange = viewRanges.value(QStringLiteral("%1:%2").arg(item.column).arg(item.row));
+                bool useXRange = false;
+                double xmin = qQNaN();
+                double xmax = qQNaN();
+                if (useCustomRange) {
+                    useXRange = true;
+                    xmin = customXMin;
+                    xmax = customXMax;
+                } else if (useCurrentView && viewRange.isValid()) {
+                    useXRange = true;
+                    xmin = std::min(viewRange.left(), viewRange.right());
+                    xmax = std::max(viewRange.left(), viewRange.right());
+                }
+                QString baseName = QString("%1-%2-%3").arg(shot, tree, signal);
+                const QString rangeSuffix = exportRangeFileSuffix(useXRange, xmin, xmax);
+                if (!rangeSuffix.isEmpty()) {
+                    baseName += "-" + rangeSuffix;
+                }
+                const QString path = uniqueExportPath(outputDir, baseName, format);
                 QString error;
-                if (writeSeriesTextFile(path, item.series, &error)) {
+                if (writeSeriesDataFile(path,
+                                        item.series,
+                                        format,
+                                        useXRange,
+                                        xmin,
+                                        xmax,
+                                        &error)) {
                     ++written;
                 } else {
                     errors.push_back(error);

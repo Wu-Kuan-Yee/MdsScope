@@ -315,7 +315,13 @@ private:
     void dataSourceSetupForCurrentPanel();
     void openExportDataDialog();
     void exportCurrentPanelData();
-    void exportDataForPanels(const QVector<QPair<int, int>>& panels, const QString& baseDirPath);
+    void exportDataForPanels(const QVector<QPair<int, int>>& panels,
+                             const QString& baseDirPath,
+                             int exportFormat,
+                             int exportRange,
+                             double customXMin = qQNaN(),
+                             double customXMax = qQNaN(),
+                             const QHash<QString, QSet<int>>& signalFilter = {});
     void applyScaleToAll();
     void resetCurrentScale();
     void resetScales();

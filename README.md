@@ -10,17 +10,12 @@ configuration, MDSIP defaults, login flow, and HTTP metadata API target EAST.
 
 ## Features
 
-- Load WebScope-style environment files from the user configuration directory.
-- Display multiple synchronized plotting panels.
-- Fetch signal data from MDSIP servers.
+- Load TOML and WebScope-style `.webscp` environment files.
+- Plot multiple synchronized MDSplus signal panels.
 - Switch between thin and full data read modes.
-- Apply shot numbers globally across panels.
-- EAST HTTP metadata support for latest shot and top-bar shot summary.
-- Follow the system light/dark preference on Linux, macOS, and Windows, with a
-  manual Auto / Light / Dark theme switch.
-- About dialog with application, Git, Qt, system, source, and update-check
-  information.
-- Run on Linux, macOS, and Windows desktop environments.
+- Apply single-shot or batch-shot expressions globally.
+- Use EAST HTTP metadata for latest shot and top-bar shot summary.
+- Run on Linux, macOS, and Windows with system light/dark theme support.
 
 ## Requirements
 
@@ -58,10 +53,8 @@ Prebuilt release packages are published from Git tags:
 
 - Windows portable package: download the Windows zip from the GitHub release
   page, extract it, and run `MdsScope.exe`.
-- Ubuntu packages: download the matching `.deb` package for the target Ubuntu
-  release and CPU architecture, then install it with your preferred package
-  tool.
-- macOS: no prebuilt disk image is currently published; build from source.
+- Ubuntu packages: download and install the matching `.deb` package.
+- macOS: build from source.
 
 Linux source build:
 
@@ -71,9 +64,6 @@ cmake --build build -j
 cmake --install build
 MdsScope
 ```
-
-For non-root Linux source installs, the default prefix is `~/.local`; use
-`--prefix` only for a custom location.
 
 Windows source build:
 
@@ -90,37 +80,18 @@ cmake --build build -j
 open ./build/MdsScope.app
 ```
 
-Install the macOS app:
+Optional install commands:
 
 ```bash
 cmake --install build --prefix "$HOME/Applications" --component app
-```
-
-Install the command-line tools:
-
-```bash
 cmake --install build --component tools
-```
-
-The app command installs `MdsScope.app`; the tools command installs `MdsScope`
-and `transfer` to the default command-line prefix (`$HOME/.local` for non-root
-users).
-
-Uninstall a CMake install:
-
-```bash
 cmake --build build --target uninstall
 ```
 
-Remove a user-installed macOS app bundle:
-
-```bash
-rm -rf "$HOME/Applications/MdsScope.app"
-```
+For non-root source installs, the default command-line prefix is `~/.local`; use
+`--prefix` only for a custom location.
 
 ## Configuration
-
-### Environment Files
 
 Installed templates and signal indexes are read from the application resources:
 
@@ -129,13 +100,6 @@ Linux source install: ~/.local/share/mdsscope/
 Linux package install: /usr/share/mdsscope/
 macOS app bundle:     MdsScope.app/Contents/Resources/
 Windows portable:     extracted package directory
-```
-
-These locations contain:
-
-```text
-environment/
-source_index/
 ```
 
 User-editable configuration is stored separately:
@@ -154,43 +118,18 @@ macOS: ~/Library/Caches/mdsscope/
 Windows: %LOCALAPPDATA%\MdsScope\cache\
 ```
 
-The placeholders `<config>` and `<cache>` below refer to these platform-specific
-directories.
-
 `auth.cache` is not plaintext; it stores the username, password, and token in an
 encrypted local cache bound to the current machine/user.
 
-On startup, MdsScope seeds and updates the user cache at
-`<cache>/source_index/` from the installed index while preserving locally
-discovered entries. If a user-entered tree/signal is not already in the cache,
-MdsScope adds it only after that signal has been read successfully. Failed reads
-are treated as invalid input and are not cached.
-
-The Data Source Setup dialog uses this cache for case-insensitive tree and
-signal completion. Signal candidates are scoped to the tree entered on the same
-row.
-
-On first run, MdsScope creates `<config>/environment/` and copies template
-`*.toml` and `*.webscp` files from the source tree or installed application
-resources when the user environment directory is empty.
-
-MdsScope supports two configuration formats:
+MdsScope supports two environment file formats:
 
 - `*.toml`: the recommended native MdsScope format
 - `*.webscp`: legacy WebScope-compatible format
 
-On startup, MdsScope loads `<config>/environment/init.toml` first. If that file
-is missing, it tries `init.webscp`. If neither default file exists, the first
-`*.toml` or `*.webscp` file sorted by name is loaded.
-
-When saving from the GUI, MdsScope writes both formats with the same base name:
-
-- saving `example.toml` also writes `example.webscp`
-- saving `example.webscp` also writes `example.toml`
-
-This keeps the native format and the legacy compatibility format synchronized.
-The Open dialog remembers the last selected file filter, so users can choose to
-browse native TOML files, legacy WEBSCP files, or both.
+On first run, MdsScope creates the user environment directory and copies bundled
+templates if it is empty. The default file is `init.toml`, with `init.webscp` as
+a legacy fallback. Saving from the GUI keeps TOML and WEBSCP files synchronized.
+The Open dialog can browse native TOML files, legacy WEBSCP files, or both.
 
 Example TOML:
 
@@ -211,13 +150,11 @@ y = "\\pcrl01"
 full = true
 ```
 
-The native TOML format intentionally does not store a normal panel shot number.
-Panels use the current shot shown in the MdsScope UI. The `shot` field under
-`[[panels.signals]]` is only for an explicit per-signal shot override, for
-example when comparing one signal against another shot.
+Panels use the shot shown in the MdsScope UI. A signal-level `shot` value is
+only needed for explicit per-signal shot overrides, such as shot comparison.
 
 Shot fields and the bottom-bar Shot input support single shots, semicolon lists,
-ranges, and mixed list/range expressions:
+ranges, and mixed expressions:
 
 ```text
 143850
@@ -226,76 +163,33 @@ ranges, and mixed list/range expressions:
 143850-143858;143865
 ```
 
-These expressions are expanded only at runtime for plotting, export, prewarm,
-and benchmark data loading. MdsScope keeps the saved TOML and `.webscp`
-configuration compact instead of writing one curve entry per expanded shot.
+Shot expressions are expanded at runtime so saved configuration files stay
+compact.
 
-Signals can be hidden with `hidden = true`. Hidden signals stay in the panel
-configuration, but MdsScope skips data loading, plotting, point readouts,
-axis-range calculation, export, and benchmark work for those curves. Legacy
-`.webscp` files do not carry this setting; converted signals default to
-`hidden = false`.
+Signals can be hidden with `hidden = true`. Use `full = true` on an individual
+signal to load that curve in full mode while the rest of the configuration
+stays thin.
 
-Signals default to thin data loading. Add `full = true` under an individual
-`[[panels.signals]]` entry to load that curve in full mode while the rest of the
-configuration stays thin. Legacy `.webscp` files do not carry this setting;
-converting TOML to `.webscp` intentionally omits it.
-
-When MdsScope saves TOML, it omits default values to keep files compact. Omitted
-panel defaults are empty labels, `extraction_points = 2000`, `grid = true`, and
-automatic axis ranges. Omitted signal defaults are an empty `x`, automatic
-series color, `hidden = false`, and thin data loading.
-
-When converting from legacy `.webscp`, MdsScope treats the most common
-`shot_txt` value as the old default shot and omits it from TOML. If a panel or
-signal clearly uses a different shot, that value is preserved as a signal-level
-`shot` override.
-
-### Converting Legacy `.webscp` Files
-
-Convert one file:
+Convert legacy `.webscp` files with `transfer`:
 
 ```bash
 ./build/transfer "<config>/environment/init.webscp"
-```
-
-Convert all `.webscp` files in one directory:
-
-```bash
 ./build/transfer "<config>/environment"
-```
-
-Write converted TOML files to another directory:
-
-```bash
-./build/transfer --out-dir converted "<config>/environment"
-```
-
-Convert recursively:
-
-```bash
 ./build/transfer --recursive "<config>/environment"
 ```
 
 ### EAST HTTP Metadata API
 
-The EAST HTTP metadata endpoint is stored in the repository `APIurl` file. The
-file is installed with the application resources and contains a comment citing
-the public reference for the EAST data-service workflow.
-
-On startup, MdsScope reads `APIurl`, checks the local encrypted auth cache, and
-opens the login dialog before the main window if a valid token is not available.
-After successful login, MdsScope caches the returned token and the entered
-credentials in `<cache>/auth.cache`. Later starts reuse the cached token, or
-refresh it automatically with cached credentials when it expires.
-
-The HTTP API is used for latest shot lookup and the top-bar `Ip`, `Pulse`, `It`,
-and `Time` summary. Plot data continues to come from EAST MDSIP.
+The EAST HTTP metadata endpoint is stored in `APIurl`. It is used for latest
+shot lookup and the top-bar `Ip`, `Pulse`, `It`, and `Time` summary. Plot data
+continues to come from EAST MDSIP.
 
 ### Data Export
 
 Data export writes files under an `output/` subdirectory of the selected base
-directory. The default export locations are:
+directory. Export supports text, CSV, TSV, and JSON formats, optional x-range
+selection, and remembers the last selected directory and format. The default
+export locations are:
 
 ```text
 Linux:   ~/Downloads/mdsscope/output/
@@ -305,25 +199,11 @@ Windows: %USERPROFILE%\Downloads\mdsscope\output\  (usual location)
 
 ## Benchmark Mode
 
-MdsScope includes a simple benchmark mode for MDS data loading:
+MdsScope includes a simple benchmark mode for MDS data loading. Useful options
+include `--shot`, `--full`, `--repeat`, `--summary`, and `--prewarm`.
 
 ```bash
 ./build/MdsScope --benchmark environment/your_config.webscp --summary
-```
-
-Useful options:
-
-```text
---shot SHOT_NUMBER
---full
---repeat N
---summary
---prewarm
-```
-
-For headless environments:
-
-```bash
 QT_QPA_PLATFORM=offscreen ./build/MdsScope --benchmark environment/your_config.webscp --summary
 ```
 
