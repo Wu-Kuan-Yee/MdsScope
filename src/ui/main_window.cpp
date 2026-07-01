@@ -2542,6 +2542,7 @@ void MainWindow::openCustomizeDialog()
     for (QSpinBox* box : {legendSize, axisSize, unitSize, uiSize}) {
         box->setRange(6, 28);
         box->setSingleStep(1);
+        box->setButtonSymbols(QAbstractSpinBox::NoButtons);
     }
     legendSize->setValue(fonts.legendSize);
     axisSize->setValue(fonts.axisSize);

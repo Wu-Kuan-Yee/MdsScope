@@ -280,7 +280,7 @@ private slots:
     void settingChanged(const QString& group, const QString& key, const QDBusVariant& value)
     {
         if (group == QStringLiteral("org.freedesktop.appearance") && key == QStringLiteral("color-scheme")) {
-            setSystemScheme(resolveColorScheme(value.variant().toUInt()));
+            setSystemScheme(portalColorScheme(value.variant().toUInt()));
         }
     }
 #endif
@@ -310,6 +310,11 @@ private:
             return 2;
         }
         return 0;
+    }
+
+    static uint portalColorScheme(uint scheme)
+    {
+        return scheme == 1 ? 1 : 2;
     }
 
     static uint readKdeColorScheme()
@@ -354,7 +359,7 @@ private:
         if (output.contains(QStringLiteral("prefer-dark"))) {
             return 1;
         }
-        if (output.contains(QStringLiteral("prefer-light"))) {
+        if (output.contains(QStringLiteral("prefer-light")) || output.contains(QStringLiteral("default"))) {
             return 2;
         }
 
@@ -381,8 +386,7 @@ private:
                                                              QStringLiteral("org.freedesktop.appearance"),
                                                              QStringLiteral("color-scheme"));
         if (reply.isValid()) {
-            const uint scheme = reply.value().variant().toUInt();
-            return resolveColorScheme(scheme);
+            return portalColorScheme(reply.value().variant().toUInt());
         }
         return readFallbackColorScheme();
     }
