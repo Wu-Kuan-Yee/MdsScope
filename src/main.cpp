@@ -244,6 +244,9 @@ public:
             setSystemScheme(readCurrentColorScheme());
         });
         pollTimer_.start(3000);
+        QTimer::singleShot(0, this, [this] { setSystemScheme(readCurrentColorScheme()); });
+        QTimer::singleShot(750, this, [this] { setSystemScheme(readCurrentColorScheme()); });
+        QTimer::singleShot(2000, this, [this] { setSystemScheme(readCurrentColorScheme()); });
     }
 
     ~SystemThemeWatcher() override
@@ -287,7 +290,7 @@ private:
         process.setProgram(program);
         process.setArguments(arguments);
         process.start();
-        if (!process.waitForFinished(500)) {
+        if (!process.waitForFinished(1200)) {
             return {};
         }
         return QString::fromUtf8(process.readAllStandardOutput()).trimmed().toLower();

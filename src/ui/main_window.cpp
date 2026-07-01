@@ -32,6 +32,7 @@ public:
         setFixedSize(92, 34);
         setCursor(Qt::PointingHandCursor);
         setFocusPolicy(Qt::NoFocus);
+        setMouseTracking(true);
         animation_.setDuration(150);
         animation_.setEasingCurve(QEasingCurve::OutCubic);
         connect(&animation_, &QVariantAnimation::valueChanged, this, [this](const QVariant& value) {
@@ -115,7 +116,14 @@ protected:
             event->accept();
             return;
         }
+        updateTooltipForX(event->position().x());
         QWidget::mouseMoveEvent(event);
+    }
+
+    void enterEvent(QEnterEvent* event) override
+    {
+        updateTooltipForX(event->position().x());
+        QWidget::enterEvent(event);
     }
 
     void mouseReleaseEvent(QMouseEvent* event) override
@@ -170,6 +178,12 @@ private:
         }
         setMdsScopeThemeMode(mode);
         setMode(mode);
+    }
+
+    void updateTooltipForX(qreal x)
+    {
+        const ThemeMode hoverMode = modeForX(x, width());
+        setToolTip(QStringLiteral("Theme: %1").arg(themeModeLabel(hoverMode)));
     }
 
     static void drawSun(QPainter* painter, const QPointF& center, const QColor& color, bool filled)
@@ -2005,9 +2019,7 @@ void MainWindow::buildUi()
     toolbar->addAction(style()->standardIcon(QStyle::SP_BrowserReload), "Refresh", this, &MainWindow::refreshData);
     loginAction_ = toolbar->addAction(loginIcon(false), "Login", this, &MainWindow::openLoginDialog);
     updateLoginActionIcon();
-    toolbar->addSeparator();
     toolbar->addAction(gearIcon(), "Layout setup", this, &MainWindow::openLayoutSetupDialog);
-    toolbar->addSeparator();
     toolbar->addAction(fontIcon(), "Customize fonts", this, &MainWindow::openCustomizeDialog);
 
     gridHost_ = new QWidget(this);
