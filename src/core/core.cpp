@@ -22,6 +22,9 @@ QString appConfigDir()
 #ifdef Q_OS_WIN
     const QString path = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
     return path.isEmpty() ? QDir::home().filePath("AppData/Local/MdsScope") : path;
+#elif defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+    const QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    return path.isEmpty() ? QDir::home().filePath("Library/Application Support/MdsScope") : path;
 #else
     return QDir::home().filePath(".config/mdsscope");
 #endif
@@ -32,6 +35,9 @@ QString appCacheDir()
 #ifdef Q_OS_WIN
     const QString path = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
     return path.isEmpty() ? QDir::home().filePath("AppData/Local/MdsScope/cache") : path;
+#elif defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+    const QString path = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
+    return path.isEmpty() ? QDir::home().filePath("Library/Caches/MdsScope") : path;
 #else
     return QDir::home().filePath(".cache/mdsscope");
 #endif
@@ -393,6 +399,12 @@ QByteArray localAuthKey()
     material += qgetenv("COMPUTERNAME");
     material += '|';
     material += qgetenv("USERNAME");
+#elif defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+    material += QSysInfo::machineUniqueId();
+    material += '|';
+    material += QSysInfo::machineHostName().toUtf8();
+    material += '|';
+    material += qgetenv("USER");
 #else
     QFile machineId("/etc/machine-id");
     if (machineId.open(QIODevice::ReadOnly | QIODevice::Text)) {

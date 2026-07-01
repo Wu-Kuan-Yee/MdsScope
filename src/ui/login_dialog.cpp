@@ -9,7 +9,7 @@ LoginDialog::LoginDialog(QString rootPath, QWidget* parent)
     setWindowTitle("Login");
     setModal(true);
     setFixedWidth(420);
-    setStyleSheet(
+    QString styleSheet =
         "QDialog { background: palette(base); }"
         "QLabel#title { font-size: 24px; font-weight: 600; color: palette(text); }"
         "QLabel#subtitle { color: palette(mid); }"
@@ -17,7 +17,14 @@ LoginDialog::LoginDialog(QString rootPath, QWidget* parent)
         "QLineEdit { min-height: 32px; padding: 4px 8px; border: 1px solid palette(mid); border-radius: 4px; }"
         "QLineEdit:focus { border: 1px solid palette(highlight); }"
         "QPushButton { min-height: 32px; padding: 4px 14px; border-radius: 4px; }"
-        "QPushButton#primary { background: palette(highlight); color: palette(highlighted-text); border: 1px solid palette(highlight); }");
+        "QPushButton#primary { background: palette(highlight); color: palette(highlighted-text); border: 1px solid palette(highlight); }";
+    if (QApplication::palette().color(QPalette::Window).lightness() >= 128) {
+        styleSheet +=
+            "QLabel { background: transparent; }"
+            "QLineEdit { background: #ffffff; color: #111827; border-color: #cbd5e1; selection-background-color: #2563eb; selection-color: #ffffff; }"
+            "QLineEdit:focus { border-color: #2563eb; }";
+    }
+    setStyleSheet(styleSheet);
 
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(28, 24, 28, 24);

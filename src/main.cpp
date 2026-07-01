@@ -286,7 +286,7 @@ private slots:
 #endif
 
 private:
-#ifdef Q_OS_LINUX
+#if defined(Q_OS_LINUX) || defined(Q_OS_MACOS) || defined(Q_OS_MAC)
     static QString processOutput(const QString& program, const QStringList& arguments)
     {
         QProcess process;
@@ -298,7 +298,9 @@ private:
         }
         return QString::fromUtf8(process.readAllStandardOutput()).trimmed().toLower();
     }
+#endif
 
+#ifdef Q_OS_LINUX
     static uint schemeFromText(const QString& text)
     {
         if (text.contains(QStringLiteral("dark"))) {
@@ -386,6 +388,17 @@ private:
     }
 #endif
 
+#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+    static uint readMacColorScheme()
+    {
+        const QString output = processOutput(QStringLiteral("defaults"),
+                                             {QStringLiteral("read"),
+                                              QStringLiteral("-g"),
+                                              QStringLiteral("AppleInterfaceStyle")});
+        return output.contains(QStringLiteral("dark")) ? 1 : 2;
+    }
+#endif
+
 #ifdef Q_OS_WIN
     static uint readWindowsColorScheme()
     {
@@ -402,6 +415,8 @@ private:
         }
 #ifdef Q_OS_LINUX
         return readFallbackColorScheme();
+#elif defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+        return readMacColorScheme();
 #elif defined(Q_OS_WIN)
         return readWindowsColorScheme();
 #else
@@ -413,6 +428,8 @@ private:
     {
 #ifdef Q_OS_LINUX
         return readPortalColorScheme();
+#elif defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+        return readMacColorScheme();
 #elif defined(Q_OS_WIN)
         return readWindowsColorScheme();
 #else
