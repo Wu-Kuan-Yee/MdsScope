@@ -3,11 +3,6 @@
 MdsScope is a C++/Qt desktop application for browsing WebScope-style shot
 configuration files (`*.webscp`) and plotting MDSplus signal data through MDSIP.
 
-The project is developed as a native C++/Qt implementation of the EAST MDSplus
-data viewing workflow described by Yang and Xiao (2012).
-
-https://doi.org/10.1016/j.fusengdes.2012.09.015
-
 It is intended to be a transparent, open-source alternative to older Java 8 based
 WebScope-style clients, which can be difficult to maintain on newer Java
 runtimes. The application is currently EAST-specific: the bundled signal
@@ -335,20 +330,6 @@ Do not commit:
 The EAST API URL is intentionally stored in `APIurl`; do not commit personal
 tokens or cache files.
 
-## References
-
-The original EAST web-based MDSplus/WebScope workflow is described in:
-
-Yang, F.; Xiao, B. J. A web based MDSplus data analysis and visualization
-system for EAST. Fusion Engineering and Design 2012, 87(12), 2161-2165.
-
-https://doi.org/10.1016/j.fusengdes.2012.09.015
-
-## License
-
-MdsScope is licensed under the GNU General Public License version 3. See
-`COPYING` for the full license text.
-
 ## Disclaimer
 
 This software is provided for research, engineering, and data visualization
@@ -364,3 +345,20 @@ Users are responsible for ensuring they have permission to access any MDSIP
 servers, HTTP APIs, shot data, configuration files, and tokens used with this
 application. Do not publish private endpoints, tokens, or restricted
 experimental data.
+
+## References
+
+The original EAST web-based MDSplus/WebScope workflow is described in:
+
+Yang, F.; Xiao, B. J. A web based MDSplus data analysis and visualization
+system for EAST. Fusion Engineering and Design 2012, 87(12), 2161-2165.
+
+https://doi.org/10.1016/j.fusengdes.2012.09.015
+
+## License
+
+Copyright (C) 2026 Weikang Wang.
+
+MdsScope is licensed under
+[GPL-3.0-or-later](https://www.gnu.org/licenses/gpl-3.0.html). See `COPYING`
+for the full GNU General Public License version 3 text.

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Weikang Wang
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include "mdsscope_internal.h"
 #include "mds_client.h"
 #include "point_overlay.h"
@@ -1762,7 +1765,8 @@ public:
         addRow("Git Version", QStringLiteral(MDSSCOPE_GIT_VERSION));
         addRow("Qt Version", QString::fromLatin1(qVersion()));
         addRow("System", systemText);
-        addRow("Maintained by", htmlLink("Weikang Wang", "https://github.com/wwktz"), true);
+        addRow("Copyright", QStringLiteral("Copyright (C) 2026 ") + htmlLink("Weikang Wang", "https://github.com/wwktz"), true);
+        addRow("License", htmlLink("GPL-3.0-or-later", "https://www.gnu.org/licenses/gpl-3.0.html"), true);
         addRow("Source", htmlLink("GitHub", "https://github.com/wwktz/MdsScope"), true, false);
         layout->addWidget(card);
 
