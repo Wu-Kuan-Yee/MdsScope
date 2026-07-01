@@ -1691,6 +1691,22 @@ QIcon infoIcon()
     return QIcon(pixmap);
 }
 
+QIcon recentArrowIcon()
+{
+    QPixmap pixmap(12, 30);
+    pixmap.fill(Qt::transparent);
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QApplication::palette().color(QPalette::ButtonText));
+    painter.drawPolygon(QPolygonF{
+        QPointF(1.5, 12.5),
+        QPointF(10.5, 12.5),
+        QPointF(6.0, 18.0),
+    });
+    return QIcon(pixmap);
+}
+
 QString htmlLink(const QString& label, const QString& url)
 {
     return QStringLiteral("<a style=\"color:#ff8a65; text-decoration:none; font-weight:700;\" href=\"%1\">%2</a>")
@@ -2275,6 +2291,9 @@ void MainWindow::changeEvent(QEvent* event)
     if (event->type() == QEvent::PaletteChange && aboutButton_) {
         aboutButton_->setIcon(infoIcon());
     }
+    if (event->type() == QEvent::PaletteChange && recentEnvironmentButton_) {
+        recentEnvironmentButton_->setIcon(recentArrowIcon());
+    }
     QMainWindow::changeEvent(event);
 }
 
@@ -2341,7 +2360,50 @@ void MainWindow::buildUi()
     toolbar->setStyleSheet(
         "QToolBar { spacing: 5px; padding: 2px 4px; border: 0px; }"
         "QToolButton { margin: 0px; padding: 3px; min-width: 30px; min-height: 30px; }");
-    toolbar->addAction(style()->standardIcon(QStyle::SP_DirOpenIcon), "Open configure file", this, &MainWindow::openEnvironmentFile);
+    QAction* openAction = toolbar->addAction(style()->standardIcon(QStyle::SP_DirOpenIcon), "Open configure file", this, &MainWindow::openEnvironmentFile);
+    openButton_ = qobject_cast<QToolButton*>(toolbar->widgetForAction(openAction));
+    if (openButton_) {
+        openButton_->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    }
+    auto* recentEnvironmentSpace = new QWidget(toolbar);
+    recentEnvironmentSpace->setFixedSize(7, 30);
+    toolbar->addWidget(recentEnvironmentSpace);
+    recentEnvironmentButton_ = new QToolButton(toolbar);
+    recentEnvironmentButton_->setObjectName("recentEnvironmentButton");
+    recentEnvironmentButton_->setIcon(recentArrowIcon());
+    recentEnvironmentButton_->setIconSize(QSize(12, 30));
+    recentEnvironmentButton_->setToolTip("Recent configure files");
+    recentEnvironmentButton_->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    recentEnvironmentButton_->setAutoRaise(true);
+    recentEnvironmentButton_->setFixedSize(12, 30);
+    recentEnvironmentButton_->setStyleSheet(
+        "QToolButton#recentEnvironmentButton {"
+        "  background: transparent;"
+        "  color: palette(buttonText);"
+        "  border: 0px;"
+        "  padding: 0px;"
+        "  margin: 0px;"
+        "  min-width: 12px;"
+        "  max-width: 12px;"
+        "  min-height: 30px;"
+        "  max-height: 30px;"
+        "}");
+    auto positionRecentEnvironmentButton = [toolbar, this] {
+        if (openButton_ && recentEnvironmentButton_) {
+            recentEnvironmentButton_->move(openButton_->mapTo(toolbar, QPoint(openButton_->width() - 4, 0)));
+            recentEnvironmentButton_->raise();
+        }
+    };
+    if (openButton_) {
+        positionRecentEnvironmentButton();
+        QTimer::singleShot(0, this, positionRecentEnvironmentButton);
+        recentEnvironmentButton_->show();
+    }
+    connect(recentEnvironmentButton_, &QToolButton::clicked, this, &MainWindow::showRecentEnvironmentMenu);
+    QWidget* recentMenuParent = openButton_ ? static_cast<QWidget*>(openButton_) : static_cast<QWidget*>(toolbar);
+    recentEnvironmentMenu_ = new QMenu(recentMenuParent);
+    connect(recentEnvironmentMenu_, &QMenu::aboutToShow, this, &MainWindow::refreshRecentEnvironmentMenu);
+    refreshRecentEnvironmentMenu();
     QAction* saveAction = toolbar->addAction(saveIcon(), "Save", this, &MainWindow::saveCurrentEnvironment);
     saveAction->setShortcut(QKeySequence::Save);
     saveAction->setShortcutContext(Qt::ApplicationShortcut);
@@ -2428,7 +2490,7 @@ void MainWindow::buildUi()
         "  padding: 1px 8px;"
         "  min-height: 18px;"
         "}"
-        "QLineEdit {"
+        "QLineEdit, QComboBox {"
         "  min-height: 18px;"
         "  padding: 0px 2px;"
         "}"
@@ -2447,19 +2509,28 @@ void MainWindow::buildUi()
     bottomLayout->addWidget(zoomButton_);
     bottomLayout->addWidget(pointButton_);
     bottomLayout->addWidget(new QLabel("Shot", bottom));
-    shotEdit_ = new QLineEdit(bottom);
+    shotCombo_ = new QComboBox(bottom);
+    shotCombo_->setEditable(true);
+    shotCombo_->setInsertPolicy(QComboBox::NoInsert);
+    shotCombo_->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+    shotCombo_->setMaxVisibleItems(10);
+    shotCombo_->view()->setTextElideMode(Qt::ElideMiddle);
+    shotCombo_->view()->setMinimumWidth(260);
+    shotCombo_->view()->setMaximumWidth(520);
+    shotEdit_ = shotCombo_->lineEdit();
+    refreshShotHistory();
     auto resizeShotEdit = [this] {
-        if (!shotEdit_) {
+        if (!shotEdit_ || !shotCombo_) {
             return;
         }
         const QFontMetrics fm(shotEdit_->font());
         const int textWidth = fm.horizontalAdvance(shotEdit_->text().trimmed().isEmpty()
                                                        ? QStringLiteral("143850-143858")
                                                        : shotEdit_->text().trimmed());
-        shotEdit_->setFixedWidth(std::clamp(textWidth + 32, 105, 520));
+        shotCombo_->setFixedWidth(std::clamp(textWidth + 52, 120, 620));
     };
     resizeShotEdit();
-    bottomLayout->addWidget(shotEdit_);
+    bottomLayout->addWidget(shotCombo_);
     auto* apply = new QPushButton("Apply", bottom);
     auto* prev = new QPushButton("Prev", bottom);
     auto* next = new QPushButton("Next", bottom);
@@ -2483,6 +2554,13 @@ void MainWindow::buildUi()
     connect(stop, &QPushButton::clicked, this, [this] { setStatus("Stop requested"); });
     connect(shotEdit_, &QLineEdit::returnPressed, this, &MainWindow::applyShot);
     connect(shotEdit_, &QLineEdit::textChanged, this, [resizeShotEdit] { resizeShotEdit(); });
+    connect(shotCombo_, &QComboBox::activated, this, [this](int index) {
+        const QString shot = shotCombo_->itemData(index).toString();
+        if (!shot.isEmpty()) {
+            shotCombo_->setEditText(shot);
+        }
+        applyShot();
+    });
     connect(dataModeCombo_, &QComboBox::currentIndexChanged, this, [this] { refreshData(); });
     connect(aboutButton_, &QToolButton::clicked, this, &MainWindow::openAboutDialog);
 }
@@ -2492,9 +2570,9 @@ void MainWindow::loadDefaultEnvironment(bool useLatestWhenNoCurrentShot)
     const QString defaultTomlConfig = QDir(environmentPath_).filePath("init.toml");
     const QString defaultWebscpConfig = QDir(environmentPath_).filePath("init.webscp");
     if (QFileInfo::exists(defaultTomlConfig)) {
-        loadEnvironmentFile(defaultTomlConfig, useLatestWhenNoCurrentShot);
+        loadEnvironmentFile(defaultTomlConfig, useLatestWhenNoCurrentShot, false);
     } else if (QFileInfo::exists(defaultWebscpConfig)) {
-        loadEnvironmentFile(defaultWebscpConfig, useLatestWhenNoCurrentShot);
+        loadEnvironmentFile(defaultWebscpConfig, useLatestWhenNoCurrentShot, false);
     } else {
         loadEnvironmentList(useLatestWhenNoCurrentShot);
     }
@@ -2505,7 +2583,7 @@ void MainWindow::loadEnvironmentList(bool useLatestWhenNoCurrentShot)
     QDir dir(environmentPath_);
     const auto files = dir.entryInfoList({"*.toml", "*.webscp"}, QDir::Files, QDir::Name);
     if (!files.isEmpty()) {
-        loadEnvironmentFile(files.first().absoluteFilePath(), useLatestWhenNoCurrentShot);
+        loadEnvironmentFile(files.first().absoluteFilePath(), useLatestWhenNoCurrentShot, false);
         return;
     }
     setStatus("No environment files found");
@@ -2537,6 +2615,46 @@ void MainWindow::rememberFileDialogDir(const QString& path)
     settings.setValue("files/last_dir", selectedPath);
 }
 
+QStringList MainWindow::recentEnvironmentFiles() const
+{
+    QSettings settings(uiSettingsPath(rootPath_), QSettings::IniFormat);
+    QStringList files = settings.value("files/recent").toStringList();
+    QStringList cleaned;
+    for (const QString& file : files) {
+        const QString path = QFileInfo(file).absoluteFilePath();
+        if (!path.isEmpty() && QFileInfo::exists(path) && !cleaned.contains(path)) {
+            cleaned.push_back(path);
+        }
+        if (cleaned.size() >= 10) {
+            break;
+        }
+    }
+    return cleaned;
+}
+
+void MainWindow::rememberRecentEnvironmentFile(const QString& path)
+{
+    const QString filePath = QFileInfo(path).absoluteFilePath();
+    if (filePath.isEmpty()) {
+        return;
+    }
+    QStringList files = recentEnvironmentFiles();
+    files.removeAll(filePath);
+    files.prepend(filePath);
+    while (files.size() > 10) {
+        files.removeLast();
+    }
+    QSettings settings(uiSettingsPath(rootPath_), QSettings::IniFormat);
+    settings.setValue("files/recent", files);
+}
+
+void MainWindow::clearRecentEnvironmentFiles()
+{
+    QSettings settings(uiSettingsPath(rootPath_), QSettings::IniFormat);
+    settings.remove("files/recent");
+    refreshRecentEnvironmentMenu();
+}
+
 void MainWindow::openEnvironmentFile()
 {
     QSettings settings(uiSettingsPath(rootPath_), QSettings::IniFormat);
@@ -2553,7 +2671,109 @@ void MainWindow::openEnvironmentFile()
     }
 }
 
-bool MainWindow::loadEnvironmentFile(const QString& path, bool useLatestWhenNoCurrentShot)
+void MainWindow::openRecentEnvironmentFile(const QString& path)
+{
+    if (!QFileInfo::exists(path)) {
+        QMessageBox::warning(this, "Open MdsScope Config", "Recent file no longer exists:\n" + path);
+        refreshRecentEnvironmentMenu();
+        return;
+    }
+    rememberFileDialogDir(path);
+    loadEnvironmentFile(path);
+}
+
+void MainWindow::refreshRecentEnvironmentMenu()
+{
+    if (!recentEnvironmentMenu_) {
+        return;
+    }
+    recentEnvironmentMenu_->clear();
+    const QStringList files = recentEnvironmentFiles();
+    if (files.isEmpty()) {
+        QAction* empty = recentEnvironmentMenu_->addAction("No Recent Files");
+        empty->setEnabled(false);
+        return;
+    }
+
+    const QFontMetrics fm(recentEnvironmentMenu_->font());
+    int menuTextWidth = fm.horizontalAdvance("Clear Recent Files");
+    for (const QString& path : files) {
+        menuTextWidth = std::max(menuTextWidth, fm.horizontalAdvance(QFileInfo(path).fileName()));
+    }
+    const int menuWidth = std::clamp(menuTextWidth + 56, 220, 520);
+    recentEnvironmentMenu_->setMinimumWidth(menuWidth);
+    for (const QString& path : files) {
+        const QFileInfo info(path);
+        QAction* action = recentEnvironmentMenu_->addAction(fm.elidedText(info.fileName(), Qt::ElideMiddle, menuWidth - 36));
+        action->setToolTip(path);
+        connect(action, &QAction::triggered, this, [this, path] { openRecentEnvironmentFile(path); });
+    }
+    recentEnvironmentMenu_->addSeparator();
+    QAction* clearAction = recentEnvironmentMenu_->addAction("Clear Recent Files");
+    connect(clearAction, &QAction::triggered, this, &MainWindow::clearRecentEnvironmentFiles);
+}
+
+void MainWindow::showRecentEnvironmentMenu()
+{
+    if (!openButton_ || !recentEnvironmentMenu_) {
+        return;
+    }
+    refreshRecentEnvironmentMenu();
+    recentEnvironmentMenu_->popup(openButton_->mapToGlobal(QPoint(0, openButton_->height())));
+}
+
+QStringList MainWindow::recentShotExpressions() const
+{
+    QSettings settings(uiSettingsPath(rootPath_), QSettings::IniFormat);
+    QStringList shots = settings.value("shot/recent").toStringList();
+    QStringList cleaned;
+    for (const QString& shot : shots) {
+        const QString value = shot.trimmed();
+        if (!value.isEmpty() && !cleaned.contains(value)) {
+            cleaned.push_back(value);
+        }
+        if (cleaned.size() >= 10) {
+            break;
+        }
+    }
+    return cleaned;
+}
+
+void MainWindow::rememberShotExpression(const QString& shot)
+{
+    const QString value = shot.trimmed();
+    if (value.isEmpty()) {
+        return;
+    }
+    QStringList shots = recentShotExpressions();
+    shots.removeAll(value);
+    shots.prepend(value);
+    while (shots.size() > 10) {
+        shots.removeLast();
+    }
+    QSettings settings(uiSettingsPath(rootPath_), QSettings::IniFormat);
+    settings.setValue("shot/recent", shots);
+    refreshShotHistory();
+}
+
+void MainWindow::refreshShotHistory()
+{
+    if (!shotCombo_ || !shotEdit_) {
+        return;
+    }
+    const QString current = shotEdit_->text();
+    QSignalBlocker comboBlocker(shotCombo_);
+    QSignalBlocker editBlocker(shotEdit_);
+    shotCombo_->clear();
+    const QFontMetrics fm(shotCombo_->font());
+    for (const QString& shot : recentShotExpressions()) {
+        shotCombo_->addItem(fm.elidedText(shot, Qt::ElideMiddle, 300), shot);
+        shotCombo_->setItemData(shotCombo_->count() - 1, shot, Qt::ToolTipRole);
+    }
+    shotCombo_->setEditText(current);
+}
+
+bool MainWindow::loadEnvironmentFile(const QString& path, bool useLatestWhenNoCurrentShot, bool rememberRecent)
 {
     const QString previousShot = shotEdit_ ? shotEdit_->text().trimmed() : QString();
     const bool shouldFetchLatest = useLatestWhenNoCurrentShot && previousShot.isEmpty();
@@ -2582,6 +2802,9 @@ bool MainWindow::loadEnvironmentFile(const QString& path, bool useLatestWhenNoCu
         updateTopInfoLabels();
     }
     setStatus(QString("Loaded %1").arg(QFileInfo(path).fileName()));
+    if (rememberRecent) {
+        rememberRecentEnvironmentFile(path);
+    }
     prewarmConnections(!shouldFetchLatest);
     if (shouldFetchLatest) {
         fetchLatestShotAsync();
@@ -2999,6 +3222,7 @@ void MainWindow::applyShot()
     if (shotEdit_->text() != shot) {
         shotEdit_->setText(shot);
     }
+    rememberShotExpression(shot);
     ++latestShotGeneration_;
     setAllPlotShots(shot);
     refreshData();
