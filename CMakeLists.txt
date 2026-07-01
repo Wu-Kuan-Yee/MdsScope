@@ -50,7 +50,7 @@ else()
     set(MDS_SCOPE_GIT_VERSION "unknown")
 endif()
 
-if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT AND UNIX AND NOT APPLE)
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT AND UNIX)
     if("$ENV{USER}" STREQUAL "root" OR DEFINED ENV{SUDO_USER})
         set(CMAKE_INSTALL_PREFIX "/usr/local" CACHE PATH "Install prefix" FORCE)
     elseif(DEFINED ENV{HOME})
@@ -188,9 +188,42 @@ endif()
 if(APPLE)
     install(TARGETS MdsScope
         BUNDLE DESTINATION .
+        COMPONENT app
+    )
+    install(PROGRAMS "$<TARGET_FILE:MdsScope>"
+        DESTINATION ${CMAKE_INSTALL_BINDIR}
+        RENAME MdsScope
+        COMPONENT tools
     )
     install(TARGETS transfer
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        COMPONENT tools
+    )
+
+    install(FILES
+        environment/init.toml
+        environment/init.webscp
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/mdsscope/environment
+        COMPONENT tools
+    )
+
+    install(FILES
+        APIurl
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/mdsscope
+        COMPONENT tools
+    )
+
+    install(FILES
+        source_index/trees.txt
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/mdsscope/source_index
+        COMPONENT tools
+    )
+
+    install(DIRECTORY
+        source_index/signals
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/mdsscope/source_index
+        FILES_MATCHING PATTERN "*.txt"
+        COMPONENT tools
     )
 else()
     install(TARGETS MdsScope transfer

@@ -88,11 +88,32 @@ macOS source build:
 cmake -S . -B build -DCMAKE_PREFIX_PATH="$(brew --prefix qt)"
 cmake --build build -j
 open ./build/MdsScope.app
-cmake --install build --prefix "$HOME/Applications"
 ```
 
-Use `/Applications` instead of `$HOME/Applications` for a system-wide macOS
-install. Linux uses `mdsscope.desktop`; macOS uses `MdsScope.app`.
+Install the macOS app:
+
+```bash
+cmake --install build --prefix "$HOME/Applications" --component app
+```
+
+Install the command-line tools to the default prefix (`$HOME/.local` for
+non-root users):
+
+```bash
+cmake --install build --component tools
+```
+
+This gives:
+
+```text
+$HOME/.local/bin/MdsScope
+$HOME/.local/bin/transfer
+```
+
+The `app` component installs `MdsScope.app`; the `tools` component installs the
+`MdsScope` and `transfer` command-line executables.
+
+Linux uses `mdsscope.desktop`; macOS uses `MdsScope.app`.
 
 Uninstall a CMake install:
 
