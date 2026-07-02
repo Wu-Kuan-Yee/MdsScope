@@ -269,6 +269,9 @@ public:
     void setThemeMode(ThemeMode mode)
     {
         mode = normalizedThemeMode(static_cast<int>(mode));
+        if (mode == ThemeMode::Auto) {
+            setSystemScheme(readCurrentColorScheme());
+        }
         if (mode == currentMode_) {
             return;
         }
@@ -365,11 +368,16 @@ private:
         return 0;
     }
 
-    static uint readFallbackColorScheme()
+    static uint readConfiguredDesktopColorScheme()
     {
-        uint scheme = readQtColorScheme();
-        if (scheme != 0) {
-            return scheme;
+        const QString desktop = qEnvironmentVariable("XDG_CURRENT_DESKTOP").toLower();
+        const bool kdeSession = desktop.contains(QStringLiteral("kde")) || desktop.contains(QStringLiteral("plasma"))
+                                || qEnvironmentVariableIsSet("KDE_FULL_SESSION");
+        if (kdeSession) {
+            const uint scheme = readKdeColorScheme();
+            if (scheme != 0) {
+                return scheme;
+            }
         }
 
         const QString gtkTheme = qEnvironmentVariable("GTK_THEME").toLower();
@@ -392,12 +400,25 @@ private:
                                {QStringLiteral("get"),
                                 QStringLiteral("org.gnome.desktop.interface"),
                                 QStringLiteral("gtk-theme")});
-        scheme = schemeFromText(output);
+        uint scheme = schemeFromText(output);
         if (scheme != 0) {
             return scheme;
         }
 
-        scheme = readKdeColorScheme();
+        if (!kdeSession) {
+            scheme = readKdeColorScheme();
+        }
+        return scheme;
+    }
+
+    static uint readFallbackColorScheme()
+    {
+        uint scheme = readConfiguredDesktopColorScheme();
+        if (scheme != 0) {
+            return scheme;
+        }
+
+        scheme = readQtColorScheme();
         return scheme != 0 ? scheme : 2;
     }
 
@@ -413,7 +434,7 @@ private:
         if (reply.isValid()) {
             return portalColorScheme(reply.value().variant().toUInt());
         }
-        return readFallbackColorScheme();
+        return 0;
     }
 #endif
 
@@ -456,8 +477,8 @@ private:
     static uint readCurrentColorScheme()
     {
 #ifdef Q_OS_LINUX
-        const uint qtScheme = readQtColorScheme();
-        return qtScheme != 0 ? qtScheme : readPortalColorScheme();
+        uint scheme = readPortalColorScheme();
+        return scheme != 0 ? scheme : readFallbackColorScheme();
 #elif defined(Q_OS_MACOS) || defined(Q_OS_MAC)
         return readMacColorScheme();
 #elif defined(Q_OS_WIN)
