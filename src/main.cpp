@@ -246,6 +246,9 @@ public:
                                               SLOT(settingChanged(QString,QString,QDBusVariant)));
 #endif
         connect(&pollTimer_, &QTimer::timeout, this, [this] {
+            if (currentMode_ != ThemeMode::Auto) {
+                return;
+            }
             setSystemScheme(readCurrentColorScheme());
         });
         pollTimer_.start(3000);

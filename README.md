@@ -15,7 +15,7 @@ configuration, MDSIP defaults, login flow, and HTTP metadata API target EAST.
 - Switch between thin and full data read modes.
 - Apply single-shot or batch-shot expressions globally.
 - Use EAST HTTP metadata for latest shot and top-bar shot summary.
-- Run on Linux, macOS, and Windows with system light/dark theme support.
+- Run on Linux, macOS, and Windows.
 
 ## Requirements
 
@@ -187,9 +187,8 @@ continues to come from EAST MDSIP.
 ### Data Export
 
 Data export writes files under an `output/` subdirectory of the selected base
-directory. Export supports text, CSV, TSV, and JSON formats, optional x-range
-selection, and remembers the last selected directory and format. The default
-export locations are:
+directory. Export supports text, CSV, TSV, and JSON formats, plus optional
+x-range selection. The default export locations are:
 
 ```text
 Linux:   ~/Downloads/mdsscope/output/

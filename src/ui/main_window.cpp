@@ -652,7 +652,7 @@ public:
         , sourceIndexDir_(sourceIndexDir)
     {
         setWindowTitle("Data Source Setup");
-        treeModel_ = new QStringListModel(readSourceIndexLines(QDir(sourceIndexDir_).filePath("trees.txt")), this);
+        treeNames_ = readSourceIndexLines(QDir(sourceIndexDir_).filePath("trees.txt"));
         auto* mainLayout = new QVBoxLayout(this);
 
         rowsHost_ = new QWidget(this);
@@ -705,7 +705,6 @@ public:
                     if (!row->deleted) {
                         ++activeCount;
                         if (!copiedDefaults) {
-                            sig.experiment = row->tree->text().trimmed();
                             sig.serverIp = row->server->text().trimmed();
                             copiedDefaults = true;
                         }
@@ -752,17 +751,21 @@ private:
         QLineEdit* tree = nullptr;
         QLineEdit* signal = nullptr;
         QLineEdit* server = nullptr;
+        QStringListModel* treeModel = nullptr;
         QCompleter* treeCompleter = nullptr;
         QStringListModel* signalModel = nullptr;
         QCompleter* signalCompleter = nullptr;
+        QMenu* reverseTreeMenu = nullptr;
         QPushButton* colorButton = nullptr;
         QCheckBox* hidden = nullptr;
         QComboBox* dataMode = nullptr;
         QPushButton* deleteButton = nullptr;
         QColor color;
         QString xExpr;
+        QString autoTree;
         bool deleted = false;
         bool manualColor = false;
+        bool updatingTreeFromAutoMatch = false;
     };
 
     void addRow(const SignalSpec& sig, int colorIndex)
@@ -772,9 +775,11 @@ private:
         row->tree = new QLineEdit(sig.experiment, rowsHost_);
         row->signal = new QLineEdit(sig.yExpr, rowsHost_);
         row->server = new QLineEdit(sig.serverIp, rowsHost_);
-        row->treeCompleter = makeCompleter(treeModel_, row->tree);
+        row->treeModel = new QStringListModel(row->tree);
+        row->treeCompleter = makeCompleter(row->treeModel, row->tree);
         row->signalModel = new QStringListModel(row->signal);
         row->signalCompleter = makeCompleter(row->signalModel, row->signal);
+        row->reverseTreeMenu = new QMenu(row->tree);
         row->colorButton = new QPushButton(rowsHost_);
         row->hidden = new QCheckBox(rowsHost_);
         row->dataMode = new QComboBox(rowsHost_);
@@ -792,6 +797,7 @@ private:
         row->dataMode->setMinimumWidth(72);
         row->tree->setCompleter(row->treeCompleter);
         row->signal->setCompleter(row->signalCompleter);
+        updateTreeCompleter(row, false);
         updateSignalCompleter(row);
         updateColorButton(row);
 
@@ -815,7 +821,13 @@ private:
             }
         });
         connect(row->tree, &QLineEdit::textChanged, this, [this, row] {
+            if (!row->updatingTreeFromAutoMatch) {
+                row->autoTree.clear();
+            }
             updateSignalCompleter(row);
+        });
+        connect(row->signal, &QLineEdit::textChanged, this, [this, row] {
+            updateTreeCompleter(row, true);
         });
         connect(row->deleteButton, &QPushButton::clicked, this, [row] {
             row->deleted = true;
@@ -912,15 +924,262 @@ private:
 
     QStringList signalNamesForTree(const QString& tree)
     {
-        const QString key = tree.trimmed().toLower();
+        const QString resolvedTree = exactTreeName(tree);
+        const QString key = resolvedTree.trimmed().toLower();
         if (key.isEmpty()) {
-            return {};
+            return allSignalNames();
         }
         if (!signalCache_.contains(key)) {
-            const QString path = QDir(QDir(sourceIndexDir_).filePath("signals")).filePath(sourceIndexFileName(tree));
+            const QString path = QDir(QDir(sourceIndexDir_).filePath("signals")).filePath(sourceIndexFileName(resolvedTree));
             signalCache_.insert(key, readSourceIndexLines(path));
         }
         return signalCache_.value(key);
+    }
+
+    QString exactTreeName(const QString& tree) const
+    {
+        const QString key = tree.trimmed();
+        if (key.isEmpty()) {
+            return {};
+        }
+        for (const QString& candidate : treeNames_) {
+            if (candidate.compare(key, Qt::CaseInsensitive) == 0) {
+                return candidate;
+            }
+        }
+        return {};
+    }
+
+    void ensureGlobalSignalIndex()
+    {
+        if (globalSignalIndexLoaded_) {
+            return;
+        }
+        globalSignalIndexLoaded_ = true;
+
+        QSet<QString> seenSignals;
+        for (const QString& tree : std::as_const(treeNames_)) {
+            const QString treeKey = tree.trimmed().toLower();
+            if (treeKey.isEmpty()) {
+                continue;
+            }
+
+            const QStringList signalNames = signalNamesForTree(tree);
+            for (const QString& signalName : signalNames) {
+                const QString signalKey = signalIndexKey(signalName);
+                if (signalKey.isEmpty()) {
+                    continue;
+                }
+                signalToTrees_[signalKey].insert(tree);
+                if (!seenSignals.contains(signalKey)) {
+                    globalSignals_.push_back(signalName);
+                    seenSignals.insert(signalKey);
+                }
+            }
+        }
+        globalSignals_.sort(Qt::CaseInsensitive);
+    }
+
+    QStringList allSignalNames()
+    {
+        ensureGlobalSignalIndex();
+        return globalSignals_;
+    }
+
+    QStringList treeNamesForSignal(const QString& signal)
+    {
+        const QString filter = signalIndexKey(signal);
+        if (filter.isEmpty()) {
+            return treeNames_;
+        }
+
+        ensureGlobalSignalIndex();
+        const auto exactTrees = signalToTrees_.constFind(filter);
+        if (exactTrees != signalToTrees_.cend()) {
+            QStringList trees(exactTrees.value().cbegin(), exactTrees.value().cend());
+            trees.sort(Qt::CaseInsensitive);
+            return trees;
+        }
+
+        QSet<QString> seenTrees;
+        QStringList trees;
+        for (auto it = signalToTrees_.cbegin(); it != signalToTrees_.cend(); ++it) {
+            if (!it.key().contains(filter)) {
+                continue;
+            }
+            for (const QString& tree : it.value()) {
+                const QString treeKey = tree.toLower();
+                if (!seenTrees.contains(treeKey)) {
+                    trees.push_back(tree);
+                    seenTrees.insert(treeKey);
+                }
+            }
+        }
+        trees.sort(Qt::CaseInsensitive);
+        return trees;
+    }
+
+    bool signalHasExactTreeMatches(const QString& signal)
+    {
+        const QString key = signalIndexKey(signal);
+        if (key.isEmpty()) {
+            return false;
+        }
+        ensureGlobalSignalIndex();
+        return signalToTrees_.contains(key);
+    }
+
+    QStringList exactTreeMatchesForSignal(const QString& signal)
+    {
+        const QString key = signalIndexKey(signal);
+        if (key.isEmpty()) {
+            return {};
+        }
+        ensureGlobalSignalIndex();
+        const auto it = signalToTrees_.constFind(key);
+        if (it == signalToTrees_.cend()) {
+            return {};
+        }
+        QStringList trees(it.value().cbegin(), it.value().cend());
+        trees.sort(Qt::CaseInsensitive);
+        return trees;
+    }
+
+    static QString signalIndexKey(const QString& signal)
+    {
+        QString key = normalizedMdsSignal(signal).trimmed().toLower();
+        while (key.startsWith(QStringLiteral("\\\\"))) {
+            key.remove(0, 1);
+        }
+        return key;
+    }
+
+    void updateTreeCompleter(Row* row, bool showReverseMatches)
+    {
+        if (!row || !row->treeModel) {
+            return;
+        }
+        row->treeModel->setStringList(treeNamesForSignal(row->signal->text()));
+        if (!treeAvailableForReverseMatch(row)) {
+            if (row->reverseTreeMenu) {
+                row->reverseTreeMenu->hide();
+            }
+            return;
+        }
+        const bool hasExactMatches = signalHasExactTreeMatches(row->signal->text());
+        const QStringList exactTrees = hasExactMatches ? exactTreeMatchesForSignal(row->signal->text()) : QStringList();
+        maybeApplyUniqueTreeMatch(row, exactTrees);
+        if (exactTrees.size() <= 1) {
+            if (row->reverseTreeMenu) {
+                row->reverseTreeMenu->hide();
+            }
+            return;
+        }
+        if ((!showReverseMatches || row->signal->text().trimmed().isEmpty() || !hasExactMatches) && row->reverseTreeMenu) {
+            row->reverseTreeMenu->hide();
+        }
+        if (!showReverseMatches || row->signal->text().trimmed().isEmpty()
+            || row->treeModel->rowCount() == 0 || !hasExactMatches) {
+            return;
+        }
+
+        if (row->signalCompleter && row->signalCompleter->popup()) {
+            row->signalCompleter->popup()->hide();
+        }
+        if (row->treeCompleter && row->treeCompleter->popup()) {
+            row->treeCompleter->popup()->hide();
+        }
+        if (row->reverseTreeMenu) {
+            row->reverseTreeMenu->hide();
+        }
+
+        const QString signalText = row->signal->text();
+        QTimer::singleShot(80, this, [this, row, signalText] {
+            if (!row || row->deleted || !row->tree || !row->reverseTreeMenu || !row->treeModel
+                || row->signal->text() != signalText || !signalHasExactTreeMatches(signalText)
+                || row->treeModel->rowCount() == 0 || !treeAvailableForReverseMatch(row)
+                || exactTreeMatchesForSignal(signalText).size() <= 1) {
+                return;
+            }
+            if (row->signalCompleter && row->signalCompleter->popup() && row->signalCompleter->popup()->isVisible()) {
+                row->signalCompleter->popup()->hide();
+                QTimer::singleShot(80, this, [this, row, signalText] {
+                    if (!row || row->deleted || !row->tree || !row->reverseTreeMenu || !row->treeModel
+                        || row->signal->text() != signalText || !signalHasExactTreeMatches(signalText)
+                        || row->treeModel->rowCount() == 0 || !treeAvailableForReverseMatch(row)
+                        || exactTreeMatchesForSignal(signalText).size() <= 1) {
+                        return;
+                    }
+                    showReverseTreeMenu(row, signalText);
+                });
+                return;
+            }
+            showReverseTreeMenu(row, signalText);
+        });
+    }
+
+    static bool treeAvailableForReverseMatch(const Row* row)
+    {
+        if (!row || !row->tree) {
+            return false;
+        }
+        const QString currentTree = row->tree->text().trimmed();
+        return currentTree.isEmpty()
+               || (!row->autoTree.isEmpty()
+                   && currentTree.compare(row->autoTree, Qt::CaseInsensitive) == 0);
+    }
+
+    void maybeApplyUniqueTreeMatch(Row* row, const QStringList& trees)
+    {
+        if (!row || row->deleted || !row->tree || trees.size() != 1) {
+            return;
+        }
+
+        const QString tree = trees.front();
+        const QString currentTree = row->tree->text().trimmed();
+        if (!treeAvailableForReverseMatch(row)) {
+            return;
+        }
+
+        if (currentTree.compare(tree, Qt::CaseInsensitive) == 0) {
+            row->autoTree = tree;
+            return;
+        }
+
+        row->updatingTreeFromAutoMatch = true;
+        row->tree->setText(tree);
+        row->updatingTreeFromAutoMatch = false;
+        row->autoTree = tree;
+    }
+
+    void showReverseTreeMenu(Row* row, const QString& signal)
+    {
+        if (!row || row->deleted || !row->tree || !row->reverseTreeMenu) {
+            return;
+        }
+
+        const QStringList trees = exactTreeMatchesForSignal(signal);
+        if (trees.isEmpty()) {
+            return;
+        }
+
+        row->reverseTreeMenu->clear();
+        for (const QString& tree : trees) {
+            QAction* action = row->reverseTreeMenu->addAction(tree);
+            connect(action, &QAction::triggered, this, [row, tree] {
+                if (row && row->tree) {
+                    row->tree->setText(tree);
+                }
+            });
+        }
+
+        const QFontMetrics fm(row->reverseTreeMenu->font());
+        int menuWidth = row->tree->width();
+        for (const QString& tree : trees) {
+            menuWidth = std::max(menuWidth, fm.horizontalAdvance(tree) + 48);
+        }
+        row->reverseTreeMenu->setMinimumWidth(menuWidth);
+        row->reverseTreeMenu->popup(row->tree->mapToGlobal(QPoint(0, row->tree->height())));
     }
 
     void updateSignalCompleter(Row* row)
@@ -943,9 +1202,12 @@ private:
     QString sourceIndexDir_;
     QWidget* rowsHost_ = nullptr;
     QGridLayout* rowsLayout_ = nullptr;
-    QStringListModel* treeModel_ = nullptr;
+    QStringList treeNames_;
+    QStringList globalSignals_;
     QHash<QString, QStringList> signalCache_;
+    QHash<QString, QSet<QString>> signalToTrees_;
     QVector<Row*> rows_;
+    bool globalSignalIndexLoaded_ = false;
 };
 
 class PanelSetupDialog final : public QDialog {
@@ -3817,6 +4079,16 @@ void MainWindow::rememberLoadedSourceSignal(const LoadedSignal& item)
         return;
     }
     const SignalSpec& sig = displayConfig_.columns[item.column][item.row].signalSpecs[item.signal];
+    const QString tree = sig.experiment.trimmed().toLower();
+    const QString signal = normalizedMdsSignal(sig.yExpr).trimmed().toLower();
+    if (tree.isEmpty() || signal.isEmpty()) {
+        return;
+    }
+    const QString key = tree + QChar('\n') + signal;
+    if (rememberedSourceSignals_.contains(key)) {
+        return;
+    }
+    rememberedSourceSignals_.insert(key);
     addSourceIndexSignal(sig.experiment, sig.yExpr);
 }
 

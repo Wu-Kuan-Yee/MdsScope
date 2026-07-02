@@ -414,6 +414,7 @@ private:
     int streamedFailed_ = 0;
     QVector<LoadedSignal> queuedLoadedSignals_;
     bool queuedLoadedSignalApply_ = false;
+    QSet<QString> rememberedSourceSignals_;
     QString latestShot_;
     bool latestShotFetchRunning_ = false;
     int latestShotGeneration_ = 0;
