@@ -1089,7 +1089,7 @@ void PlotWidget::renderBasePlot(QPainter& painter) const
         axisLabelRects.push_back(textRect);
         painter.drawText(textRect, alignment, xLabels.value(i));
     }
-    const QString xUnit = spec_.xLabel.trimmed().isEmpty() ? QStringLiteral("S") : spec_.xLabel.trimmed();
+    const QString xUnit = spec_.xLabel.trimmed().isEmpty() ? QStringLiteral("s") : spec_.xLabel.trimmed();
     double xUnitCenter = pr.center().x();
     if (xTickPixels.size() >= 2) {
         double bestDistance = std::numeric_limits<double>::infinity();
