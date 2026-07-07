@@ -178,6 +178,22 @@ Convert legacy `.webscp` files with `transfer`:
 ./build/transfer --recursive "<config>/environment"
 ```
 
+Windows portable package examples:
+
+```powershell
+.\transfer.exe ".\environment\init.webscp"
+.\transfer.exe ".\environment"
+.\transfer.exe --recursive ".\environment"
+.\transfer.exe --recursive --out-dir ".\converted" ".\environment"
+```
+
+Windows source build examples:
+
+```powershell
+.\build\Release\transfer.exe ".\environment\init.webscp"
+.\build\Release\transfer.exe --recursive --out-dir ".\converted" ".\environment"
+```
+
 ### EAST HTTP Metadata API
 
 The EAST HTTP metadata endpoint is stored in `APIurl`. It is used for latest
