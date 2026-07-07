@@ -1218,7 +1218,19 @@ void PlotWidget::mousePressEvent(QMouseEvent* event)
 void PlotWidget::keyPressEvent(QKeyEvent* event)
 {
     if (interactionMode_ == InteractionMode::Point && event->modifiers() == Qt::NoModifier) {
-        if (event->key() == Qt::Key_Left) {
+        if (event->key() == Qt::Key_Escape) {
+            if (pointTrackingActive_) {
+                pointTrackingActive_ = false;
+                pointHoverQueued_ = false;
+                hoverText_.clear();
+                hoverSeriesIndex_ = -1;
+                hoverSeriesLocked_ = false;
+                clearPointOverlay();
+                emit pointTrackingStopped();
+                event->accept();
+                return;
+            }
+        } else if (event->key() == Qt::Key_Left) {
             if (stepActivePoint(-1)) {
                 event->accept();
                 return;

@@ -2766,7 +2766,7 @@ void MainWindow::buildUi()
         button->setToolButtonStyle(Qt::ToolButtonIconOnly);
     }
     zoomButton_->setToolTip("Zoom / Move (Ctrl+Z): drag to zoom, middle-drag or Shift-drag to move");
-    pointButton_->setToolTip("Point (Ctrl+P)");
+    pointButton_->setToolTip("Point (Ctrl+P): click to activate, Esc to exit");
     pointButton_->setChecked(true);
     bottomLayout->addWidget(zoomButton_);
     bottomLayout->addWidget(pointButton_);
