@@ -175,6 +175,7 @@ public:
     void resetScale(bool repaint = true);
     void applyView(const QRectF& view);
     void applyXRangeAutoY(double xmin, double xmax);
+    void applyYRangeKeepX(double ymin, double ymax);
     QRectF currentView() const;
     bool hasView() const { return hasView_; }
     void setPointX(double x);
@@ -332,6 +333,7 @@ private:
                              double customXMax = qQNaN(),
                              const QHash<QString, QSet<int>>& signalFilter = {});
     void applyScaleToAll();
+    void applyYScaleToAll();
     void resetCurrentScale();
     void resetScales();
     void maximizeCurrentPanel();

@@ -443,6 +443,31 @@ void PlotWidget::applyXRangeAutoY(double xmin, double xmax)
     update();
 }
 
+void PlotWidget::applyYRangeKeepX(double ymin, double ymax)
+{
+    if (!std::isfinite(ymin) || !std::isfinite(ymax) || ymin == ymax) {
+        return;
+    }
+    if (ymax < ymin) {
+        std::swap(ymin, ymax);
+    }
+
+    QRectF next = effectiveView();
+    if (!next.isValid() || next.width() <= 0.0) {
+        next = dataBounds();
+    }
+    if (!next.isValid() || next.width() <= 0.0) {
+        return;
+    }
+    next.setTop(ymin);
+    next.setBottom(ymax);
+    expandFlatRange(next);
+    view_ = next;
+    hasView_ = true;
+    invalidatePlotCache();
+    update();
+}
+
 QRectF PlotWidget::currentView() const
 {
     return effectiveView();

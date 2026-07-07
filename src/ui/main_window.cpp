@@ -13,6 +13,19 @@ void setLabelTextIfChanged(QLabel* label, const QString& text)
     }
 }
 
+void clearCustomRanges(PlotSpec* plot)
+{
+    if (!plot) {
+        return;
+    }
+    plot->customXRange = false;
+    plot->customYRange = false;
+    plot->xmin = qQNaN();
+    plot->xmax = qQNaN();
+    plot->ymin = qQNaN();
+    plot->ymax = qQNaN();
+}
+
 QString themeModeLabel(ThemeMode mode)
 {
     switch (mode) {
@@ -3227,6 +3240,7 @@ void MainWindow::showPanelContextMenu(PlotWidget* plot, int column, int row, con
     QAction* resetCurrentAction = menu.addAction("Reset Current Scale");
     QAction* resetAllAction = menu.addAction("Reset All Panels");
     QAction* sameXAction = menu.addAction("All Same X Scale");
+    QAction* sameYAction = menu.addAction("All Same Y Scale");
 
     const QAction* chosen = menu.exec(plot->mapToGlobal(pos));
     if (!chosen) {
@@ -3248,6 +3262,8 @@ void MainWindow::showPanelContextMenu(PlotWidget* plot, int column, int row, con
         resetScales();
     } else if (chosen == sameXAction) {
         applyScaleToAll();
+    } else if (chosen == sameYAction) {
+        applyYScaleToAll();
     }
 }
 
@@ -4214,7 +4230,9 @@ void MainWindow::panelSetupForCurrentPanel()
     }
 
     dialog.applyTo(&plot);
-    syncDisplayConfig();
+    displayConfig_ = expandedShotLayout(config_);
+    plotWidgets_[selectedColumn_][selectedRow_]->setSpec(displayConfig_.columns[selectedColumn_][selectedRow_]);
+    plotWidgets_[selectedColumn_][selectedRow_]->resetScale();
     updateTopInfoLabels();
     setStatus(QString("Updated panel setup: col %1 row %2").arg(selectedColumn_ + 1).arg(selectedRow_ + 1));
 }
@@ -4516,14 +4534,50 @@ void MainWindow::applyScaleToAll()
     setStatus("Applied current X scale to other panels");
 }
 
+void MainWindow::applyYScaleToAll()
+{
+    PlotWidget* current = currentPlotWidget();
+    if (!current) {
+        return;
+    }
+    const QRectF view = current->currentView();
+    if (!view.isValid() || view.height() <= 0.0) {
+        return;
+    }
+    for (auto& col : plotWidgets_) {
+        for (PlotWidget* plot : col) {
+            if (plot == current) {
+                continue;
+            }
+            plot->applyYRangeKeepX(view.top(), view.bottom());
+        }
+    }
+    setStatus("Applied current Y scale to other panels");
+}
+
 void MainWindow::resetCurrentScale()
 {
     PlotWidget* current = currentPlotWidget();
     if (!current) {
         return;
     }
+    if (selectedColumn_ >= 0 && selectedRow_ >= 0
+        && selectedColumn_ < config_.columns.size()
+        && selectedRow_ < config_.columns[selectedColumn_].size()) {
+        clearCustomRanges(&config_.columns[selectedColumn_][selectedRow_]);
+        displayConfig_ = expandedShotLayout(config_);
+        if (selectedColumn_ < displayConfig_.columns.size()
+            && selectedRow_ < displayConfig_.columns[selectedColumn_].size()) {
+            current->setSpec(displayConfig_.columns[selectedColumn_][selectedRow_]);
+        }
+        updateTopInfoLabels();
+        current = currentPlotWidget();
+        if (!current) {
+            return;
+        }
+    }
     current->resetScale();
-    setStatus("Reset current panel scale");
+    setStatus("Reset current panel to auto scale");
 }
 
 void MainWindow::resetScales()
@@ -4532,6 +4586,13 @@ void MainWindow::resetScales()
     if (gridHost_ && updatesEnabled) {
         gridHost_->setUpdatesEnabled(false);
     }
+    for (auto& col : config_.columns) {
+        for (PlotSpec& plot : col) {
+            clearCustomRanges(&plot);
+        }
+    }
+    syncDisplayConfig();
+    updateTopInfoLabels();
     for (auto& col : plotWidgets_) {
         for (PlotWidget* plot : col) {
             if (plot) {
@@ -4549,7 +4610,7 @@ void MainWindow::resetScales()
             }
         }
     }
-    setStatus("Reset all scales");
+    setStatus("Reset all panels to auto scale");
 }
 
 void MainWindow::maximizeCurrentPanel()
