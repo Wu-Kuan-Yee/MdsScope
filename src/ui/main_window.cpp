@@ -808,7 +808,7 @@ private:
         row->shot->setMinimumWidth(72);
         row->signal->setMinimumWidth(150);
         row->server->setMinimumWidth(120);
-        row->dataMode->setMinimumWidth(72);
+        row->dataMode->setMinimumWidth(90);
         row->tree->setCompleter(row->treeCompleter);
         row->signal->setCompleter(row->signalCompleter);
         updateTreeCompleter(row, false);
@@ -3836,6 +3836,19 @@ QString signalKey(int column, int row, int signal)
 {
     return QString::number(column) + ',' + QString::number(row) + ',' + QString::number(signal);
 }
+
+QString readModeKey(DataReadMode readMode)
+{
+    switch (readMode) {
+    case DataReadMode::Thin:
+        return QStringLiteral("thin");
+    case DataReadMode::Medium:
+        return QStringLiteral("medium");
+    case DataReadMode::Full:
+        return QStringLiteral("full");
+    }
+    return QStringLiteral("thin");
+}
 }
 
 void MainWindow::refreshData()
@@ -4078,7 +4091,7 @@ QString MainWindow::refreshKey(DataReadMode readMode) const
     const QString shot = shotEdit_ ? shotEdit_->text().trimmed() : QString();
     return QString("%1|%2|%3")
         .arg(shot)
-        .arg(readMode == DataReadMode::Full ? "full" : "thin")
+        .arg(readModeKey(readMode))
         .arg(layoutRefreshSignature(config_));
 }
 
@@ -4094,7 +4107,7 @@ QString MainWindow::panelRefreshKey(int column, int row, int signal, DataReadMod
         .arg(column)
         .arg(row)
         .arg(signal)
-        .arg(readMode == DataReadMode::Full ? "full" : "thin")
+        .arg(readModeKey(readMode))
         .arg(panelSignature);
 }
 

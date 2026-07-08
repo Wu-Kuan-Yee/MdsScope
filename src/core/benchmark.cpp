@@ -4,6 +4,21 @@
 #include "mdsscope_internal.h"
 #include "mds_client.h"
 
+namespace {
+QString readModeName(DataReadMode readMode)
+{
+    switch (readMode) {
+    case DataReadMode::Thin:
+        return QStringLiteral("thin");
+    case DataReadMode::Medium:
+        return QStringLiteral("medium");
+    case DataReadMode::Full:
+        return QStringLiteral("full");
+    }
+    return QStringLiteral("thin");
+}
+}
+
 int runMdsScopeBenchmark(const QString& configPath,
                          DataReadMode readMode,
                          const QString& shotOverride,
@@ -93,7 +108,7 @@ int runMdsScopeBenchmark(const QString& configPath,
         if (!shotOverride.trimmed().isEmpty()) {
             out << "Shot override: " << shotOverride.trimmed() << Qt::endl;
         }
-        out << "Mode: " << (readMode == DataReadMode::Full ? "full" : "thin")
+        out << "Mode: " << readModeName(readMode)
             << ", plots=" << plotCount
             << ", signals=" << signalCount
             << ", groups=" << groups.size() << Qt::endl;
