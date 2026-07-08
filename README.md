@@ -12,10 +12,22 @@ configuration, MDSIP defaults, login flow, and HTTP metadata API target EAST.
 
 - Load TOML and WebScope-style `.webscp` environment files.
 - Plot multiple synchronized MDSplus signal panels.
-- Switch between thin and full data read modes.
+- Three sampling quality modes: **thin** (fast preview), **medium** (high-resolution), and **full** (complete data).
 - Apply single-shot or batch-shot expressions globally.
 - Use EAST HTTP metadata for latest shot and top-bar shot summary.
 - Run on Linux, macOS, and Windows.
+
+### Sampling Quality Modes
+
+MdsScope offers three data sampling modes to balance speed and precision:
+
+- **Thin** (default): Fast preview mode using server-side averaging (SetTimeContext). Loads ~20,000 averaged points per signal. Best for quick trend visualization. For EAST HRS signals: ~4s for 34 signals. Spike amplitudes may be attenuated by 10-20% but trends are accurate.
+
+- **Medium**: High-resolution mode using stride sampling. Loads ~20,000 real measured values per signal (every 550th sample for 11M-point signals). Preserves spike amplitude accurately. For EAST HRS signals: ~8-11s for 34 signals. Recommended when precise spike analysis is needed.
+
+- **Full**: Complete precision mode. Reads all raw data points with no sampling. Slowest but most accurate. Use for detailed analysis of specific time ranges after zooming in.
+
+The mode can be set globally via the top toolbar dropdown, or overridden per signal in the source setup dialog. When zoomed to small time ranges, the application automatically uses full precision regardless of the selected mode.
 
 ## Requirements
 

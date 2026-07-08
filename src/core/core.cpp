@@ -1138,8 +1138,13 @@ LayoutConfig parseTomlEnvironment(const QString& path)
             else if (key == "color") currentSignal->colorName = tomlUnescape(value);
             else if (key == "manual_color") currentSignal->manualColor = tomlBool(value, false);
             else if (key == "hidden") currentSignal->hidden = tomlBool(value, false);
-            else if (key == "full") currentSignal->fullData = tomlBool(value, false);
-            else if (key == "read_mode") currentSignal->fullData = tomlUnescape(value).compare("full", Qt::CaseInsensitive) == 0;
+            else if (key == "full") currentSignal->readMode = tomlBool(value, false) ? DataReadMode::Full : DataReadMode::Thin;
+            else if (key == "read_mode") {
+                QString mode = tomlUnescape(value).toLower();
+                if (mode == "full") currentSignal->readMode = DataReadMode::Full;
+                else if (mode == "medium") currentSignal->readMode = DataReadMode::Medium;
+                else currentSignal->readMode = DataReadMode::Thin;
+            }
         }
     }
 
@@ -1298,8 +1303,10 @@ bool writeEnvironmentToml(const LayoutConfig& config, const QString& path, QStri
                 if (sig.hidden) {
                     writeTomlBool(out, "hidden", true);
                 }
-                if (sig.fullData) {
-                    writeTomlBool(out, "full", true);
+                if (sig.readMode == DataReadMode::Full) {
+                    writeTomlString(out, "read_mode", "full");
+                } else if (sig.readMode == DataReadMode::Medium) {
+                    writeTomlString(out, "read_mode", "medium");
                 }
                 out << '\n';
             }
@@ -1420,5 +1427,15 @@ LayoutConfig expandedShotLayout(const LayoutConfig& config)
 
 DataReadMode effectiveSignalReadMode(DataReadMode globalMode, const SignalSpec& sig)
 {
-    return globalMode == DataReadMode::Full || sig.fullData ? DataReadMode::Full : DataReadMode::Thin;
+    // The higher-precision of the global mode and the per-signal override wins.
+    // Precision order: Thin < Medium < Full.
+    auto rank = [](DataReadMode m) {
+        switch (m) {
+        case DataReadMode::Thin:   return 0;
+        case DataReadMode::Medium: return 1;
+        case DataReadMode::Full:   return 2;
+        }
+        return 0;
+    };
+    return rank(sig.readMode) >= rank(globalMode) ? sig.readMode : globalMode;
 }
