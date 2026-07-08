@@ -131,12 +131,10 @@ jobs:
 
           windeployqt --release --compiler-runtime --no-translations --dir $stage (Join-Path $stage "MdsScope.exe")
 
-          Copy-Item "environment" (Join-Path $stage "environment") -Recurse
-          Copy-Item "source_index" (Join-Path $stage "source_index") -Recurse
-          Copy-Item "APIurl" $stage
+          Copy-Item "resources" (Join-Path $stage "resources") -Recurse
           Copy-Item "COPYING" $stage
           Copy-Item "README.md" $stage
-          Copy-Item "mdsscope.svg" $stage
+          Copy-Item "packaging\linux\mdsscope.svg" $stage
 
           Compress-Archive -Path $stage -DestinationPath "build\mdsscope-windows-x64.zip" -Force
 
