@@ -3,7 +3,7 @@
 
 cmake_minimum_required(VERSION 3.16)
 
-project(MdsScope VERSION 5.5 LANGUAGES CXX)
+project(MdsScope VERSION 5.5.1 LANGUAGES CXX)
 
 execute_process(
     COMMAND git rev-parse --short=9 HEAD
@@ -74,7 +74,7 @@ if(UNIX AND NOT APPLE)
 endif()
 
 configure_file(
-    cmake_uninstall.cmake.in
+    "${PROJECT_SOURCE_DIR}/cmake/cmake_uninstall.cmake.in"
     "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
     @ONLY
 )
@@ -148,17 +148,17 @@ set_target_properties(MdsScope PROPERTIES WIN32_EXECUTABLE TRUE)
 
 if(APPLE)
     file(GLOB MDS_SCOPE_SOURCE_INDEX_SIGNALS CONFIGURE_DEPENDS
-        "${CMAKE_CURRENT_SOURCE_DIR}/source_index/signals/*.txt"
+        "${PROJECT_SOURCE_DIR}/resources/source_index/signals/*.txt"
     )
-    set(MDS_SCOPE_MACOS_ICON "${CMAKE_CURRENT_SOURCE_DIR}/mdsscope.icns")
+    set(MDS_SCOPE_MACOS_ICON "${PROJECT_SOURCE_DIR}/packaging/macos/mdsscope.icns")
     set(MDS_SCOPE_MACOS_ENVIRONMENT_FILES
-        "${CMAKE_CURRENT_SOURCE_DIR}/environment/init.toml"
-        "${CMAKE_CURRENT_SOURCE_DIR}/environment/init.webscp"
+        "${PROJECT_SOURCE_DIR}/resources/environment/init.toml"
+        "${PROJECT_SOURCE_DIR}/resources/environment/init.webscp"
     )
     set(MDS_SCOPE_MACOS_RESOURCE_FILES
         "${MDS_SCOPE_MACOS_ICON}"
-        "${CMAKE_CURRENT_SOURCE_DIR}/APIurl"
-        "${CMAKE_CURRENT_SOURCE_DIR}/source_index/trees.txt"
+        "${PROJECT_SOURCE_DIR}/resources/APIurl"
+        "${PROJECT_SOURCE_DIR}/resources/source_index/trees.txt"
         ${MDS_SCOPE_MACOS_ENVIRONMENT_FILES}
         ${MDS_SCOPE_SOURCE_INDEX_SIGNALS}
     )
@@ -166,10 +166,10 @@ if(APPLE)
     set_source_files_properties("${MDS_SCOPE_MACOS_ICON}" PROPERTIES
         MACOSX_PACKAGE_LOCATION "Resources"
     )
-    set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/APIurl" PROPERTIES
+    set_source_files_properties("${PROJECT_SOURCE_DIR}/resources/APIurl" PROPERTIES
         MACOSX_PACKAGE_LOCATION "Resources"
     )
-    set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/source_index/trees.txt" PROPERTIES
+    set_source_files_properties("${PROJECT_SOURCE_DIR}/resources/source_index/trees.txt" PROPERTIES
         MACOSX_PACKAGE_LOCATION "Resources/source_index"
     )
     set_source_files_properties(${MDS_SCOPE_MACOS_ENVIRONMENT_FILES} PROPERTIES
@@ -243,26 +243,26 @@ if(APPLE)
     )
 
     install(FILES
-        environment/init.toml
-        environment/init.webscp
+        "${PROJECT_SOURCE_DIR}/resources/environment/init.toml"
+        "${PROJECT_SOURCE_DIR}/resources/environment/init.webscp"
         DESTINATION ${CMAKE_INSTALL_DATADIR}/mdsscope/environment
         COMPONENT tools
     )
 
     install(FILES
-        APIurl
+        "${PROJECT_SOURCE_DIR}/resources/APIurl"
         DESTINATION ${CMAKE_INSTALL_DATADIR}/mdsscope
         COMPONENT tools
     )
 
     install(FILES
-        source_index/trees.txt
+        "${PROJECT_SOURCE_DIR}/resources/source_index/trees.txt"
         DESTINATION ${CMAKE_INSTALL_DATADIR}/mdsscope/source_index
         COMPONENT tools
     )
 
     install(DIRECTORY
-        source_index/signals
+        "${PROJECT_SOURCE_DIR}/resources/source_index/signals"
         DESTINATION ${CMAKE_INSTALL_DATADIR}/mdsscope/source_index
         COMPONENT tools
         FILES_MATCHING PATTERN "*.txt"
@@ -274,35 +274,35 @@ else()
     )
 
     install(FILES
-        environment/init.toml
-        environment/init.webscp
+        "${PROJECT_SOURCE_DIR}/resources/environment/init.toml"
+        "${PROJECT_SOURCE_DIR}/resources/environment/init.webscp"
         DESTINATION ${CMAKE_INSTALL_DATADIR}/mdsscope/environment
     )
 
     install(FILES
-        APIurl
+        "${PROJECT_SOURCE_DIR}/resources/APIurl"
         DESTINATION ${CMAKE_INSTALL_DATADIR}/mdsscope
     )
 
     if(UNIX)
         install(FILES
-            mdsscope.svg
+            "${PROJECT_SOURCE_DIR}/packaging/linux/mdsscope.svg"
             DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps
         )
 
         install(FILES
-            mdsscope.desktop
+            "${PROJECT_SOURCE_DIR}/packaging/linux/mdsscope.desktop"
             DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
         )
     endif()
 
     install(FILES
-        source_index/trees.txt
+        "${PROJECT_SOURCE_DIR}/resources/source_index/trees.txt"
         DESTINATION ${CMAKE_INSTALL_DATADIR}/mdsscope/source_index
     )
 
     install(DIRECTORY
-        source_index/signals
+        "${PROJECT_SOURCE_DIR}/resources/source_index/signals"
         DESTINATION ${CMAKE_INSTALL_DATADIR}/mdsscope/source_index
         FILES_MATCHING PATTERN "*.txt"
     )

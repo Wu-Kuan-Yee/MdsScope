@@ -68,9 +68,9 @@ void printUsage(QTextStream& out)
     out << "Usage: transfer [--recursive] [--out-dir DIR] <file.webscp|directory>...\n"
         << "\n"
         << "Examples:\n"
-        << "  transfer environment/init.webscp\n"
-        << "  transfer environment\n"
-        << "  transfer --recursive --out-dir converted environment\n";
+        << "  transfer resources/environment/init.webscp\n"
+        << "  transfer resources/environment\n"
+        << "  transfer --recursive --out-dir converted resources/environment\n";
 }
 }
 
