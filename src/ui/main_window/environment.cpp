@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Weikang Wang
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "mdsscope_internal.h"
-#include "shared.h"
+#include "mdsscope_internal.hpp"
+#include "shared.hpp"
 
 
 void MainWindow::loadDefaultEnvironment(bool useLatestWhenNoCurrentShot)

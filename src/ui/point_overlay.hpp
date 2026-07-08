@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "mdsscope_internal.h"
+#include "mdsscope_internal.hpp"
 
 class PointOverlay final : public QWidget {
 public:

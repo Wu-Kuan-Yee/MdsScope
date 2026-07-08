@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "shared.h"
+#include "shared.hpp"
 
 class SignalDialog final : public QDialog {
 public:

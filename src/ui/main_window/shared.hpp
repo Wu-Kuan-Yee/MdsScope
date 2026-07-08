@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "mdsscope_internal.h"
+#include "mdsscope_internal.hpp"
 
 void setLabelTextIfChanged(QLabel* label, const QString& text);
 void clearCustomRanges(PlotSpec* plot);

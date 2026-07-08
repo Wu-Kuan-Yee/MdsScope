@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "mdsscope_app.h"
+#include "mdsscope_app.hpp"
 #include <atomic>
 #include <functional>
 #include <memory>

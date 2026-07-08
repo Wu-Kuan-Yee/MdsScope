@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: 2026 Weikang Wang
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "mdsscope_internal.h"
-#include "about_dialog.h"
-#include "shared.h"
+#include "mdsscope_internal.hpp"
+#include "about_dialog.hpp"
+#include "shared.hpp"
 
 
 void MainWindow::applyShot()

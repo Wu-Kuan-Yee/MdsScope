@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Weikang Wang
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "core/mdsscope_internal.h"
+#include "core/mdsscope_internal.hpp"
 
 #include <QCoreApplication>
 #include <QDirIterator>

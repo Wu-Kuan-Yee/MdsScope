@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "mdsscope_internal.h"
+#include "mdsscope_internal.hpp"
 
 inline constexpr int kMinMaxBlockSize = 256;
 

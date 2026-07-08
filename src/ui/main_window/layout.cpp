@@ -1,11 +1,11 @@
 // SPDX-FileCopyrightText: 2026 Weikang Wang
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "mdsscope_internal.h"
-#include "layout_dialog.h"
-#include "shared.h"
-#include "signal_dialogs.h"
-#include "point_overlay.h"
+#include "mdsscope_internal.hpp"
+#include "layout_dialog.hpp"
+#include "shared.hpp"
+#include "signal_dialogs.hpp"
+#include "point_overlay.hpp"
 
 namespace {
 struct PreservedPanelData {

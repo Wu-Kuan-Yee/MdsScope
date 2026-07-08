@@ -115,19 +115,19 @@ add_executable(MdsScope
     src/ui/main_window/shared.cpp
     src/ui/main_window/shot.cpp
     src/ui/main_window/ui.cpp
-    src/mdsscope_app.h
-    src/core/mdsscope_internal.h
-    src/core/text_utils.h
-    src/mds/mds_client.h
-    src/mds/mds_ip_client.h
-    src/ui/main_window/about_dialog.h
-    src/ui/main_window/export_dialog.h
-    src/ui/main_window/layout_dialog.h
-    src/ui/main_window/signal_dialogs.h
-    src/ui/main_window/shared.h
-    src/ui/main_window/theme.h
-    src/ui/plot/helpers.h
-    src/ui/point_overlay.h
+    src/mdsscope_app.hpp
+    src/core/mdsscope_internal.hpp
+    src/core/text_utils.hpp
+    src/mds/mds_client.hpp
+    src/mds/mds_ip_client.hpp
+    src/ui/main_window/about_dialog.hpp
+    src/ui/main_window/export_dialog.hpp
+    src/ui/main_window/layout_dialog.hpp
+    src/ui/main_window/signal_dialogs.hpp
+    src/ui/main_window/shared.hpp
+    src/ui/main_window/theme.hpp
+    src/ui/plot/helpers.hpp
+    src/ui/point_overlay.hpp
 )
 
 add_executable(transfer
@@ -138,9 +138,9 @@ add_executable(transfer
     src/core/app_paths.cpp
     src/core/visuals.cpp
     src/core/text_utils.cpp
-    src/mdsscope_app.h
-    src/core/mdsscope_internal.h
-    src/core/text_utils.h
+    src/mdsscope_app.hpp
+    src/core/mdsscope_internal.hpp
+    src/core/text_utils.hpp
 )
 
 set_target_properties(transfer PROPERTIES AUTOMOC OFF)

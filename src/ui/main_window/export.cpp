@@ -1,10 +1,10 @@
 // SPDX-FileCopyrightText: 2026 Weikang Wang
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "mdsscope_internal.h"
-#include "export_dialog.h"
-#include "shared.h"
-#include "mds_client.h"
+#include "mdsscope_internal.hpp"
+#include "export_dialog.hpp"
+#include "shared.hpp"
+#include "mds_client.hpp"
 
 
 void MainWindow::openExportDataDialog()

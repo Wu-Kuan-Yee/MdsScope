@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "shared.h"
+#include "shared.hpp"
 
 inline QString themeModeLabel(ThemeMode mode)
 {

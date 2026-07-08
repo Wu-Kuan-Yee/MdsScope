@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Weikang Wang
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "mdsscope_app.h"
-#include "mdsscope_internal.h"
+#include "mdsscope_app.hpp"
+#include "mdsscope_internal.hpp"
 
 #include <QApplication>
 #include <QColor>
