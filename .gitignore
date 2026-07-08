@@ -1,7 +1,7 @@
 build/
 build*/
-environment/*
-!environment/
-!environment/init.toml
-!environment/init.webscp
+resources/environment/*
+!resources/environment/
+!resources/environment/init.toml
+!resources/environment/init.webscp
 output/
