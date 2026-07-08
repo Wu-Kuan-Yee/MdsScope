@@ -1,6 +1,9 @@
+# SPDX-FileCopyrightText: 2026 Weikang Wang
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 cmake_minimum_required(VERSION 3.16)
 
-project(MdsScope VERSION 5.4.1 LANGUAGES CXX)
+project(MdsScope VERSION 5.5 LANGUAGES CXX)
 
 execute_process(
     COMMAND git rev-parse --short=9 HEAD
@@ -82,23 +85,62 @@ add_custom_target(uninstall
 
 add_executable(MdsScope
     src/main.cpp
-    src/core/core.cpp
+    src/core/api_auth.cpp
     src/core/benchmark.cpp
+    src/core/environment_io.cpp
+    src/core/mds_helpers.cpp
+    src/core/app_paths.cpp
+    src/core/visuals.cpp
+    src/core/text_utils.cpp
     src/mds/mds_client.cpp
+    src/mds/mds_ip_client.cpp
+    src/mds/mds_ip_east.cpp
+    src/mds/mds_ip_fetch.cpp
+    src/mds/mds_ip_pipeline.cpp
+    src/mds/mds_ip_protocol.cpp
+    src/mds/mds_ip_signal_fetch.cpp
+    src/mds/mds_ip_series.cpp
     src/ui/login_dialog.cpp
-    src/ui/plot_widget.cpp
-    src/ui/main_window.cpp
+    src/ui/plot/events.cpp
+    src/ui/plot/readout.cpp
+    src/ui/plot/render.cpp
+    src/ui/plot/state.cpp
+    src/ui/plot/view.cpp
+    src/ui/main_window/window.cpp
+    src/ui/main_window/data.cpp
+    src/ui/main_window/environment.cpp
+    src/ui/main_window/export.cpp
+    src/ui/main_window/layout.cpp
+    src/ui/main_window/scale.cpp
+    src/ui/main_window/shared.cpp
+    src/ui/main_window/shot.cpp
+    src/ui/main_window/ui.cpp
     src/mdsscope_app.h
     src/core/mdsscope_internal.h
+    src/core/text_utils.h
     src/mds/mds_client.h
+    src/mds/mds_ip_client.h
+    src/ui/main_window/about_dialog.h
+    src/ui/main_window/export_dialog.h
+    src/ui/main_window/layout_dialog.h
+    src/ui/main_window/signal_dialogs.h
+    src/ui/main_window/shared.h
+    src/ui/main_window/theme.h
+    src/ui/plot/helpers.h
     src/ui/point_overlay.h
 )
 
 add_executable(transfer
     src/transfer.cpp
-    src/core/core.cpp
+    src/core/api_auth.cpp
+    src/core/environment_io.cpp
+    src/core/mds_helpers.cpp
+    src/core/app_paths.cpp
+    src/core/visuals.cpp
+    src/core/text_utils.cpp
     src/mdsscope_app.h
     src/core/mdsscope_internal.h
+    src/core/text_utils.h
 )
 
 set_target_properties(transfer PROPERTIES AUTOMOC OFF)
