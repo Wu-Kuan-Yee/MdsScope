@@ -86,11 +86,23 @@ cmake --build build --config Release
 
 Install from a source build when needed:
 
+Linux:
+
 ```bash
-cmake --install build --prefix "$HOME/Applications"
+cmake --install build
 ```
 
 For non-root Linux installs, the default command-line prefix is `~/.local`.
+
+macOS:
+
+```bash
+# GUI app bundle
+cmake --install build --prefix "$HOME/Applications" --component app
+
+# Command-line tools and shared resources
+cmake --install build --prefix "$HOME/.local" --component tools
+```
 
 ## Configuration
 
