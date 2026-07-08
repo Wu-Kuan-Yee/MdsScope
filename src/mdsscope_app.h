@@ -324,7 +324,7 @@ private:
     void cancelDataFetch();
     void cancelPanelFetch();
     void cancelPrewarmConnections();
-    void prewarmConnections();
+    bool prewarmConnections();
     QString refreshKey(DataReadMode readMode) const;
     QString panelRefreshKey(int column, int row, int signal, DataReadMode readMode) const;
     void refreshOne(int column, int row, int signal);
@@ -425,6 +425,7 @@ private:
     InteractionMode currentInteractionMode_ = InteractionMode::Zoom;
     QString activeRefreshKey_;
     QString queuedRefreshKey_;
+    bool pendingPrewarmRefresh_ = false;
     int runningDataFetches_ = 0;
     int activeDataFetchGeneration_ = 0;
     QString activePanelRefreshKey_;
