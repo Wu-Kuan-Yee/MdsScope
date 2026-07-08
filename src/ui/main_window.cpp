@@ -2549,6 +2549,13 @@ MainWindow::MainWindow(QString rootPath, QWidget* parent)
         }
     });
     connect(&warmWatcher_, &QFutureWatcher<void>::finished, this, [this] {
+        if (pendingPrewarmRefresh_) {
+            pendingPrewarmRefresh_ = false;
+            if (runningDataFetches_ <= 0 && activeRefreshKey_.isEmpty() && !latestShotFetchRunning_) {
+                refreshData();
+                return;
+            }
+        }
         if (runningDataFetches_ <= 0 && activeRefreshKey_.isEmpty() && !latestShotFetchRunning_) {
             setStatus("MDS connections ready");
         }
@@ -3059,6 +3066,7 @@ bool MainWindow::loadEnvironmentFile(const QString& path,
 {
     const QString previousShot = shotEdit_ ? shotEdit_->text().trimmed() : QString();
     const bool shouldFetchLatest = useLatestWhenNoCurrentShot && previousShot.isEmpty();
+    pendingPrewarmRefresh_ = false;
     cancelPrewarmConnections();
     activeRefreshKey_.clear();
     activePanelRefreshKey_.clear();
@@ -3088,13 +3096,17 @@ bool MainWindow::loadEnvironmentFile(const QString& path,
     if (rememberRecent) {
         rememberRecentEnvironmentFile(path);
     }
-    if (prewarmBeforeRefresh) {
-        prewarmConnections();
-        if (!shouldFetchLatest) {
+    if (prewarmBeforeRefresh && !shouldFetchLatest) {
+        pendingPrewarmRefresh_ = true;
+        setStatus(QString("Preparing MDS connections for %1...").arg(QFileInfo(path).fileName()));
+        if (!prewarmConnections()) {
+            pendingPrewarmRefresh_ = false;
             refreshData();
         }
     } else if (!shouldFetchLatest) {
         refreshData();
+    } else if (prewarmBeforeRefresh) {
+        pendingPrewarmRefresh_ = true;
     }
     if (shouldFetchLatest) {
         fetchLatestShotAsync();
@@ -3611,12 +3623,22 @@ void MainWindow::fetchLatestShotAsync()
             }
             latestShotFetchRunning_ = false;
             if (latest.isEmpty()) {
+                pendingPrewarmRefresh_ = false;
                 setStatus("Latest shot unavailable");
                 return;
             }
             latestShot_ = latest;
             if (shotEdit_ && shotEdit_->text() != latestShot_) {
                 shotEdit_->setText(latestShot_);
+            }
+            if (pendingPrewarmRefresh_) {
+                rememberShotExpression(latestShot_);
+                setAllPlotShots(latestShot_);
+                setStatus(QString("Preparing MDS connections for shot %1...").arg(latestShot_));
+                if (prewarmConnections()) {
+                    return;
+                }
+                pendingPrewarmRefresh_ = false;
             }
             applyShot();
         }, Qt::QueuedConnection);
@@ -3848,6 +3870,7 @@ QString readModeKey(DataReadMode readMode)
 
 void MainWindow::refreshData()
 {
+    pendingPrewarmRefresh_ = false;
     cancelPrewarmConnections();
     // Any normal refresh invalidates a pending "Continue": the shot, config or
     // read mode may have changed, so resuming the old fetch no longer applies.
@@ -4064,13 +4087,13 @@ void MainWindow::cancelPrewarmConnections()
     }
 }
 
-void MainWindow::prewarmConnections()
+bool MainWindow::prewarmConnections()
 {
     if (config_.columns.isEmpty()) {
-        return;
+        return false;
     }
     if (warmWatcher_.isRunning()) {
-        return;
+        return false;
     }
 
     const LayoutConfig snapshot = expandedShotLayout(config_);
@@ -4079,6 +4102,7 @@ void MainWindow::prewarmConnections()
     warmWatcher_.setFuture(QtConcurrent::run([snapshot, cancel] {
         warmMdsConnections(snapshot, cancel);
     }));
+    return true;
 }
 
 QString MainWindow::refreshKey(DataReadMode readMode) const
