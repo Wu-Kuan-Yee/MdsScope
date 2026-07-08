@@ -21,11 +21,11 @@ configuration, MDSIP defaults, login flow, and HTTP metadata API target EAST.
 
 MdsScope offers three data sampling modes to balance speed and precision:
 
-- **Thin** (default): Fast preview mode using server-side averaging (SetTimeContext). Loads ~20,000 averaged points per signal. Best for quick trend visualization. For EAST HRS signals: ~4s for 34 signals. Spike amplitudes may be attenuated by 10-20% but trends are accurate.
+- **Thin** (default): Fast preview mode for quick trend visualization.
 
-- **Medium**: High-resolution mode using stride sampling. Loads ~20,000 real measured values per signal (every 550th sample for 11M-point signals). Preserves spike amplitude accurately. For EAST HRS signals: ~8-11s for 34 signals. Recommended when precise spike analysis is needed.
+- **Medium**: Higher-resolution sampled mode using real measured values. Recommended when spike amplitude matters.
 
-- **Full**: Complete precision mode. Reads all raw data points with no sampling. Slowest but most accurate. Use for detailed analysis of specific time ranges after zooming in.
+- **Full**: Reads all raw data with no sampling. Use for detailed analysis of specific time ranges.
 
 The mode can be set globally via the top toolbar dropdown, or overridden per signal in the source setup dialog. When zoomed to small time ranges, the application automatically uses full precision regardless of the selected mode.
 
@@ -35,10 +35,6 @@ The mode can be set globally via the top toolbar dropdown, or overridden per sig
 - A C++23 compiler
 - Qt 6.4 or newer with Core, Widgets, Network, and Concurrent
 - Qt 6 DBus on Linux
-
-MdsScope is currently developed and tested for Linux, macOS, and Windows
-desktop environments. Windows support targets Windows 10/11 with MSVC 2022 and
-Qt 6. Windows 7 is not supported.
 
 ### Dependency Installation
 
@@ -61,30 +57,18 @@ matching Qt 6 MSVC build.
 
 ## Build and Install
 
-Prebuilt release packages are published from Git tags:
+Prebuilt Windows and Ubuntu packages are published from Git tags. To build from
+source:
 
-- Windows portable package: download the Windows zip from the GitHub release
-  page, extract it, and run `MdsScope.exe`.
-- Ubuntu packages: download and install the matching `.deb` package.
-- macOS: build from source.
-
-Linux source build:
+Linux:
 
 ```bash
 cmake -S . -B build
 cmake --build build -j
-cmake --install build
-MdsScope
+./build/MdsScope
 ```
 
-Windows source build:
-
-```powershell
-cmake -S . -B build -G "Visual Studio 17 2022" -A x64
-cmake --build build --config Release
-```
-
-macOS source build:
+macOS:
 
 ```bash
 cmake -S . -B build -DCMAKE_PREFIX_PATH="$(brew --prefix qt)"
@@ -92,56 +76,39 @@ cmake --build build -j
 open ./build/MdsScope.app
 ```
 
-Optional install commands:
+Windows:
 
-```bash
-cmake --install build --prefix "$HOME/Applications" --component app
-cmake --install build --component tools
-cmake --build build --target uninstall
+```powershell
+cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+cmake --build build --config Release
+.\build\Release\MdsScope.exe
 ```
 
-For non-root source installs, the default command-line prefix is `~/.local`; use
-`--prefix` only for a custom location.
+Install from a source build when needed:
+
+```bash
+cmake --install build --prefix "$HOME/Applications"
+```
+
+For non-root Linux installs, the default command-line prefix is `~/.local`.
 
 ## Configuration
 
-Installed templates and signal indexes are read from the application resources:
+On first run, MdsScope creates a user configuration directory and copies bundled
+templates if it is empty:
 
 ```text
-Linux source install: ~/.local/share/mdsscope/
-Linux package install: /usr/share/mdsscope/
-macOS app bundle:     MdsScope.app/Contents/Resources/
-Windows portable:     extracted package directory
-```
-
-User-editable configuration is stored separately:
-
-```text
-Linux: ~/.config/mdsscope/
-macOS: ~/Library/Application Support/mdsscope/
+Linux:   ~/.config/mdsscope/
+macOS:   ~/Library/Application Support/mdsscope/
 Windows: %LOCALAPPDATA%\MdsScope\
-```
-
-Cache data is stored separately:
-
-```text
-Linux: ~/.cache/mdsscope/
-macOS: ~/Library/Caches/mdsscope/
-Windows: %LOCALAPPDATA%\MdsScope\cache\
 ```
 
 `auth.cache` is not plaintext; it stores the username, password, and token in an
 encrypted local cache bound to the current machine/user.
 
-MdsScope supports two environment file formats:
-
-- `*.toml`: the recommended native MdsScope format
-- `*.webscp`: legacy WebScope-compatible format
-
-On first run, MdsScope creates the user environment directory and copies bundled
-templates if it is empty. The default file is `init.toml`, with `init.webscp` as
-a legacy fallback. Saving from the GUI keeps TOML and WEBSCP files synchronized.
-The Open dialog can browse native TOML files, legacy WEBSCP files, or both.
+MdsScope supports native `*.toml` files and legacy WebScope-compatible
+`*.webscp` files. The default template is `init.toml`; saving from the GUI keeps
+TOML and WEBSCP files synchronized.
 
 Example TOML:
 
@@ -159,14 +126,14 @@ y_label = "kA"
 tree = "pcs_east"
 server = "202.127.204.12"
 y = "\\pcrl01"
-full = true
+read_mode = "full"
 ```
 
 Panels use the shot shown in the MdsScope UI. A signal-level `shot` value is
 only needed for explicit per-signal shot overrides, such as shot comparison.
 
-Shot fields and the bottom-bar Shot input support single shots, semicolon lists,
-ranges, and mixed expressions:
+Shot fields support single shots, semicolon lists, ranges, and mixed
+expressions:
 
 ```text
 143850
@@ -175,31 +142,18 @@ ranges, and mixed expressions:
 143850-143858;143865
 ```
 
-Shot expressions are expanded at runtime so saved configuration files stay
-compact.
-
-Signals can be hidden with `hidden = true`. Use `full = true` on an individual
-signal to load that curve in full mode while the rest of the configuration
-stays thin.
+Useful signal options include `shot`, `hidden = true`, and
+`read_mode = "medium"` or `read_mode = "full"` for per-signal data mode
+overrides.
 
 Convert legacy `.webscp` files with `transfer`:
 
 ```bash
-./build/transfer "<config>/environment/init.webscp"
-./build/transfer "<config>/environment"
-./build/transfer --recursive "<config>/environment"
+./build/transfer environment/init.webscp
+./build/transfer --recursive environment
 ```
 
-Windows portable package examples:
-
-```powershell
-.\transfer.exe ".\environment\init.webscp"
-.\transfer.exe ".\environment"
-.\transfer.exe --recursive ".\environment"
-.\transfer.exe --recursive --out-dir ".\converted" ".\environment"
-```
-
-Windows source build examples:
+On Windows source builds, use the executable under `build\Release`:
 
 ```powershell
 .\build\Release\transfer.exe ".\environment\init.webscp"
@@ -209,14 +163,13 @@ Windows source build examples:
 ### EAST HTTP Metadata API
 
 The EAST HTTP metadata endpoint is stored in `APIurl`. It is used for latest
-shot lookup and the top-bar `Ip`, `Pulse`, `It`, and `Time` summary. Plot data
-continues to come from EAST MDSIP.
+shot lookup and the top-bar summary. Plot data continues to come from EAST
+MDSIP.
 
 ### Data Export
 
-Data export writes files under an `output/` subdirectory of the selected base
-directory. Export supports text, CSV, TSV, and JSON formats, plus optional
-x-range selection. The default export locations are:
+Data export supports text, CSV, TSV, and JSON formats. By default, exported
+files are written under:
 
 ```text
 Linux:   ~/Downloads/mdsscope/output/
@@ -226,12 +179,10 @@ Windows: %USERPROFILE%\Downloads\mdsscope\output\  (usual location)
 
 ## Benchmark Mode
 
-MdsScope includes a simple benchmark mode for MDS data loading. Useful options
-include `--shot`, `--full`, `--repeat`, `--summary`, and `--prewarm`.
+MdsScope includes a simple benchmark mode for MDS data loading:
 
 ```bash
 ./build/MdsScope --benchmark environment/your_config.webscp --summary
-QT_QPA_PLATFORM=offscreen ./build/MdsScope --benchmark environment/your_config.webscp --summary
 ```
 
 ## Repository Hygiene

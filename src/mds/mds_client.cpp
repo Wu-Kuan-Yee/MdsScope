@@ -179,7 +179,7 @@ public:
 
     void warmConnections(const LayoutConfig& snapshot) const
     {
-        QHash<QString, QVector<NativeRequest>> groups;
+        QHash<QString, NativeRequest> representatives;
         for (int c = 0; c < snapshot.columns.size(); ++c) {
             for (int r = 0; r < snapshot.columns[c].size(); ++r) {
                 const PlotSpec& plot = snapshot.columns[c][r];
@@ -203,30 +203,30 @@ public:
                     request.sig = sig;
                     request.readMode = effectiveSignalReadMode(readMode_, sig);
                     request.maxPoints = maxPointsForSignal(plot, sig);
-                    groups[groupKey(request)].push_back(std::move(request));
+                    representatives.insert(groupKey(request), std::move(request));
                 }
             }
         }
 
-        QVector<QVector<NativeRequest>> chunks;
-        for (auto it = groups.begin(); it != groups.end(); ++it) {
-            appendConnectionChunks(it.value(), &chunks);
+        QVector<NativeRequest> warmRequests;
+        warmRequests.reserve(representatives.size());
+        for (auto it = representatives.begin(); it != representatives.end(); ++it) {
+            warmRequests.push_back(std::move(it.value()));
         }
-        prioritizeConnectionChunks(&chunks);
 
         constexpr int kMaxGlobalSockets = 16;
-        for (int start = 0; start < chunks.size(); start += kMaxGlobalSockets) {
+        for (int start = 0; start < warmRequests.size(); start += kMaxGlobalSockets) {
             if (isCanceled()) {
                 clearCurrentThreadConnections();
                 break;
             }
-            const int count = std::min(kMaxGlobalSockets, static_cast<int>(chunks.size()) - start);
+            const int count = std::min(kMaxGlobalSockets, static_cast<int>(warmRequests.size()) - start);
             const int warmCount = std::max(count, kMaxGlobalSockets);
             QVector<QFuture<void>> futures;
             futures.reserve(warmCount);
             for (int i = 0; i < warmCount; ++i) {
                 QVector<NativeRequest> warmChunk;
-                warmChunk.push_back(chunks[start + (i % count)].front());
+                warmChunk.push_back(warmRequests[start + (i % count)]);
                 futures.push_back(QtConcurrent::run(groupFetchPool(), [this, warmChunk = std::move(warmChunk)] {
                     fetchGroupResults(warmChunk, true);
                 }));
