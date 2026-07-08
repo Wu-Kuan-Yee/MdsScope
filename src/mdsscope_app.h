@@ -419,7 +419,6 @@ private:
     int pendingPanelColumn_ = -1;
     int pendingPanelRow_ = -1;
     int pendingPanelSignal_ = -1;
-    bool startupPrewarmPending_ = false;
     bool singlePanelMaximized_ = false;
     int maximizedColumn_ = -1;
     int maximizedRow_ = -1;
