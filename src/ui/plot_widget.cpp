@@ -1413,10 +1413,8 @@ void PlotWidget::resizeEvent(QResizeEvent* event)
 
 void PlotWidget::leaveEvent(QEvent*)
 {
-    if (interactionMode_ == InteractionMode::Point) {
-        pointTrackingActive_ = false;
+    if (interactionMode_ == InteractionMode::Point && pointTrackingActive_) {
         pointHoverQueued_ = false;
-        emit pointTrackingStopped();
     }
 }
 

@@ -646,7 +646,9 @@ int main(int argc, char* argv[])
                 repeat = parsed;
             }
         }
-        const DataReadMode readMode = args.contains("--full") ? DataReadMode::Full : DataReadMode::Thin;
+        const DataReadMode readMode = args.contains("--full") ? DataReadMode::Full
+                                          : args.contains("--medium") ? DataReadMode::Medium
+                                          : DataReadMode::Thin;
         int code = 0;
         for (int i = 0; i < repeat; ++i) {
             code = std::max(code, runMdsScopeBenchmark(configPath,

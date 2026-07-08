@@ -18,6 +18,9 @@
 #include <QVector>
 #include <QWidget>
 
+#include <atomic>
+#include <memory>
+
 class QGridLayout;
 class QEvent;
 class QLabel;
@@ -42,8 +45,9 @@ enum class InteractionMode {
 };
 
 enum class DataReadMode {
-    Thin,
-    Full,
+    Thin,    // Fast preview: SetTimeContext averaging, ~4s for 34 EAST signals
+    Medium,  // High-resolution stride sampling, ~8-11s, preserves spike amplitude
+    Full,    // All data, slowest, highest precision
 };
 
 enum class ThemeMode {
@@ -70,7 +74,7 @@ struct SignalSpec {
     QString colorName;
     bool manualColor = false;
     bool hidden = false;
-    bool fullData = false;
+    DataReadMode readMode = DataReadMode::Thin;  // Per-signal sampling quality override
 };
 
 struct PlotSpec {
@@ -290,7 +294,10 @@ private:
     QStringList recentShotExpressions() const;
     void rememberShotExpression(const QString& shot);
     void refreshShotHistory();
-    bool loadEnvironmentFile(const QString& path, bool useLatestWhenNoCurrentShot = false, bool rememberRecent = true);
+    bool loadEnvironmentFile(const QString& path,
+                             bool useLatestWhenNoCurrentShot = false,
+                             bool rememberRecent = true,
+                             bool prewarmBeforeRefresh = false);
     void rebuildGrid();
     void selectPlot(int column, int row);
     void setInteractionMode(InteractionMode mode);
@@ -307,7 +314,17 @@ private:
     QString maxShotInConfig() const;
     QString latestShotFromApi() const;
     void refreshData();
-    void prewarmConnections(bool refreshAfter);
+    void stopDataRefresh();
+    void onStopOrContinue();
+    void resumeDataRefresh();
+    void launchDataFetch(const LayoutConfig& snapshot, DataReadMode readMode, const QString& key);
+    int countRemainingSignals(const LayoutConfig& snapshot) const;
+    void clearDataPause();
+    void setStopButtonPaused(bool paused);
+    void cancelDataFetch();
+    void cancelPanelFetch();
+    void cancelPrewarmConnections();
+    void prewarmConnections();
     QString refreshKey(DataReadMode readMode) const;
     QString panelRefreshKey(int column, int row, int signal, DataReadMode readMode) const;
     void refreshOne(int column, int row, int signal);
@@ -386,7 +403,6 @@ private:
     QToolButton* zoomButton_ = nullptr;
     QToolButton* pointButton_ = nullptr;
     QVector<QVector<PlotWidget*>> plotWidgets_;
-    QFutureWatcher<QVector<LoadedSignal>> dataWatcher_;
     QFutureWatcher<QVector<LoadedSignal>> panelWatcher_;
     QFutureWatcher<void> warmWatcher_;
     QString topSummaryShot_;
@@ -403,19 +419,34 @@ private:
     int pendingPanelColumn_ = -1;
     int pendingPanelRow_ = -1;
     int pendingPanelSignal_ = -1;
-    bool warmRefreshPending_ = false;
+    bool startupPrewarmPending_ = false;
     bool singlePanelMaximized_ = false;
     int maximizedColumn_ = -1;
     int maximizedRow_ = -1;
     InteractionMode currentInteractionMode_ = InteractionMode::Zoom;
     QString activeRefreshKey_;
     QString queuedRefreshKey_;
+    int runningDataFetches_ = 0;
+    int activeDataFetchGeneration_ = 0;
     QString activePanelRefreshKey_;
     QString queuedPanelRefreshKey_;
     int streamedOk_ = 0;
     int streamedFailed_ = 0;
     QVector<LoadedSignal> queuedLoadedSignals_;
     bool queuedLoadedSignalApply_ = false;
+    std::shared_ptr<std::atomic_bool> dataCancel_;
+    std::shared_ptr<std::atomic_bool> panelCancel_;
+    std::shared_ptr<std::atomic_bool> warmCancel_;
+    QPushButton* stopButton_ = nullptr;
+    bool dataRefreshPaused_ = false;
+    bool pendingResume_ = false;
+    LayoutConfig activeFetchSnapshot_;
+    DataReadMode activeFetchReadMode_ = DataReadMode::Thin;
+    LayoutConfig pausedSnapshot_;
+    LayoutConfig pendingResumeSnapshot_;
+    DataReadMode pausedReadMode_ = DataReadMode::Thin;
+    QString pausedKey_;
+    QSet<QString> attemptedSignals_;
     QSet<QString> rememberedSourceSignals_;
     QString latestShot_;
     bool latestShotFetchRunning_ = false;

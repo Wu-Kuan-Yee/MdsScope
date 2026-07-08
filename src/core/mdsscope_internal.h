@@ -86,6 +86,7 @@
 #include <QtEndian>
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstring>
 #include <functional>

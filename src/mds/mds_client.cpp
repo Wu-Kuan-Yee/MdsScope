@@ -5,6 +5,26 @@
 #include "mds_client.h"
 
 namespace {
+
+// Dedicated pool for the socket "group fetch" workers. It is deliberately
+// separate from the global QThreadPool used by MainWindow to launch the outer
+// fetchMdsSignals() call: that outer thread blocks on future.result() of the
+// workers below, so running the workers on a different pool avoids nesting on
+// the same pool. Sizing it here also makes the socket count a TRUE global cap
+// shared across concurrent fetches (main data refresh + single-panel refresh +
+// retries), instead of each fetch independently opening up to 16 sockets.
+constexpr int kGroupFetchThreadLimit = 16;
+
+QThreadPool* groupFetchPool()
+{
+    static QThreadPool* pool = [] {
+        auto* created = new QThreadPool();
+        created->setMaxThreadCount(kGroupFetchThreadLimit);
+        return created;
+    }();
+    return pool;
+}
+
 class MdsIpClient {
     struct NativeRequest {
         int loadedIndex = -1;
@@ -57,8 +77,10 @@ class MdsIpClient {
 public:
     using ResultCallback = std::function<void(const LoadedSignal&)>;
 
-    explicit MdsIpClient(DataReadMode readMode = DataReadMode::Thin, ResultCallback callback = {})
-        : readMode_(readMode), callback_(std::move(callback))
+    explicit MdsIpClient(DataReadMode readMode = DataReadMode::Thin,
+                         ResultCallback callback = {},
+                         std::shared_ptr<std::atomic_bool> cancel = {})
+        : readMode_(readMode), callback_(std::move(callback)), cancel_(std::move(cancel))
     {
     }
 
@@ -132,12 +154,16 @@ public:
 
         constexpr int kMaxGlobalSockets = 16;
         for (int start = 0; start < chunks.size(); start += kMaxGlobalSockets) {
+            if (isCanceled()) {
+                clearCurrentThreadConnections();
+                break;
+            }
             const int count = std::min(kMaxGlobalSockets, static_cast<int>(chunks.size()) - start);
             QVector<QFuture<QVector<SignalFetchResult>>> futures;
             futures.reserve(count);
             for (int i = 0; i < count; ++i) {
                 QVector<NativeRequest> chunk = std::move(chunks[start + i]);
-                futures.push_back(QtConcurrent::run([this, chunk = std::move(chunk)] {
+                futures.push_back(QtConcurrent::run(groupFetchPool(), [this, chunk = std::move(chunk)] {
                     return fetchGroupResults(chunk);
                 }));
             }
@@ -145,7 +171,9 @@ public:
                 applyFetchResults(future.result(), &loaded);
             }
         }
-        retryTransientFailures(requestsByLoadedIndex, &loaded);
+        if (!isCanceled()) {
+            retryTransientFailures(requestsByLoadedIndex, &loaded);
+        }
         return loaded;
     }
 
@@ -188,6 +216,10 @@ public:
 
         constexpr int kMaxGlobalSockets = 16;
         for (int start = 0; start < chunks.size(); start += kMaxGlobalSockets) {
+            if (isCanceled()) {
+                clearCurrentThreadConnections();
+                break;
+            }
             const int count = std::min(kMaxGlobalSockets, static_cast<int>(chunks.size()) - start);
             const int warmCount = std::max(count, kMaxGlobalSockets);
             QVector<QFuture<void>> futures;
@@ -195,8 +227,8 @@ public:
             for (int i = 0; i < warmCount; ++i) {
                 QVector<NativeRequest> warmChunk;
                 warmChunk.push_back(chunks[start + (i % count)].front());
-                futures.push_back(QtConcurrent::run([this, warmChunk = std::move(warmChunk)] {
-                    fetchGroupResults(warmChunk);
+                futures.push_back(QtConcurrent::run(groupFetchPool(), [this, warmChunk = std::move(warmChunk)] {
+                    fetchGroupResults(warmChunk, true);
                 }));
             }
             for (auto& future : futures) {
@@ -232,6 +264,7 @@ public:
 private:
     DataReadMode readMode_ = DataReadMode::Thin;
     ResultCallback callback_;
+    std::shared_ptr<std::atomic_bool> cancel_;
     static constexpr bool kEnableMultiSignalBatch = false;
     static constexpr bool kEnableCombinedSignalFetch = false;
     static constexpr bool kUseServerSideThin = true;
@@ -267,6 +300,43 @@ private:
     private:
         QSemaphore* semaphore_ = nullptr;
     };
+
+    bool isCanceled() const
+    {
+        return cancel_ && cancel_->load(std::memory_order_relaxed);
+    }
+
+    class CurrentCancelGuard {
+    public:
+        explicit CurrentCancelGuard(const std::shared_ptr<std::atomic_bool>& cancel)
+            : previous_(currentCancel())
+        {
+            currentCancel() = cancel.get();
+        }
+
+        ~CurrentCancelGuard()
+        {
+            currentCancel() = previous_;
+        }
+
+        CurrentCancelGuard(const CurrentCancelGuard&) = delete;
+        CurrentCancelGuard& operator=(const CurrentCancelGuard&) = delete;
+
+    private:
+        const std::atomic_bool* previous_ = nullptr;
+    };
+
+    static const std::atomic_bool*& currentCancel()
+    {
+        thread_local const std::atomic_bool* cancel = nullptr;
+        return cancel;
+    }
+
+    static bool currentCanceled()
+    {
+        const std::atomic_bool* cancel = currentCancel();
+        return cancel && cancel->load(std::memory_order_relaxed);
+    }
 
     static QString groupKey(const NativeRequest& request)
     {
@@ -419,6 +489,16 @@ private:
         return 1;
     }
 
+    static int heavyThinConnectionLimit()
+    {
+        bool ok = false;
+        const int configured = qEnvironmentVariableIntValue("MDSSCOPE_HEAVY_THIN_CONNECTIONS", &ok);
+        if (ok) {
+            return std::clamp(configured, 1, kMaxConnectionsPerGroup);
+        }
+        return std::min(8, kMaxConnectionsPerGroup);
+    }
+
     static bool isLikelyHeavySignal(const SignalSpec& sig)
     {
         const QString experiment = sig.experiment.trimmed().toLower();
@@ -465,16 +545,31 @@ private:
             }
         }
 
+        QVector<NativeRequest> heavy;
         QVector<NativeRequest> normal;
+        heavy.reserve(heavyCount);
         normal.reserve(requests.size());
-        const bool splitHeavySignals = heavyCount > 0 && heavyCount <= 8;
         for (const NativeRequest& request : requests) {
-            if (splitHeavySignals && isLikelyHeavySignal(request.sig)) {
-                chunks->push_back(QVector<NativeRequest>{request});
+            if (isLikelyHeavySignal(request.sig)) {
+                heavy.push_back(request);
             } else {
                 normal.push_back(request);
             }
         }
+
+        if (!heavy.isEmpty()) {
+            const int bucketCount = std::min(static_cast<int>(heavy.size()), heavyThinConnectionLimit());
+            QVector<QVector<NativeRequest>> heavyBuckets(bucketCount);
+            for (int i = 0; i < heavy.size(); ++i) {
+                heavyBuckets[i % bucketCount].push_back(heavy[i]);
+            }
+            for (QVector<NativeRequest>& bucket : heavyBuckets) {
+                if (!bucket.isEmpty()) {
+                    chunks->push_back(std::move(bucket));
+                }
+            }
+        }
+
         if (normal.isEmpty()) {
             return;
         }
@@ -482,9 +577,9 @@ private:
         const QString experiment = normal.front().sig.experiment.trimmed().toLower();
         if (experiment == "east" && normal.size() > 16) {
             int bucketCount = 2;
-            if (!splitHeavySignals && normal.size() > 48) {
+            if (normal.size() > 48) {
                 bucketCount = 6;
-            } else if (!splitHeavySignals && normal.size() > 32) {
+            } else if (normal.size() > 32) {
                 bucketCount = 4;
             }
             QVector<QVector<NativeRequest>> buckets(bucketCount);
@@ -507,9 +602,14 @@ private:
         applyFetchResults(fetchGroupResults(requests), loaded);
     }
 
-    QVector<SignalFetchResult> fetchGroupResults(const QVector<NativeRequest>& requests) const
+    QVector<SignalFetchResult> fetchGroupResults(const QVector<NativeRequest>& requests, bool openOnly = false) const
     {
+        CurrentCancelGuard cancelGuard(cancel_);
         if (requests.isEmpty()) {
+            return {};
+        }
+        if (isCanceled()) {
+            clearCurrentThreadConnections();
             return {};
         }
 
@@ -539,9 +639,23 @@ private:
                 cached->socket->setProxy(QNetworkProxy::NoProxy);
                 stageTimer.restart();
                 cached->socket->connectToHost(serverHost(firstSig.serverIp), serverPort(firstSig.serverIp));
-                if (!cached->socket->waitForConnected(kNetworkTimeoutMs)) {
-                    error = cached->socket->errorString();
-                    resetConnection(cached);
+                QElapsedTimer connectTimer;
+                connectTimer.start();
+                while (cached->socket->state() != QAbstractSocket::ConnectedState) {
+                    if (isCanceled()) {
+                        error = "operation canceled";
+                        resetConnection(cached);
+                        break;
+                    }
+                    if (!cached->socket->waitForConnected(50)) {
+                        if (connectTimer.elapsed() >= kNetworkTimeoutMs) {
+                            error = cached->socket->errorString();
+                            resetConnection(cached);
+                            break;
+                        }
+                    }
+                }
+                if (!error.isEmpty()) {
                     break;
                 }
                 connectMs = stageTimer.elapsed();
@@ -646,6 +760,10 @@ private:
                          .arg(firstPlot.shot)
                          .arg(requests.size()));
 
+        if (openOnly) {
+            return {};
+        }
+
         QVector<NativeRequest> thinRequests;
         thinRequests.reserve(requests.size());
         for (const NativeRequest& request : requests) {
@@ -665,7 +783,6 @@ private:
                 for (const SignalFetchResult& result : pipelinedEastResults) {
                     fetchedIndexes.insert(result.loadedIndex);
                 }
-                emitResults(thinRequests, pipelinedEastResults);
                 results += pipelinedEastResults;
             }
         }
@@ -707,6 +824,10 @@ private:
         }
 
         for (int i = 0; i < requests.size(); ++i) {
+            if (isCanceled()) {
+                clearCurrentThreadConnections();
+                break;
+            }
             const NativeRequest& request = requests[i];
             if (fetchedIndexes.contains(request.loadedIndex)) {
                 continue;
@@ -860,6 +981,7 @@ private:
                              .arg(item.request.sig.yExpr)
                              .arg(result.series.pointCount())
                              .arg(result.series.error.simplified()));
+            emitResult(item.request, result);
             results.push_back(std::move(result));
         }
 
@@ -987,18 +1109,33 @@ private:
         SignalSpec firstSig = pending.front().request.sig;
         firstSig.yExpr = pending.front().scaled.baseExpr;
         QString localError;
-        const UniformTimebase timebase = eastUniformTimebase(socket, pending.front().request.plot.shot, firstSig, &localError);
-        if (!timebase.valid) {
+        const int maxPoints = pending.front().request.maxPoints > 0 ? pending.front().request.maxPoints : 2000;
+        const EastThinPlan plan = eastThinPlan(socket, pending.front().request.plot.shot, firstSig, maxPoints, &localError);
+        if (!plan.valid || plan.sampling.sourceCount <= 0 || !plan.timebase.valid) {
             if (error) {
                 error->clear();
             }
             return {};
         }
 
-        const int maxPoints = pending.front().request.maxPoints > 0 ? pending.front().request.maxPoints : 2000;
-        const double start = timebase.start;
-        const double end = start + 4.0;
-        const double delta = (end - start) / static_cast<double>(maxPoints);
+        const PlotSpec& firstPlot = pending.front().request.plot;
+        double start = plan.timebase.start;
+        double end = start + static_cast<double>(plan.sampling.sourceCount - 1) * plan.timebase.step;
+        double delta = plan.timebase.step * static_cast<double>(plan.sampling.step);
+        if (firstPlot.customXRange
+            && std::isfinite(firstPlot.xmin)
+            && std::isfinite(firstPlot.xmax)
+            && firstPlot.xmax > firstPlot.xmin) {
+            start = firstPlot.xmin;
+            end = firstPlot.xmax;
+            delta = (end - start) / static_cast<double>(maxPoints);
+        }
+        if (!std::isfinite(start) || !std::isfinite(end) || !std::isfinite(delta) || delta <= 0.0 || end <= start) {
+            if (error) {
+                error->clear();
+            }
+            return {};
+        }
         value(socket,
               QString("SetTimeContext(%1,%2,%3)")
                   .arg(start, 0, 'g', 12)
@@ -1097,6 +1234,14 @@ private:
         return !isPermanentMdsError(item.series.error);
     }
 
+    static bool shouldStreamResult(const SignalFetchResult& result)
+    {
+        if (result.series.hasData()) {
+            return true;
+        }
+        return !result.series.error.isEmpty() && isPermanentMdsError(result.series.error);
+    }
+
     void retryTransientFailures(const QHash<int, NativeRequest>& requestsByLoadedIndex, QVector<LoadedSignal>* loaded) const
     {
         QVector<NativeRequest> retryRequests;
@@ -1118,7 +1263,7 @@ private:
             for (int i = 0; i < count; ++i) {
                 QVector<NativeRequest> single;
                 single.push_back(retryRequests[start + i]);
-                futures.push_back(QtConcurrent::run([this, single = std::move(single)] {
+                futures.push_back(QtConcurrent::run(groupFetchPool(), [this, single = std::move(single)] {
                     return fetchGroupResults(single);
                 }));
             }
@@ -1150,14 +1295,14 @@ private:
 
     void emitResult(const NativeRequest& request, const SignalFetchResult& result) const
     {
-        if (callback_) {
+        if (callback_ && !isCanceled() && shouldStreamResult(result)) {
             callback_(loadedSignalFromResult(request, result));
         }
     }
 
     void emitResults(const QVector<NativeRequest>& requests, const QVector<SignalFetchResult>& results) const
     {
-        if (!callback_) {
+        if (!callback_ || isCanceled()) {
             return;
         }
         QHash<int, const NativeRequest*> byIndex;
@@ -1166,6 +1311,12 @@ private:
             byIndex.insert(request.loadedIndex, &request);
         }
         for (const SignalFetchResult& result : results) {
+            if (isCanceled()) {
+                return;
+            }
+            if (!shouldStreamResult(result)) {
+                continue;
+            }
             if (const NativeRequest* request = byIndex.value(result.loadedIndex, nullptr)) {
                 callback_(loadedSignalFromResult(*request, result));
             }
@@ -1287,7 +1438,7 @@ private:
         ThinSampling sampling;
         UniformTimebase fastTimebase;
         const QString xExpr = sig.xExpr.trimmed();
-        const bool serverSideThin = readMode == DataReadMode::Thin && kUseServerSideThin;
+        const bool serverSideThin = (readMode == DataReadMode::Thin || readMode == DataReadMode::Medium) && kUseServerSideThin;
         SignalSpec fastSig = sig;
         const ScaledSignalExpr scaledExpr = scaledSimpleSignalExpr(sig.yExpr);
         if (scaledExpr.valid) {
@@ -1333,21 +1484,45 @@ private:
             }
         }
         if (serverSideThin && xExpr.isEmpty() && scaledExpr.valid && isEastTimebaseCandidate(plot.shot, fastSig)) {
-            if (!prefersEastTimeContext(fastSig.yExpr)) {
-                QString savedError;
-                SignalSeries saved = fetchSavedEastSignalOnOpenSocket(socket, plot, fastSig, maxPoints, &savedError);
-                if (saved.hasData()) {
-                    applySeriesScale(&saved, sig.yExpr, scaledExpr.scale);
-                    if (error) {
-                        error->clear();
-                    }
-                    return saved;
+            QString savedError;
+            SignalSeries saved = fetchSavedEastSignalOnOpenSocket(socket, plot, fastSig, maxPoints, &savedError);
+            if (saved.hasData()) {
+                applySeriesScale(&saved, sig.yExpr, scaledExpr.scale);
+                if (error) {
+                    error->clear();
                 }
+                return saved;
             }
+            // For thin/preview: full-read envelope (min/max per bucket) preserves
+            // spikes perfectly (0% loss) at ~1.8s/signal vs stride-sampling's ~1.3s
+            // but 91% bucket miss rate. With 8-way parallel the wall-clock is ~6-7s
+            // for 34 signals (vs Java's ~7s), faster than Java and spike-preserving.
+            SignalSeries envelope = fetchEastFullEnvelopeSignalOnOpenSocket(socket, plot, fastSig, maxPoints, readMode, error);
+            if (envelope.hasData()) {
+                applySeriesScale(&envelope, sig.yExpr, scaledExpr.scale);
+                return envelope;
+            }
+            if (error) {
+                error->clear();
+            }
+            // SetTimeContext-based server resample is ~5x faster than length
+            // sampling on segmented EAST nodes: it lets the server resample to the
+            // requested time resolution instead of reading the full record and
+            // striding ([1:*:step] forces a full 11M-point read, ~1.3s; the windowed
+            // resample is ~0.25s). This is what Java's freq-mode path uses. Fall
+            // back to length sampling only if the time-context read yields no data.
             SignalSeries contextual = fetchEastTimeContextSignalOnOpenSocket(socket, plot, fastSig, maxPoints, timebaseCache, error);
             if (contextual.hasData()) {
                 applySeriesScale(&contextual, sig.yExpr, scaledExpr.scale);
                 return contextual;
+            }
+            if (error) {
+                error->clear();
+            }
+            SignalSeries sampled = fetchEastLengthSampledSignalOnOpenSocket(socket, plot, fastSig, maxPoints, error);
+            if (sampled.hasData()) {
+                applySeriesScale(&sampled, sig.yExpr, scaledExpr.scale);
+                return sampled;
             }
             if (error) {
                 error->clear();
@@ -1482,6 +1657,138 @@ private:
         return result;
     }
 
+    // Oversampled envelope for thin/medium modes:
+    // - Thin (DataReadMode::Thin): SetTimeContext 20k-pt averaging, ~4s, fast preview
+    // - Medium (DataReadMode::Medium): stride 20k-pt sampling, ~8-11s, preserves spike amplitude
+    SignalSeries fetchEastFullEnvelopeSignalOnOpenSocket(QTcpSocket& socket,
+                                                         const PlotSpec& plot,
+                                                         const SignalSpec& sig,
+                                                         int maxPoints,
+                                                         DataReadMode readMode,
+                                                         QString* error) const
+    {
+        SignalSeries result;
+        result.name = normalizedMdsSignal(sig.yExpr);
+        if (maxPoints <= 0) {
+            return result;
+        }
+
+        QString localError;
+        const EastThinPlan plan = eastThinPlan(socket, plot.shot, sig, maxPoints, &localError);
+        if (!plan.valid || plan.sampling.sourceCount <= 0 || !plan.timebase.valid) {
+            return result;
+        }
+
+        // Only use envelope when sampling ratio is high enough.
+        static constexpr int kOversample = 10;
+        if (plan.sampling.step <= 4) {
+            return result;
+        }
+
+        const int oversampledPoints = maxPoints * kOversample;
+        const double start = plan.timebase.start;
+        const double end = start + static_cast<double>(plan.sampling.sourceCount - 1) * plan.timebase.step;
+
+        if (readMode == DataReadMode::Medium) {
+            // Medium mode: stride sampling at high resolution (real measured values)
+            const int fineStep = std::max(1, plan.sampling.sourceCount / oversampledPoints);
+            const QString sampledExpr = QString("( _jscope_0 = (data(%1)[1:*:%2]), fs_float(_jscope_0))")
+                                            .arg(sig.yExpr.trimmed()).arg(fineStep);
+            const double sampledStart = start + plan.timebase.step; // [1:*:step] skips index 0
+            const double sampledStep = plan.timebase.step * static_cast<double>(fineStep);
+
+            const Message yMessage = value(socket, sampledExpr, &localError);
+            result = makeSeriesUniformXFromMessage(result.name, yMessage, sampledStart, sampledStep, oversampledPoints, &localError);
+            if (!result.hasData()) {
+                if (error) error->clear();
+                return result;
+            }
+            traceMdsLine(QString("east_envelope_signal shot=%1 tree=%2 y=%3 method=stride points=%4")
+                             .arg(plot.shot, sig.experiment, sig.yExpr)
+                             .arg(result.pointCount()));
+        } else {
+            // Thin mode: SetTimeContext averaging (fast but spike amplitude slightly attenuated)
+            const double delta = (end - start) / static_cast<double>(oversampledPoints - 1);
+            value(socket,
+                  QString("SetTimeContext(%1,%2,%3)")
+                      .arg(start, 0, 'g', 12)
+                      .arg(end,   0, 'g', 12)
+                      .arg(delta, 0, 'g', 12),
+                  &localError);
+            if (!localError.isEmpty()) {
+                value(socket, "SetTimeContext()", &localError);
+                return result;
+            }
+
+            const Message yMessage = value(socket,
+                                           QString("( _jscope_0 = (%1), fs_float(_jscope_0))").arg(sig.yExpr.trimmed()),
+                                           &localError);
+            value(socket, "SetTimeContext()", &localError);
+
+            result = makeSeriesUniformXFromMessage(result.name, yMessage, start, delta, oversampledPoints, &localError);
+            if (!result.hasData()) {
+                if (error) error->clear();
+                return result;
+            }
+            traceMdsLine(QString("east_envelope_signal shot=%1 tree=%2 y=%3 method=STC points=%4")
+                             .arg(plot.shot, sig.experiment, sig.yExpr)
+                             .arg(result.pointCount()));
+        }
+        if (error) error->clear();
+        return result;
+    }
+
+    SignalSeries fetchEastLengthSampledSignalOnOpenSocket(QTcpSocket& socket,
+                                                          const PlotSpec& plot,
+                                                          const SignalSpec& sig,
+                                                          int maxPoints,
+                                                          QString* error) const
+    {
+        SignalSeries result;
+        result.name = normalizedMdsSignal(sig.yExpr);
+        if (maxPoints <= 0) {
+            return result;
+        }
+
+        QString localError;
+        const EastThinPlan plan = eastThinPlan(socket, plot.shot, sig, maxPoints, &localError);
+        if (!plan.valid || plan.sampling.sampledCount <= 0 || !plan.timebase.valid) {
+            if (error) {
+                error->clear();
+            }
+            return result;
+        }
+
+        const int sampleStep = plan.sampling.step;
+        const QString yExpr = sampleStep > 1
+                                  ? QString("( _jscope_0 = (data(%1)[1:*:%2]), fs_float(_jscope_0))").arg(sig.yExpr).arg(sampleStep)
+                                  : QString("( _jscope_0 = (%1), fs_float(_jscope_0))").arg(sig.yExpr);
+        const double sampledStart = sampleStep > 1 ? plan.timebase.start + plan.timebase.step : plan.timebase.start;
+        const double sampledStep = plan.timebase.step * static_cast<double>(sampleStep);
+        const Message yMessage = value(socket, yExpr, &localError);
+        result = makeSeriesUniformXFromMessage(result.name,
+                                               yMessage,
+                                               sampledStart,
+                                               sampledStep,
+                                               maxPoints,
+                                               &localError);
+        if (!result.hasData()) {
+            if (error) {
+                error->clear();
+            }
+            return {};
+        }
+
+        traceMdsLine(QString("east_length_sampled_signal shot=%1 tree=%2 y=%3 points=%4 step=%5")
+                         .arg(plot.shot, sig.experiment, sig.yExpr)
+                         .arg(result.pointCount())
+                         .arg(sampleStep));
+        if (error) {
+            error->clear();
+        }
+        return result;
+    }
+
     SignalSeries fetchEastTimeContextSignalOnOpenSocket(QTcpSocket& socket,
                                                         const PlotSpec& plot,
                                                         const SignalSpec& sig,
@@ -1496,23 +1803,31 @@ private:
         }
 
         QString localError;
-        UniformTimebase timebase;
-        if (timebaseCache) {
-            timebase = timebaseCache->value(eastTimebaseKey(plot.shot, sig));
-        }
-        if (!timebase.valid) {
-            timebase = eastUniformTimebase(socket, plot.shot, sig, &localError);
-        }
-        if (!timebase.valid) {
+        const EastThinPlan plan = eastThinPlan(socket, plot.shot, sig, maxPoints, &localError);
+        if (!plan.valid || plan.sampling.sourceCount <= 0 || !plan.timebase.valid) {
             if (error) {
                 error->clear();
             }
             return result;
         }
 
-        const double start = timebase.start;
-        const double end = start + 4.0;
-        const double delta = (end - start) / static_cast<double>(maxPoints);
+        double start = plan.timebase.start;
+        double end = start + static_cast<double>(plan.sampling.sourceCount - 1) * plan.timebase.step;
+        double delta = plan.timebase.step * static_cast<double>(plan.sampling.step);
+        if (plot.customXRange
+            && std::isfinite(plot.xmin)
+            && std::isfinite(plot.xmax)
+            && plot.xmax > plot.xmin) {
+            start = plot.xmin;
+            end = plot.xmax;
+            delta = (end - start) / static_cast<double>(maxPoints);
+        }
+        if (!std::isfinite(start) || !std::isfinite(end) || !std::isfinite(delta) || delta <= 0.0 || end <= start) {
+            if (error) {
+                error->clear();
+            }
+            return result;
+        }
         value(socket,
               QString("SetTimeContext(%1,%2,%3)")
                   .arg(start, 0, 'g', 12)
@@ -1559,9 +1874,8 @@ private:
         result.name = normalizedMdsSignal(sig.yExpr);
         const QString savedExpr = sig.yExpr.trimmed() + "_s";
         QString localError;
-        const QVector<double> y = numericValue(socket,
-                                               QString("( _jscope_0 = (%1), fs_float(_jscope_0))").arg(savedExpr),
-                                               &localError);
+        const QString yExpr = QString("( _jscope_0 = (%1), fs_float(_jscope_0))").arg(savedExpr);
+        const QVector<double> y = numericValue(socket, yExpr, &localError);
         if (y.isEmpty()) {
             if (error) {
                 error->clear();
@@ -1569,9 +1883,8 @@ private:
             return result;
         }
 
-        const QVector<double> x = numericValue(socket,
-                                               QString("( _jscope_1 = (dim_of(%1)), ft_float(_jscope_1))").arg(savedExpr),
-                                               &localError);
+        const QString xExpr = QString("( _jscope_1 = (dim_of(%1)), ft_float(_jscope_1))").arg(savedExpr);
+        const QVector<double> x = numericValue(socket, xExpr, &localError);
         result = makeSeries(result.name, y, x, maxPoints);
         if (!result.hasData()) {
             if (error) {
@@ -1620,19 +1933,42 @@ private:
     static bool writeMessage(QTcpSocket& socket, const QByteArray& packet, QString* error)
     {
         socket.write(packet);
-        if (!socket.waitForBytesWritten(kNetworkTimeoutMs)) {
-            *error = socket.errorString();
-            return false;
+        QElapsedTimer timer;
+        timer.start();
+        while (socket.bytesToWrite() > 0) {
+            if (currentCanceled()) {
+                socket.abort();
+                *error = "operation canceled";
+                return false;
+            }
+            if (!socket.waitForBytesWritten(50)) {
+                if (timer.elapsed() >= kNetworkTimeoutMs) {
+                    *error = socket.errorString();
+                    return false;
+                }
+            }
         }
         return true;
     }
 
     static bool readFully(QTcpSocket& socket, QByteArray* out, qsizetype size, QString* error)
     {
+        QElapsedTimer timer;
+        timer.start();
         while (out->size() < size) {
-            if (socket.bytesAvailable() <= 0 && !socket.waitForReadyRead(kNetworkTimeoutMs)) {
-                *error = socket.errorString();
+            if (currentCanceled()) {
+                socket.abort();
+                *error = "operation canceled";
                 return false;
+            }
+            if (socket.bytesAvailable() <= 0) {
+                if (!socket.waitForReadyRead(50)) {
+                    if (timer.elapsed() >= kNetworkTimeoutMs) {
+                        *error = socket.errorString();
+                        return false;
+                    }
+                    continue;
+                }
             }
             out->append(socket.read(size - out->size()));
         }
@@ -1707,10 +2043,19 @@ private:
 
     static bool flushQueuedValues(QTcpSocket& socket, QString* error)
     {
+        QElapsedTimer timer;
+        timer.start();
         while (socket.bytesToWrite() > 0) {
-            if (!socket.waitForBytesWritten(kNetworkTimeoutMs)) {
-                *error = socket.errorString();
+            if (currentCanceled()) {
+                socket.abort();
+                *error = "operation canceled";
                 return false;
+            }
+            if (!socket.waitForBytesWritten(50)) {
+                if (timer.elapsed() >= kNetworkTimeoutMs) {
+                    *error = socket.errorString();
+                    return false;
+                }
             }
         }
         return true;
@@ -2108,19 +2453,40 @@ private:
 
         const QString yExpr = sig.yExpr.trimmed();
         QString localError;
+        // Java (MdsAccess.getSignal) never calls size() on segmented EAST nodes:
+        // it derives the point count from the cheap scalar children daqtime*freq
+        // (~3ms) instead of size() (~1200ms per segmented node). Match that here,
+        // falling back to size() only when daqtime is unavailable, as Java does.
         const QVector<double> meta = numericValue(socket,
-                                                  QString("[size(%1),%1:freq,%1:trigtime]").arg(yExpr),
+                                                  QString("[%1:daqtime,%1:freq,%1:trigtime]").arg(yExpr),
                                                   &localError);
-        if (meta.size() < 3 || !std::isfinite(meta[0]) || !std::isfinite(meta[1]) || !std::isfinite(meta[2])) {
+        if (meta.size() < 3 || !std::isfinite(meta[1]) || !std::isfinite(meta[2])) {
             if (error) {
                 error->clear();
             }
             return plan;
         }
 
-        const int pointCount = static_cast<int>(std::llround(meta[0]));
         const int freq = static_cast<int>(std::llround(meta[1]));
-        if (pointCount <= 0 || freq <= 0) {
+        if (freq <= 0) {
+            if (error) {
+                error->clear();
+            }
+            return plan;
+        }
+
+        const double daqtime = std::isfinite(meta[0]) ? meta[0] : 0.0;
+        int pointCount = daqtime > 0.0
+                             ? static_cast<int>(std::llround(daqtime * static_cast<double>(freq)))
+                             : 0;
+        if (pointCount <= 0) {
+            QString sizeError;
+            const int sizeCount = intValue(socket, QString("size(%1)").arg(yExpr), &sizeError);
+            if (sizeCount > 0) {
+                pointCount = sizeCount;
+            }
+        }
+        if (pointCount <= 0) {
             if (error) {
                 error->clear();
             }
@@ -2666,15 +3032,16 @@ private:
 
 QVector<LoadedSignal> fetchMdsSignals(const LayoutConfig& snapshot,
                                       DataReadMode readMode,
-                                      LoadedSignalCallback callback)
+                                      LoadedSignalCallback callback,
+                                      std::shared_ptr<std::atomic_bool> cancel)
 {
-    MdsIpClient client(readMode, std::move(callback));
+    MdsIpClient client(readMode, std::move(callback), std::move(cancel));
     return client.fetchAll(snapshot);
 }
 
-void warmMdsConnections(const LayoutConfig& snapshot)
+void warmMdsConnections(const LayoutConfig& snapshot, std::shared_ptr<std::atomic_bool> cancel)
 {
-    MdsIpClient client(DataReadMode::Thin);
+    MdsIpClient client(DataReadMode::Thin, {}, std::move(cancel));
     client.warmConnections(snapshot);
 }
 

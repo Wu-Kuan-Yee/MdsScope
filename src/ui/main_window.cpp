@@ -283,7 +283,7 @@ QString signalRefreshSignature(const SignalSpec& sig)
         sig.colorName,
         sig.manualColor ? QStringLiteral("manual-color") : QStringLiteral("auto-color"),
         sig.hidden ? QStringLiteral("hidden") : QStringLiteral("shown"),
-        sig.fullData ? QStringLiteral("full") : QStringLiteral("thin"),
+        QString::number(static_cast<int>(sig.readMode)),
     }.join(QChar(0x1f));
 }
 
@@ -330,7 +330,7 @@ bool signalDataSourceEqual(const SignalSpec& lhs, const SignalSpec& rhs)
            && lhs.experiment == rhs.experiment
            && lhs.serverIp == rhs.serverIp
            && lhs.hidden == rhs.hidden
-           && lhs.fullData == rhs.fullData;
+           && lhs.readMode == rhs.readMode;
 }
 
 bool signalDataSourcesEqual(const QVector<SignalSpec>& lhs, const QVector<SignalSpec>& rhs)
@@ -752,7 +752,7 @@ public:
             sig.colorName = row->color.name();
             sig.manualColor = row->manualColor;
             sig.hidden = row->hidden->isChecked();
-            sig.fullData = row->dataMode->currentData().toInt() == static_cast<int>(DataReadMode::Full);
+            sig.readMode = static_cast<DataReadMode>(row->dataMode->currentData().toInt());
             out.push_back(std::move(sig));
         }
         return out;
@@ -802,8 +802,9 @@ private:
         row->xExpr = sig.xExpr;
         row->hidden->setChecked(sig.hidden);
         row->dataMode->addItem("Thin", static_cast<int>(DataReadMode::Thin));
+        row->dataMode->addItem("Medium", static_cast<int>(DataReadMode::Medium));
         row->dataMode->addItem("Full", static_cast<int>(DataReadMode::Full));
-        row->dataMode->setCurrentIndex(sig.fullData ? 1 : 0);
+        row->dataMode->setCurrentIndex(row->dataMode->findData(static_cast<int>(sig.readMode)));
         row->shot->setMinimumWidth(72);
         row->signal->setMinimumWidth(150);
         row->server->setMinimumWidth(120);
@@ -2530,9 +2531,6 @@ MainWindow::MainWindow(QString rootPath, QWidget* parent)
     loadFontSettings(rootPath_);
     buildUi();
     applyUiFont();
-    connect(&dataWatcher_, &QFutureWatcher<QVector<LoadedSignal>>::finished, this, [this] {
-        applyLoadedSignals(dataWatcher_.result());
-    });
     connect(&panelWatcher_, &QFutureWatcher<QVector<LoadedSignal>>::finished, this, [this] {
         if (!activePanelRefreshKey_.isEmpty()) {
             applyPanelLoadedSignals(panelWatcher_.result());
@@ -2551,10 +2549,7 @@ MainWindow::MainWindow(QString rootPath, QWidget* parent)
         }
     });
     connect(&warmWatcher_, &QFutureWatcher<void>::finished, this, [this] {
-        if (warmRefreshPending_) {
-            warmRefreshPending_ = false;
-            refreshData();
-        } else {
+        if (runningDataFetches_ <= 0 && activeRefreshKey_.isEmpty()) {
             setStatus("MDS connections ready");
         }
     });
@@ -2730,9 +2725,10 @@ void MainWindow::buildUi()
     topLayout->addWidget(new QLabel("Rate", topControls));
     dataModeCombo_ = new QComboBox(topControls);
     dataModeCombo_->addItem("Thin", static_cast<int>(DataReadMode::Thin));
+    dataModeCombo_->addItem("Medium", static_cast<int>(DataReadMode::Medium));
     dataModeCombo_->addItem("Full", static_cast<int>(DataReadMode::Full));
     dataModeCombo_->setCurrentIndex(0);
-    dataModeCombo_->setFixedWidth(78);
+    dataModeCombo_->setFixedWidth(90);
     topLayout->addWidget(dataModeCombo_);
 
     topInfoLabel_ = new QLabel("Shot: --", topControls);
@@ -2811,6 +2807,12 @@ void MainWindow::buildUi()
     auto* next = new QPushButton("Next", bottom);
     auto* stop = new QPushButton("Stop", bottom);
     auto* latest = new QPushButton("Latest", bottom);
+    stopButton_ = stop;
+    // Fix the width to the wider "Continue" label (plus padding) so toggling
+    // the text never clips it or shifts the buttons to its right.
+    stop->setText("Continue");
+    stop->setFixedWidth(stop->sizeHint().width() + 16);
+    stop->setText("Stop");
     bottomLayout->addWidget(apply);
     bottomLayout->addWidget(prev);
     bottomLayout->addWidget(next);
@@ -2826,7 +2828,7 @@ void MainWindow::buildUi()
     connect(prev, &QPushButton::clicked, this, [this] { stepShot(-1); });
     connect(next, &QPushButton::clicked, this, [this] { stepShot(1); });
     connect(latest, &QPushButton::clicked, this, &MainWindow::latestShot);
-    connect(stop, &QPushButton::clicked, this, [this] { setStatus("Stop requested"); });
+    connect(stop, &QPushButton::clicked, this, &MainWindow::onStopOrContinue);
     connect(shotEdit_, &QLineEdit::returnPressed, this, &MainWindow::applyShot);
     connect(shotEdit_, &QLineEdit::textChanged, this, [resizeShotEdit] { resizeShotEdit(); });
     connect(shotCombo_, &QComboBox::activated, this, [this](int index) {
@@ -2845,9 +2847,9 @@ void MainWindow::loadDefaultEnvironment(bool useLatestWhenNoCurrentShot)
     const QString defaultTomlConfig = QDir(environmentPath_).filePath("init.toml");
     const QString defaultWebscpConfig = QDir(environmentPath_).filePath("init.webscp");
     if (QFileInfo::exists(defaultTomlConfig)) {
-        loadEnvironmentFile(defaultTomlConfig, useLatestWhenNoCurrentShot, false);
+        loadEnvironmentFile(defaultTomlConfig, useLatestWhenNoCurrentShot, false, true);
     } else if (QFileInfo::exists(defaultWebscpConfig)) {
-        loadEnvironmentFile(defaultWebscpConfig, useLatestWhenNoCurrentShot, false);
+        loadEnvironmentFile(defaultWebscpConfig, useLatestWhenNoCurrentShot, false, true);
     } else {
         loadEnvironmentList(useLatestWhenNoCurrentShot);
     }
@@ -2858,7 +2860,7 @@ void MainWindow::loadEnvironmentList(bool useLatestWhenNoCurrentShot)
     QDir dir(environmentPath_);
     const auto files = dir.entryInfoList({"*.toml", "*.webscp"}, QDir::Files, QDir::Name);
     if (!files.isEmpty()) {
-        loadEnvironmentFile(files.first().absoluteFilePath(), useLatestWhenNoCurrentShot, false);
+        loadEnvironmentFile(files.first().absoluteFilePath(), useLatestWhenNoCurrentShot, false, true);
         return;
     }
     setStatus("No environment files found");
@@ -3048,10 +3050,15 @@ void MainWindow::refreshShotHistory()
     shotCombo_->setEditText(current);
 }
 
-bool MainWindow::loadEnvironmentFile(const QString& path, bool useLatestWhenNoCurrentShot, bool rememberRecent)
+bool MainWindow::loadEnvironmentFile(const QString& path,
+                                     bool useLatestWhenNoCurrentShot,
+                                     bool rememberRecent,
+                                     bool prewarmBeforeRefresh)
 {
     const QString previousShot = shotEdit_ ? shotEdit_->text().trimmed() : QString();
     const bool shouldFetchLatest = useLatestWhenNoCurrentShot && previousShot.isEmpty();
+    cancelPrewarmConnections();
+    startupPrewarmPending_ = false;
     activeRefreshKey_.clear();
     activePanelRefreshKey_.clear();
     pendingRefresh_ = false;
@@ -3080,7 +3087,20 @@ bool MainWindow::loadEnvironmentFile(const QString& path, bool useLatestWhenNoCu
     if (rememberRecent) {
         rememberRecentEnvironmentFile(path);
     }
-    prewarmConnections(!shouldFetchLatest);
+    if (prewarmBeforeRefresh) {
+        startupPrewarmPending_ = true;
+        QTimer::singleShot(1000, this, [this] {
+            if (startupPrewarmPending_ && runningDataFetches_ <= 0 && activeRefreshKey_.isEmpty()) {
+                startupPrewarmPending_ = false;
+                prewarmConnections();
+            }
+        });
+        if (!shouldFetchLatest) {
+            refreshData();
+        }
+    } else if (!shouldFetchLatest) {
+        refreshData();
+    }
     if (shouldFetchLatest) {
         fetchLatestShotAsync();
     }
@@ -3811,26 +3831,32 @@ bool MainWindow::loadShotSummaryFromApi(const QString& shot,
     return true;
 }
 
+namespace {
+QString signalKey(int column, int row, int signal)
+{
+    return QString::number(column) + ',' + QString::number(row) + ',' + QString::number(signal);
+}
+}
+
 void MainWindow::refreshData()
 {
-    if (warmWatcher_.isRunning()) {
-        warmRefreshPending_ = true;
-        setStatus("Connecting to MDS...");
-        return;
-    }
+    cancelPrewarmConnections();
+    // Any normal refresh invalidates a pending "Continue": the shot, config or
+    // read mode may have changed, so resuming the old fetch no longer applies.
+    clearDataPause();
     syncDisplayConfig();
-    const DataReadMode readMode = dataModeCombo_ && dataModeCombo_->currentData().toInt() == static_cast<int>(DataReadMode::Full)
-                                      ? DataReadMode::Full
+    const DataReadMode readMode = dataModeCombo_
+                                      ? static_cast<DataReadMode>(dataModeCombo_->currentData().toInt())
                                       : DataReadMode::Thin;
     const QString key = refreshKey(readMode);
-    if (dataWatcher_.isRunning()) {
+    if (runningDataFetches_ > 0) {
         if (key == activeRefreshKey_ || key == queuedRefreshKey_) {
             setStatus("Data refresh already running for current shot");
             return;
         }
-        pendingRefresh_ = true;
-        queuedRefreshKey_ = key;
-        activeRefreshKey_.clear();
+        cancelDataFetch();
+        pendingRefresh_ = false;
+        queuedRefreshKey_.clear();
         queuedLoadedSignals_.clear();
         queuedLoadedSignalApply_ = false;
         for (auto& col : plotWidgets_) {
@@ -3838,7 +3864,10 @@ void MainWindow::refreshData()
                 plot->clearSeries();
             }
         }
-        setStatus("Data refresh queued for current shot");
+        attemptedSignals_.clear();
+        streamedOk_ = 0;
+        streamedFailed_ = 0;
+        launchDataFetch(displayConfig_, readMode, key);
         return;
     }
     pendingRefresh_ = false;
@@ -3849,39 +3878,198 @@ void MainWindow::refreshData()
             plot->clearSeries();
         }
     }
-    const LayoutConfig snapshot = displayConfig_;
-    activeRefreshKey_ = key;
-    queuedRefreshKey_.clear();
+    attemptedSignals_.clear();
     streamedOk_ = 0;
     streamedFailed_ = 0;
-    setStatus(readMode == DataReadMode::Thin ? "Fetching MDS data (thin)..." : "Fetching MDS data (full)...");
-    dataWatcher_.setFuture(QtConcurrent::run([this, snapshot, readMode, key] {
-        auto loaded = fetchMdsSignals(snapshot, readMode, [this, key](const LoadedSignal& item) {
-            QMetaObject::invokeMethod(this, [this, key, item] {
-                if (key == activeRefreshKey_) {
+    launchDataFetch(displayConfig_, readMode, key);
+}
+
+void MainWindow::launchDataFetch(const LayoutConfig& snapshot, DataReadMode readMode, const QString& key)
+{
+    activeFetchSnapshot_ = snapshot;
+    activeFetchReadMode_ = readMode;
+    activeRefreshKey_ = key;
+    queuedRefreshKey_.clear();
+    const int generation = ++activeDataFetchGeneration_;
+    dataCancel_ = std::make_shared<std::atomic_bool>(false);
+    const auto cancel = dataCancel_;
+    setStatus(readMode == DataReadMode::Full ? "Fetching MDS data (full)..."
+                  : readMode == DataReadMode::Medium ? "Fetching MDS data (medium)..."
+                  : "Fetching MDS data (thin)...");
+    auto* watcher = new QFutureWatcher<QVector<LoadedSignal>>(this);
+    ++runningDataFetches_;
+    connect(watcher, &QFutureWatcher<QVector<LoadedSignal>>::finished, this, [this, watcher, key, generation] {
+        const QVector<LoadedSignal> loaded = watcher->result();
+        watcher->deleteLater();
+        runningDataFetches_ = std::max(0, runningDataFetches_ - 1);
+        if (generation != activeDataFetchGeneration_ || key != activeRefreshKey_) {
+            return;
+        }
+        applyLoadedSignals(loaded);
+    });
+    watcher->setFuture(QtConcurrent::run([this, snapshot, readMode, key, cancel] {
+        auto loaded = fetchMdsSignals(snapshot, readMode, [this, key, cancel](const LoadedSignal& item) {
+            if (cancel && cancel->load(std::memory_order_relaxed)) {
+                return;
+            }
+            QMetaObject::invokeMethod(this, [this, key, item, cancel] {
+                if ((!cancel || !cancel->load(std::memory_order_relaxed)) && key == activeRefreshKey_) {
                     queueLoadedSignal(item);
                 }
             }, Qt::QueuedConnection);
-        });
+        }, cancel);
         return loaded;
     }));
 }
 
-void MainWindow::prewarmConnections(bool refreshAfter)
+void MainWindow::onStopOrContinue()
+{
+    if (dataRefreshPaused_) {
+        resumeDataRefresh();
+    } else {
+        stopDataRefresh();
+    }
+}
+
+int MainWindow::countRemainingSignals(const LayoutConfig& snapshot) const
+{
+    int remaining = 0;
+    for (int c = 0; c < snapshot.columns.size(); ++c) {
+        for (int r = 0; r < snapshot.columns[c].size(); ++r) {
+            const PlotSpec& plot = snapshot.columns[c][r];
+            for (int s = 0; s < plot.signalSpecs.size(); ++s) {
+                if (plot.signalSpecs[s].hidden) {
+                    continue;
+                }
+                if (!attemptedSignals_.contains(signalKey(c, r, s))) {
+                    ++remaining;
+                }
+            }
+        }
+    }
+    return remaining;
+}
+
+void MainWindow::stopDataRefresh()
+{
+    const bool wasRunning = runningDataFetches_ > 0;
+    cancelDataFetch();
+    cancelPanelFetch();
+    const int remaining = countRemainingSignals(activeFetchSnapshot_);
+    const QString activeKey = activeRefreshKey_;
+    const DataReadMode activeMode = activeFetchReadMode_;
+    activeRefreshKey_.clear();
+    queuedRefreshKey_.clear();
+    pendingRefresh_ = false;
+    pendingResume_ = false;
+    activePanelRefreshKey_.clear();
+    queuedPanelRefreshKey_.clear();
+    pendingPanelRefresh_ = false;
+    queuedLoadedSignals_.clear();
+    queuedLoadedSignalApply_ = false;
+    if (wasRunning && remaining > 0) {
+        pausedSnapshot_ = activeFetchSnapshot_;
+        pausedReadMode_ = activeMode;
+        pausedKey_ = activeKey;
+        setStopButtonPaused(true);
+        setStatus(QString("Data refresh paused: %1 signals remaining").arg(remaining));
+    } else {
+        clearDataPause();
+        setStatus(wasRunning ? "Data refresh stopped" : "No data refresh running");
+    }
+}
+
+void MainWindow::resumeDataRefresh()
+{
+    if (!dataRefreshPaused_) {
+        return;
+    }
+    // Fetch only signals that were never attempted; mark the already-attempted
+    // ones hidden so fetchMdsSignals skips them while keeping signal indices
+    // stable (item.signal is the raw slot index).
+    LayoutConfig remainingSnapshot = pausedSnapshot_;
+    for (int c = 0; c < remainingSnapshot.columns.size(); ++c) {
+        for (int r = 0; r < remainingSnapshot.columns[c].size(); ++r) {
+            PlotSpec& plot = remainingSnapshot.columns[c][r];
+            for (int s = 0; s < plot.signalSpecs.size(); ++s) {
+                if (attemptedSignals_.contains(signalKey(c, r, s))) {
+                    plot.signalSpecs[s].hidden = true;
+                }
+            }
+        }
+    }
+    const DataReadMode readMode = pausedReadMode_;
+    const QString key = pausedKey_;
+    clearDataPause();
+    if (runningDataFetches_ > 0) {
+        // Old (cancelled) fetch is still winding down; queue the resume so we
+        // do not oversubscribe the thread pool with a second fetch.
+        cancelDataFetch();
+        pendingResume_ = true;
+        pendingResumeSnapshot_ = remainingSnapshot;
+        pausedReadMode_ = readMode;
+        pausedKey_ = key;
+        activeRefreshKey_.clear();
+        queuedLoadedSignals_.clear();
+        queuedLoadedSignalApply_ = false;
+        setStatus("Resuming after current fetch stops...");
+        return;
+    }
+    setStatus("Resuming data fetch...");
+    launchDataFetch(remainingSnapshot, readMode, key);
+}
+
+void MainWindow::clearDataPause()
+{
+    pendingResume_ = false;
+    if (dataRefreshPaused_) {
+        setStopButtonPaused(false);
+    }
+}
+
+void MainWindow::setStopButtonPaused(bool paused)
+{
+    dataRefreshPaused_ = paused;
+    if (stopButton_) {
+        stopButton_->setText(paused ? "Continue" : "Stop");
+    }
+}
+
+void MainWindow::cancelDataFetch()
+{
+    if (dataCancel_) {
+        dataCancel_->store(true, std::memory_order_relaxed);
+    }
+}
+
+void MainWindow::cancelPanelFetch()
+{
+    if (panelCancel_) {
+        panelCancel_->store(true, std::memory_order_relaxed);
+    }
+}
+
+void MainWindow::cancelPrewarmConnections()
+{
+    if (warmCancel_) {
+        warmCancel_->store(true, std::memory_order_relaxed);
+    }
+}
+
+void MainWindow::prewarmConnections()
 {
     if (config_.columns.isEmpty()) {
         return;
     }
-    warmRefreshPending_ = warmRefreshPending_ || refreshAfter;
     if (warmWatcher_.isRunning()) {
-        setStatus("Connecting to MDS...");
         return;
     }
 
     const LayoutConfig snapshot = expandedShotLayout(config_);
-    setStatus("Connecting to MDS...");
-    warmWatcher_.setFuture(QtConcurrent::run([snapshot] {
-        warmMdsConnections(snapshot);
+    warmCancel_ = std::make_shared<std::atomic_bool>(false);
+    const auto cancel = warmCancel_;
+    warmWatcher_.setFuture(QtConcurrent::run([snapshot, cancel] {
+        warmMdsConnections(snapshot, cancel);
     }));
 }
 
@@ -3919,8 +4107,8 @@ void MainWindow::refreshOne(int column, int row, int signal)
         return;
     }
 
-    const DataReadMode readMode = dataModeCombo_ && dataModeCombo_->currentData().toInt() == static_cast<int>(DataReadMode::Full)
-                                      ? DataReadMode::Full
+    const DataReadMode readMode = dataModeCombo_
+                                      ? static_cast<DataReadMode>(dataModeCombo_->currentData().toInt())
                                       : DataReadMode::Thin;
     const QString key = panelRefreshKey(column, row, signal, readMode);
 
@@ -3934,6 +4122,9 @@ void MainWindow::refreshOne(int column, int row, int signal)
         if (key == activePanelRefreshKey_ || key == queuedPanelRefreshKey_) {
             setStatus(QString("Panel refresh already running: col %1 row %2").arg(column + 1).arg(row + 1));
             return;
+        }
+        if (panelCancel_) {
+            cancelPanelFetch();
         }
         pendingPanelRefresh_ = true;
         pendingPanelColumn_ = column;
@@ -3962,11 +4153,13 @@ void MainWindow::refreshOne(int column, int row, int signal)
     }
     activePanelRefreshKey_ = key;
     queuedPanelRefreshKey_.clear();
+    panelCancel_ = std::make_shared<std::atomic_bool>(false);
+    const auto cancel = panelCancel_;
     setStatus(singleSignalRefresh
                   ? QString("Fetching signal data: col %1 row %2 source %3").arg(column + 1).arg(row + 1).arg(signal + 1)
                   : QString("Fetching panel data: col %1 row %2").arg(column + 1).arg(row + 1));
-    panelWatcher_.setFuture(QtConcurrent::run([snapshot, readMode, singleSignalRefresh] {
-        QVector<LoadedSignal> loaded = fetchMdsSignals(snapshot, readMode);
+    panelWatcher_.setFuture(QtConcurrent::run([snapshot, readMode, singleSignalRefresh, cancel] {
+        QVector<LoadedSignal> loaded = fetchMdsSignals(snapshot, readMode, {}, cancel);
         Q_UNUSED(singleSignalRefresh);
         return loaded;
     }));
@@ -4010,6 +4203,9 @@ void MainWindow::applyLoadedSignal(const LoadedSignal& item)
     }
 
     plotWidgets_[item.column][item.row]->setSeries(item.signal, item.series);
+    // Record every delivered slot (loaded or failed) so a later Continue only
+    // re-fetches signals that were never attempted.
+    attemptedSignals_.insert(signalKey(item.column, item.row, item.signal));
     if (!item.series.hasData()) {
         ++streamedFailed_;
     } else {
@@ -4026,6 +4222,11 @@ void MainWindow::applyLoadedSignals(const QVector<LoadedSignal>& loaded)
 {
     flushQueuedLoadedSignals();
     if (activeRefreshKey_.isEmpty()) {
+        if (pendingResume_) {
+            pendingResume_ = false;
+            launchDataFetch(pendingResumeSnapshot_, pausedReadMode_, pausedKey_);
+            return;
+        }
         if (pendingRefresh_) {
             pendingRefresh_ = false;
             refreshData();
@@ -4041,6 +4242,10 @@ void MainWindow::applyLoadedSignals(const QVector<LoadedSignal>& loaded)
     activeRefreshKey_.clear();
     if (streamedOk_ + streamedFailed_ >= loaded.size()) {
         setStatus(QString("Data refresh done: %1 signals loaded, %2 failed").arg(streamedOk_).arg(streamedFailed_));
+        if (startupPrewarmPending_) {
+            startupPrewarmPending_ = false;
+            prewarmConnections();
+        }
         return;
     }
 
@@ -4061,6 +4266,10 @@ void MainWindow::applyLoadedSignals(const QVector<LoadedSignal>& loaded)
         }
     }
     setStatus(QString("Data refresh done: %1 signals loaded, %2 failed").arg(ok).arg(failed));
+    if (startupPrewarmPending_) {
+        startupPrewarmPending_ = false;
+        prewarmConnections();
+    }
 }
 
 void MainWindow::applyPanelLoadedSignals(const QVector<LoadedSignal>& loaded)
@@ -4421,8 +4630,8 @@ void MainWindow::exportDataForPanels(const QVector<QPair<int, int>>& panels,
         }
     }
 
-    const DataReadMode readMode = dataModeCombo_ && dataModeCombo_->currentData().toInt() == static_cast<int>(DataReadMode::Full)
-                                      ? DataReadMode::Full
+    const DataReadMode readMode = dataModeCombo_
+                                      ? static_cast<DataReadMode>(dataModeCombo_->currentData().toInt())
                                       : DataReadMode::Thin;
     const ExportFormat format = static_cast<ExportFormat>(exportFormat);
     setStatus(QString("Exporting data from %1 panels...").arg(panels.size()));
