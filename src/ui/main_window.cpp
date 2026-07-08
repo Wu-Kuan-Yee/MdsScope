@@ -2549,11 +2549,13 @@ MainWindow::MainWindow(QString rootPath, QWidget* parent)
         }
     });
     connect(&warmWatcher_, &QFutureWatcher<void>::finished, this, [this] {
-        if (runningDataFetches_ <= 0 && activeRefreshKey_.isEmpty()) {
+        if (runningDataFetches_ <= 0 && activeRefreshKey_.isEmpty() && !latestShotFetchRunning_) {
             setStatus("MDS connections ready");
         }
     });
-    loadDefaultEnvironment(true);
+    QTimer::singleShot(16, this, [this] {
+        loadDefaultEnvironment(true);
+    });
 }
 
 void MainWindow::changeEvent(QEvent* event)
@@ -3058,7 +3060,6 @@ bool MainWindow::loadEnvironmentFile(const QString& path,
     const QString previousShot = shotEdit_ ? shotEdit_->text().trimmed() : QString();
     const bool shouldFetchLatest = useLatestWhenNoCurrentShot && previousShot.isEmpty();
     cancelPrewarmConnections();
-    startupPrewarmPending_ = false;
     activeRefreshKey_.clear();
     activePanelRefreshKey_.clear();
     pendingRefresh_ = false;
@@ -3088,13 +3089,7 @@ bool MainWindow::loadEnvironmentFile(const QString& path,
         rememberRecentEnvironmentFile(path);
     }
     if (prewarmBeforeRefresh) {
-        startupPrewarmPending_ = true;
-        QTimer::singleShot(1000, this, [this] {
-            if (startupPrewarmPending_ && runningDataFetches_ <= 0 && activeRefreshKey_.isEmpty()) {
-                startupPrewarmPending_ = false;
-                prewarmConnections();
-            }
-        });
+        prewarmConnections();
         if (!shouldFetchLatest) {
             refreshData();
         }
@@ -4255,10 +4250,6 @@ void MainWindow::applyLoadedSignals(const QVector<LoadedSignal>& loaded)
     activeRefreshKey_.clear();
     if (streamedOk_ + streamedFailed_ >= loaded.size()) {
         setStatus(QString("Data refresh done: %1 signals loaded, %2 failed").arg(streamedOk_).arg(streamedFailed_));
-        if (startupPrewarmPending_) {
-            startupPrewarmPending_ = false;
-            prewarmConnections();
-        }
         return;
     }
 
@@ -4279,10 +4270,6 @@ void MainWindow::applyLoadedSignals(const QVector<LoadedSignal>& loaded)
         }
     }
     setStatus(QString("Data refresh done: %1 signals loaded, %2 failed").arg(ok).arg(failed));
-    if (startupPrewarmPending_) {
-        startupPrewarmPending_ = false;
-        prewarmConnections();
-    }
 }
 
 void MainWindow::applyPanelLoadedSignals(const QVector<LoadedSignal>& loaded)
