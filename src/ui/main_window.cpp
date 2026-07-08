@@ -2547,16 +2547,22 @@ MainWindow::MainWindow(QString rootPath, QWidget* parent)
             queuedPanelRefreshKey_.clear();
             refreshOne(column, row, signal);
         }
+        // A prewarm may have finished while this panel fetch was in flight; the
+        // idle guard keeps pendingPrewarmRefresh_ set until the panel drains, so
+        // launch the deferred initial full refresh now if nothing else is running.
+        maybeStartDeferredRefresh();
     });
     connect(&warmWatcher_, &QFutureWatcher<void>::finished, this, [this] {
-        if (pendingPrewarmRefresh_) {
+        const bool idle = canStartDeferredRefresh();
+        if (pendingPrewarmRefresh_ && idle) {
             pendingPrewarmRefresh_ = false;
-            if (runningDataFetches_ <= 0 && activeRefreshKey_.isEmpty() && !latestShotFetchRunning_) {
-                refreshData();
-                return;
-            }
+            refreshData();
+            return;
         }
-        if (runningDataFetches_ <= 0 && activeRefreshKey_.isEmpty() && !latestShotFetchRunning_) {
+        // If a fetch is still in flight, keep pendingPrewarmRefresh_ set so the
+        // fetch-completion handler triggers the deferred initial refresh once it
+        // drains, rather than dropping it here.
+        if (idle) {
             setStatus("MDS connections ready");
         }
     });
@@ -3937,6 +3943,11 @@ void MainWindow::launchDataFetch(const LayoutConfig& snapshot, DataReadMode read
             return;
         }
         applyLoadedSignals(loaded);
+        // A prewarm may have finished while this fetch was in flight; its finished
+        // handler leaves pendingPrewarmRefresh_ set in that case. Pick up the
+        // deferred initial refresh now that the fetch has drained and nothing else
+        // is running (applyLoadedSignals clears activeRefreshKey_ on completion).
+        maybeStartDeferredRefresh();
     });
     watcher->setFuture(QtConcurrent::run([this, snapshot, readMode, key, cancel] {
         auto loaded = fetchMdsSignals(snapshot, readMode, [this, key, cancel](const LoadedSignal& item) {
@@ -4103,6 +4114,24 @@ bool MainWindow::prewarmConnections()
         warmMdsConnections(snapshot, cancel);
     }));
     return true;
+}
+
+bool MainWindow::canStartDeferredRefresh() const
+{
+    return runningDataFetches_ <= 0
+        && activeRefreshKey_.isEmpty()
+        && !latestShotFetchRunning_
+        && !panelWatcher_.isRunning()
+        && activePanelRefreshKey_.isEmpty()
+        && !pendingPanelRefresh_;
+}
+
+void MainWindow::maybeStartDeferredRefresh()
+{
+    if (pendingPrewarmRefresh_ && canStartDeferredRefresh()) {
+        pendingPrewarmRefresh_ = false;
+        refreshData();
+    }
 }
 
 QString MainWindow::refreshKey(DataReadMode readMode) const
