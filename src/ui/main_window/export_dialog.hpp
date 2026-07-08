@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "layout_dialog.h"
+#include "layout_dialog.hpp"
 
 class ExportDataDialog final : public QDialog {
 public:

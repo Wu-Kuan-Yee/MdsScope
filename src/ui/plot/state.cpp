@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: 2026 Weikang Wang
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "mdsscope_internal.h"
-#include "point_overlay.h"
-#include "helpers.h"
+#include "mdsscope_internal.hpp"
+#include "point_overlay.hpp"
+#include "helpers.hpp"
 
 PlotWidget::PlotWidget(QWidget* parent)
     : QWidget(parent)

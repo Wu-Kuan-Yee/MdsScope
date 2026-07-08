@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "shared.h"
+#include "shared.hpp"
 
 inline QString htmlLink(const QString& label, const QString& url)
 {

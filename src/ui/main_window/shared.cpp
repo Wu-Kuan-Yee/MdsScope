@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Weikang Wang
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "shared.h"
+#include "shared.hpp"
 
 void setLabelTextIfChanged(QLabel* label, const QString& text)
 {

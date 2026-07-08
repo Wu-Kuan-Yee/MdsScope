@@ -3,8 +3,8 @@
 
 #pragma once
 
-#include "mdsscope_internal.h"
-#include "mds_client.h"
+#include "mdsscope_internal.hpp"
+#include "mds_client.hpp"
 
 namespace mds_client_internal {
 

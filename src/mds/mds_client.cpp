@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Weikang Wang
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "mds_ip_client.h"
+#include "mds_ip_client.hpp"
 
 QVector<LoadedSignal> fetchMdsSignals(const LayoutConfig& snapshot,
                                       DataReadMode readMode,
