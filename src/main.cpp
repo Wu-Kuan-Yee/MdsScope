@@ -517,21 +517,38 @@ private:
 
 QDir runtimeRootDir()
 {
+    auto runtimeResourceRootPath = [](const QDir& base) -> QString {
+        if (base.exists("environment")) {
+            return base.absolutePath();
+        }
+        const QDir resources(base.filePath("resources"));
+        if (resources.exists("environment")) {
+            return resources.absolutePath();
+        }
+        return {};
+    };
+
     QDir dir(QCoreApplication::applicationDirPath());
 #if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
     QDir bundleResources(dir);
-    if (bundleResources.cdUp() && bundleResources.cd("Resources") && bundleResources.exists("environment")) {
-        return bundleResources;
+    if (bundleResources.cdUp() && bundleResources.cd("Resources")) {
+        const QString resourceRoot = runtimeResourceRootPath(bundleResources);
+        if (!resourceRoot.isEmpty()) {
+            return QDir(resourceRoot);
+        }
     }
 #endif
-    for (int i = 0; i < 4 && !dir.exists("environment"); ++i) {
+    for (int i = 0; i < 4; ++i) {
+        const QString resourceRoot = runtimeResourceRootPath(dir);
+        if (!resourceRoot.isEmpty()) {
+            return QDir(resourceRoot);
+        }
         dir.cdUp();
     }
-    if (dir.exists("environment")) {
-        return dir;
-    }
-    if (QDir::current().exists("environment")) {
-        return QDir::current();
+
+    const QString currentResourceRoot = runtimeResourceRootPath(QDir::current());
+    if (!currentResourceRoot.isEmpty()) {
+        return QDir(currentResourceRoot);
     }
 
     QDir installDir(QCoreApplication::applicationDirPath());

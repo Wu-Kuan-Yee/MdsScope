@@ -14,7 +14,12 @@ QHash<QString, QString> defaultApiProperties()
 
 QString apiUrlPath(const QString& rootPath)
 {
-    return QDir(rootPath).filePath("APIurl");
+    const QDir root(rootPath);
+    const QString installedPath = root.filePath("APIurl");
+    if (QFileInfo::exists(installedPath)) {
+        return installedPath;
+    }
+    return root.filePath("resources/APIurl");
 }
 
 QString readApiUrl(const QString& rootPath)
@@ -277,4 +282,3 @@ QString firstShotFromJsonValue(const QJsonValue& value)
     }
     return {};
 }
-

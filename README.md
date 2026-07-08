@@ -149,22 +149,22 @@ overrides.
 Convert legacy `.webscp` files with `transfer`:
 
 ```bash
-./build/transfer environment/init.webscp
-./build/transfer --recursive environment
+./build/transfer resources/environment/init.webscp
+./build/transfer --recursive resources/environment
 ```
 
 On Windows source builds, use the executable under `build\Release`:
 
 ```powershell
-.\build\Release\transfer.exe ".\environment\init.webscp"
-.\build\Release\transfer.exe --recursive --out-dir ".\converted" ".\environment"
+.\build\Release\transfer.exe ".\resources\environment\init.webscp"
+.\build\Release\transfer.exe --recursive --out-dir ".\converted" ".\resources\environment"
 ```
 
 ### EAST HTTP Metadata API
 
-The EAST HTTP metadata endpoint is stored in `APIurl`. It is used for latest
-shot lookup and the top-bar summary. Plot data continues to come from EAST
-MDSIP.
+The EAST HTTP metadata endpoint is stored in `resources/APIurl`. It is used for
+latest shot lookup and the top-bar summary. Plot data continues to come from
+EAST MDSIP.
 
 ### Data Export
 
@@ -182,7 +182,7 @@ Windows: %USERPROFILE%\Downloads\mdsscope\output\  (usual location)
 MdsScope includes a simple benchmark mode for MDS data loading:
 
 ```bash
-./build/MdsScope --benchmark environment/your_config.webscp --summary
+./build/MdsScope --benchmark resources/environment/your_config.webscp --summary
 ```
 
 ## Repository Hygiene
@@ -193,8 +193,8 @@ Do not commit:
 - local auth caches
 - build artifacts
 
-The EAST API URL is intentionally stored in `APIurl`; do not commit personal
-tokens or cache files.
+The EAST API URL is intentionally stored in `resources/APIurl`; do not commit
+personal tokens or cache files.
 
 ## Disclaimer
 
