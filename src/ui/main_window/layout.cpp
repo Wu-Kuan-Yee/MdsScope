@@ -7,6 +7,15 @@
 #include "signal_dialogs.h"
 #include "point_overlay.h"
 
+namespace {
+struct PreservedPanelData {
+    int column = -1;
+    int row = -1;
+    QVector<SignalSeries> series;
+    bool hasView = false;
+    QRectF view;
+};
+}
 
 void MainWindow::rebuildGrid()
 {
@@ -107,11 +116,17 @@ void MainWindow::rebuildGrid()
 
 void MainWindow::syncDisplayConfig()
 {
+    const LayoutConfig previous = displayConfig_;
     displayConfig_ = expandedShotLayout(config_);
     for (int c = 0; c < plotWidgets_.size() && c < displayConfig_.columns.size(); ++c) {
         for (int r = 0; r < plotWidgets_[c].size() && r < displayConfig_.columns[c].size(); ++r) {
             if (plotWidgets_[c][r]) {
-                plotWidgets_[c][r]->setSpec(displayConfig_.columns[c][r]);
+                const bool changed = c >= previous.columns.size()
+                                     || r >= previous.columns[c].size()
+                                     || plotRefreshSignature(previous.columns[c][r]) != plotRefreshSignature(displayConfig_.columns[c][r]);
+                if (changed) {
+                    plotWidgets_[c][r]->setSpec(displayConfig_.columns[c][r]);
+                }
             }
         }
     }
@@ -173,6 +188,7 @@ void MainWindow::openLayoutSetupDialog()
     int selectRow = -1;
     int newPanels = 0;
     int keptPanels = 0;
+    QVector<PreservedPanelData> preservedPanels;
 
     for (const auto& column : layout) {
         QVector<PlotSpec> nextColumn;
@@ -190,6 +206,19 @@ void MainWindow::openLayoutSetupDialog()
                 && item.originalColumn < config_.columns.size()
                 && item.originalRow >= 0
                 && item.originalRow < config_.columns[item.originalColumn].size()) {
+                if (item.originalColumn < plotWidgets_.size()
+                    && item.originalRow < plotWidgets_[item.originalColumn].size()
+                    && plotWidgets_[item.originalColumn][item.originalRow]) {
+                    PreservedPanelData preserved;
+                    preserved.column = next.columns.size();
+                    preserved.row = nextColumn.size();
+                    preserved.series = plotWidgets_[item.originalColumn][item.originalRow]->seriesSnapshot();
+                    preserved.hasView = plotWidgets_[item.originalColumn][item.originalRow]->hasView();
+                    if (preserved.hasView) {
+                        preserved.view = plotWidgets_[item.originalColumn][item.originalRow]->currentView();
+                    }
+                    preservedPanels.push_back(std::move(preserved));
+                }
                 nextColumn.push_back(config_.columns[item.originalColumn][item.originalRow]);
                 ++keptPanels;
             }
@@ -223,11 +252,32 @@ void MainWindow::openLayoutSetupDialog()
         && selectRow >= 0 && selectRow < plotWidgets_[selectColumn].size()) {
         selectPlot(selectColumn, selectRow);
     }
+    bool shotChanged = false;
     const QString currentShot = shotEdit_ ? shotEdit_->text().trimmed() : QString();
     if (!currentShot.isEmpty()) {
+        const QString before = layoutRefreshSignature(config_);
         setAllPlotShots(currentShot);
+        shotChanged = before != layoutRefreshSignature(config_);
     }
-    refreshData();
+    if (shotChanged) {
+        refreshData();
+        return;
+    }
+    for (const PreservedPanelData& preserved : std::as_const(preservedPanels)) {
+        if (preserved.column < 0 || preserved.row < 0
+            || preserved.column >= plotWidgets_.size()
+            || preserved.row >= plotWidgets_[preserved.column].size()
+            || !plotWidgets_[preserved.column][preserved.row]) {
+            continue;
+        }
+        PlotWidget* plot = plotWidgets_[preserved.column][preserved.row];
+        for (int i = 0; i < preserved.series.size(); ++i) {
+            plot->setSeries(i, preserved.series[i]);
+        }
+        if (preserved.hasView) {
+            plot->applyView(preserved.view);
+        }
+    }
 }
 
 PlotSpec MainWindow::defaultPlotFromSelection() const

@@ -170,6 +170,7 @@ public:
 
     void setSpec(PlotSpec spec);
     const PlotSpec& spec() const { return spec_; }
+    QVector<SignalSeries> seriesSnapshot() const;
     void setSeries(int index, SignalSeries series);
     void clearSeries();
     void setSelected(bool selected);
