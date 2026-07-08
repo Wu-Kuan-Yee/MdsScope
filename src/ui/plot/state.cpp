@@ -34,6 +34,11 @@ void PlotWidget::setSpec(PlotSpec spec)
     update();
 }
 
+QVector<SignalSeries> PlotWidget::seriesSnapshot() const
+{
+    return series_;
+}
+
 void PlotWidget::setSeries(int index, SignalSeries series)
 {
     if (index >= series_.size()) {
@@ -224,4 +229,3 @@ void PlotWidget::invalidatePlotCache()
 {
     baseCacheDirty_ = true;
 }
-
