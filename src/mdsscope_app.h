@@ -325,6 +325,13 @@ private:
     void cancelPanelFetch();
     void cancelPrewarmConnections();
     bool prewarmConnections();
+    // True when no full/panel/latest-shot fetch is running or queued, i.e. a
+    // deferred initial refresh (pendingPrewarmRefresh_) may be launched now.
+    bool canStartDeferredRefresh() const;
+    // If a prewarm-deferred initial refresh is pending and nothing else is in
+    // flight, consume the flag and launch it. Safe to call from any fetch-
+    // completion handler.
+    void maybeStartDeferredRefresh();
     QString refreshKey(DataReadMode readMode) const;
     QString panelRefreshKey(int column, int row, int signal, DataReadMode readMode) const;
     void refreshOne(int column, int row, int signal);
