@@ -316,6 +316,29 @@ QIcon loginIcon(bool loggedIn)
     return QIcon(pixmap);
 }
 
+QIcon sshIcon(int state)
+{
+    QPixmap pixmap(22, 22);
+    pixmap.fill(Qt::transparent);
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    static const QColor colors[] = {
+        QColor("#64748b"), QColor("#2563eb"), QColor("#d97706"),
+        QColor("#16a34a"), QColor("#dc2626")
+    };
+    const QColor color = colors[std::clamp(state, 0, 4)];
+    painter.setPen(QPen(color, 1.7, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.setBrush(Qt::NoBrush);
+    painter.drawRoundedRect(QRectF(1.5, 3.5, 19.0, 17.0), 2.0, 2.0);
+    painter.drawLine(QPointF(5.5, 8.0), QPointF(8.5, 11.0));
+    painter.drawLine(QPointF(8.5, 11.0), QPointF(5.5, 14.0));
+    painter.drawLine(QPointF(11.5, 15.0), QPointF(16.5, 15.0));
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(color);
+    painter.drawEllipse(QPointF(18.5, 4.0), 2.5, 2.5);
+    return QIcon(pixmap);
+}
+
 QIcon modeIcon(InteractionMode mode, bool active)
 {
     QPixmap pixmap(24, 24);
@@ -344,4 +367,3 @@ QIcon modeIcon(InteractionMode mode, bool active)
     }
     return QIcon(pixmap);
 }
-

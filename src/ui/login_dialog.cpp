@@ -3,8 +3,8 @@
 
 #include "mdsscope_internal.hpp"
 
-LoginDialog::LoginDialog(QString rootPath, QWidget* parent)
-    : QDialog(parent), rootPath_(std::move(rootPath))
+LoginDialog::LoginDialog(QString rootPath, QWidget* parent, QString apiOverride)
+    : QDialog(parent), rootPath_(std::move(rootPath)), apiOverride_(std::move(apiOverride))
 {
     setWindowTitle("Login");
     setModal(true);
@@ -79,6 +79,9 @@ LoginDialog::LoginDialog(QString rootPath, QWidget* parent)
 void LoginDialog::loadProperties()
 {
     properties_ = readApiSettings(rootPath_);
+    if (!apiOverride_.trimmed().isEmpty()) {
+        properties_.insert(QStringLiteral("ApiUrl"), apiOverride_.trimmed());
+    }
     if (properties_.value("ApiUrl").trimmed().isEmpty()) {
         statusLabel_->setText("Missing API configuration.");
         statusLabel_->show();
@@ -113,7 +116,12 @@ void LoginDialog::tryLogin()
     const QString password = passwordEdit_->text();
     const ApiLoginResult result = requestApiToken(api, charset, userName, password);
     if (result.ok && !result.token.isEmpty()) {
-        saveCachedAuth(CachedAuth{userName, password, result.token});
+        CachedAuth auth;
+        loadCachedAuth(&auth);
+        auth.userName = userName;
+        auth.password = password;
+        auth.token = result.token;
+        saveCachedAuth(auth);
         accept();
         return;
     }

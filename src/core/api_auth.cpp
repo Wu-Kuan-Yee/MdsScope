@@ -151,7 +151,15 @@ bool loadCachedAuth(CachedAuth* auth)
     auth->userName = obj.value("userName").toString();
     auth->password = obj.value("password").toString();
     auth->token = obj.value("token").toString();
-    return !auth->token.isEmpty() || !auth->userName.isEmpty() || !auth->password.isEmpty();
+    const QJsonObject ssh = obj.value("ssh").toObject();
+    auth->ssh.mode = static_cast<SshMode>(std::clamp(ssh.value("mode").toInt(), 0, 2));
+    auth->ssh.host = ssh.value("host").toString();
+    auth->ssh.port = std::clamp(ssh.value("port").toInt(22), 1, 65535);
+    auth->ssh.user = ssh.value("user").toString();
+    auth->ssh.password = ssh.value("password").toString();
+    auth->ssh.identityFile = ssh.value("identityFile").toString();
+    return !auth->token.isEmpty() || !auth->userName.isEmpty() || !auth->password.isEmpty()
+           || !auth->ssh.host.isEmpty();
 }
 
 bool saveCachedAuth(const CachedAuth& auth)
@@ -160,6 +168,14 @@ bool saveCachedAuth(const CachedAuth& auth)
     obj.insert("userName", auth.userName);
     obj.insert("password", auth.password);
     obj.insert("token", auth.token);
+    QJsonObject ssh;
+    ssh.insert("mode", static_cast<int>(auth.ssh.mode));
+    ssh.insert("host", auth.ssh.host);
+    ssh.insert("port", auth.ssh.port);
+    ssh.insert("user", auth.ssh.user);
+    ssh.insert("password", auth.ssh.password);
+    ssh.insert("identityFile", auth.ssh.identityFile);
+    obj.insert("ssh", ssh);
 
     QByteArray salt;
     salt.resize(16);
@@ -180,6 +196,7 @@ bool saveCachedAuth(const CachedAuth& auth)
     }
     file.write(QJsonDocument(wrapper).toJson(QJsonDocument::Compact));
     file.write("\n");
+    file.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);
     return true;
 }
 

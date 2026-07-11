@@ -3,7 +3,7 @@
 
 cmake_minimum_required(VERSION 3.16)
 
-project(MdsScope VERSION 5.5.1 LANGUAGES CXX)
+project(MdsScope VERSION 5.6 LANGUAGES CXX)
 
 execute_process(
     COMMAND git rev-parse --short=9 HEAD
@@ -100,7 +100,10 @@ add_executable(MdsScope
     src/mds/mds_ip_protocol.cpp
     src/mds/mds_ip_signal_fetch.cpp
     src/mds/mds_ip_series.cpp
+    src/ssh/ssh_tunnel_manager.cpp
+    src/ssh/ssh_diagnostic.cpp
     src/ui/login_dialog.cpp
+    src/ui/ssh_dialog.cpp
     src/ui/plot/events.cpp
     src/ui/plot/readout.cpp
     src/ui/plot/render.cpp
@@ -114,12 +117,17 @@ add_executable(MdsScope
     src/ui/main_window/scale.cpp
     src/ui/main_window/shared.cpp
     src/ui/main_window/shot.cpp
+    src/ui/main_window/ssh.cpp
     src/ui/main_window/ui.cpp
     src/mdsscope_app.hpp
     src/core/mdsscope_internal.hpp
     src/core/text_utils.hpp
     src/mds/mds_client.hpp
     src/mds/mds_ip_client.hpp
+    src/ssh/ssh_tunnel_manager.hpp
+    src/ssh/ssh_diagnostic.hpp
+    src/ssh/ssh_settings.hpp
+    src/ui/ssh_dialog.hpp
     src/ui/main_window/about_dialog.hpp
     src/ui/main_window/export_dialog.hpp
     src/ui/main_window/layout_dialog.hpp
@@ -194,6 +202,7 @@ target_include_directories(MdsScope PRIVATE
     src/core
     src/mds
     src/ui
+    src/ssh
 )
 
 target_compile_definitions(MdsScope PRIVATE
@@ -206,6 +215,7 @@ target_include_directories(transfer PRIVATE
     src/core
     src/mds
     src/ui
+    src/ssh
 )
 
 target_link_libraries(MdsScope PRIVATE

@@ -4,11 +4,13 @@
 #include "mdsscope_internal.hpp"
 #include "mds_client.hpp"
 #include "point_overlay.hpp"
+#include "ssh_tunnel_manager.hpp"
 
 MainWindow::MainWindow(QString rootPath, QWidget* parent)
     : QMainWindow(parent), rootPath_(std::move(rootPath))
 {
     setWindowIcon(appIcon());
+    sshTunnelManager_ = new SshTunnelManager(this);
     environmentPath_ = appEnvironmentDir(rootPath_);
     ensureSourceIndexCache(rootPath_);
     exportBasePath_ = QSettings(uiSettingsPath(rootPath_), QSettings::IniFormat)

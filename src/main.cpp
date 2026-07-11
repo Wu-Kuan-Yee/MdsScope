@@ -3,6 +3,8 @@
 
 #include "mdsscope_app.hpp"
 #include "mdsscope_internal.hpp"
+#include "ssh_diagnostic.hpp"
+#include "ssh_tunnel_manager.hpp"
 
 #include <QApplication>
 #include <QColor>
@@ -588,7 +590,13 @@ bool ensureApiLoginBeforeMain(const QString& rootPath)
         return true;
     }
 
-    const QString api = properties.value("ApiUrl").trimmed();
+    const QString originalApi = properties.value("ApiUrl").trimmed();
+    QString api = originalApi;
+    QString tunnelError;
+    SshTunnelManager loginTunnel;
+    if (!originalApi.isEmpty()) {
+        loginTunnel.prepareUrl(originalApi, &api, &tunnelError);
+    }
     if (!api.isEmpty() && (!auth.userName.isEmpty() || !auth.password.isEmpty())) {
         ApiLoginResult result = requestApiToken(api, properties.value("Charset", "UTF-8"), auth.userName, auth.password);
         if (result.ok) {
@@ -597,7 +605,7 @@ bool ensureApiLoginBeforeMain(const QString& rootPath)
         }
     }
 
-    LoginDialog dialog(rootPath);
+    LoginDialog dialog(rootPath, nullptr, api);
     dialog.setWindowIcon(appIcon());
     return dialog.exec() == QDialog::Accepted;
 }
@@ -627,6 +635,17 @@ void setMdsScopeThemeMode(ThemeMode mode)
 
 int main(int argc, char* argv[])
 {
+    if (qEnvironmentVariable("MDSSCOPE_SSH_ASKPASS") == QStringLiteral("1")) {
+        QCoreApplication::setApplicationName("mdsscope");
+        QCoreApplication::setOrganizationName("MdsScope");
+        QCoreApplication helper(argc, argv);
+        CachedAuth auth;
+        if (loadCachedAuth(&auth) && !auth.ssh.password.isEmpty()) {
+            QTextStream(stdout) << auth.ssh.password << Qt::endl;
+            return 0;
+        }
+        return 1;
+    }
     QApplication::setApplicationName("mdsscope");
     QApplication::setApplicationDisplayName("MdsScope");
     QApplication::setApplicationVersion(QStringLiteral(MDSSCOPE_VERSION));
@@ -643,6 +662,22 @@ int main(int argc, char* argv[])
     QDir workDir = runtimeRootDir();
 
     const QStringList args = QCoreApplication::arguments();
+    if (args.contains(QStringLiteral("--ssh-api-test"))) {
+        return runSshApiTest(workDir.absolutePath());
+    }
+    const int sshBenchmarkIndex = args.indexOf(QStringLiteral("--ssh-benchmark"));
+    if (sshBenchmarkIndex >= 0) {
+        QString configPath = QDir(workDir).filePath(QStringLiteral("environment/init.toml"));
+        if (sshBenchmarkIndex + 1 < args.size() && !args[sshBenchmarkIndex + 1].startsWith(QStringLiteral("--"))) {
+            configPath = args[sshBenchmarkIndex + 1];
+        }
+        QString shotOverride;
+        const int shotIndex = args.indexOf(QStringLiteral("--shot"));
+        if (shotIndex >= 0 && shotIndex + 1 < args.size()) {
+            shotOverride = args[shotIndex + 1].trimmed();
+        }
+        return runSshTunnelBenchmark(configPath, shotOverride);
+    }
     const int benchmarkIndex = args.indexOf("--benchmark") >= 0 ? args.indexOf("--benchmark") : args.indexOf("--bench");
     if (benchmarkIndex >= 0) {
         QString configPath = QDir(workDir).filePath("environment/high_desity_impurity_0626.webscp");

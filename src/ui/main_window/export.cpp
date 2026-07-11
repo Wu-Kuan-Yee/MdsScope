@@ -135,6 +135,11 @@ void MainWindow::exportDataForPanels(const QVector<QPair<int, int>>& panels,
         }
     }
 
+    LayoutConfig fetchSnapshot;
+    if (!prepareSshLayout(snapshot, &fetchSnapshot)) {
+        return;
+    }
+
     const DataReadMode readMode = dataModeCombo_
                                       ? static_cast<DataReadMode>(dataModeCombo_->currentData().toInt())
                                       : DataReadMode::Thin;
@@ -142,7 +147,7 @@ void MainWindow::exportDataForPanels(const QVector<QPair<int, int>>& panels,
     setStatus(QString("Exporting data from %1 panels...").arg(panels.size()));
     QPointer<MainWindow> self(this);
     QThreadPool::globalInstance()->start([self,
-                                          snapshot,
+                                          snapshot = std::move(fetchSnapshot),
                                           baseDirPath = baseDirPath.trimmed(),
                                           readMode,
                                           format,
