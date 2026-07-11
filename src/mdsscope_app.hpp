@@ -37,6 +37,7 @@ class QToolBar;
 class QToolButton;
 class GlobalPointOverlay;
 class PointOverlay;
+class SshTunnelManager;
 
 enum class InteractionMode {
     Zoom,
@@ -148,13 +149,14 @@ class LoginDialog final : public QDialog {
     Q_OBJECT
 
 public:
-    explicit LoginDialog(QString rootPath, QWidget* parent = nullptr);
+    explicit LoginDialog(QString rootPath, QWidget* parent = nullptr, QString apiOverride = {});
 
 private:
     void loadProperties();
     void tryLogin();
 
     QString rootPath_;
+    QString apiOverride_;
     QHash<QString, QString> properties_;
     QLineEdit* userEdit_ = nullptr;
     QLineEdit* passwordEdit_ = nullptr;
@@ -306,6 +308,10 @@ private:
     void stepShot(int delta);
     void latestShot();
     void openLoginDialog();
+    void openSshDialog();
+    bool prepareSshLayout(const LayoutConfig& source, LayoutConfig* prepared);
+    bool prepareSshUrl(const QString& source, QString* prepared);
+    void updateSshActionIcon();
     void openAboutDialog();
     void applyLoginSuccessStatus(const QString& statusText);
     void updateLoginActionIcon();
@@ -313,7 +319,7 @@ private:
     void updateShotControlsFromConfig(const QString& preferredShot = {});
     void setAllPlotShots(const QString& shot);
     QString maxShotInConfig() const;
-    QString latestShotFromApi() const;
+    QString latestShotFromApi(const QString& apiOverride = {}) const;
     void refreshData();
     void stopDataRefresh();
     void onStopOrContinue();
@@ -378,7 +384,8 @@ private:
                                 QString* ip,
                                 QString* pulse,
                                 QString* it,
-                                QString* time) const;
+                                QString* time,
+                                const QString& apiOverride = {}) const;
     void setStatus(const QString& text);
     PlotWidget* currentPlotWidget() const;
     void schedulePointSync(PlotWidget* source, double x);
@@ -405,6 +412,8 @@ private:
     QLineEdit* shotEdit_ = nullptr;
     QComboBox* dataModeCombo_ = nullptr;
     QAction* loginAction_ = nullptr;
+    QAction* sshAction_ = nullptr;
+    SshTunnelManager* sshTunnelManager_ = nullptr;
     QToolButton* openButton_ = nullptr;
     QToolButton* recentEnvironmentButton_ = nullptr;
     QToolButton* aboutButton_ = nullptr;

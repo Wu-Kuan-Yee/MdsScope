@@ -75,6 +75,11 @@ void MainWindow::refreshData()
 
 void MainWindow::launchDataFetch(const LayoutConfig& snapshot, DataReadMode readMode, const QString& key)
 {
+    LayoutConfig fetchSnapshot;
+    if (!prepareSshLayout(snapshot, &fetchSnapshot)) {
+        activeRefreshKey_.clear();
+        return;
+    }
     activeFetchSnapshot_ = snapshot;
     activeFetchReadMode_ = readMode;
     activeRefreshKey_ = key;
@@ -101,8 +106,8 @@ void MainWindow::launchDataFetch(const LayoutConfig& snapshot, DataReadMode read
         // is running (applyLoadedSignals clears activeRefreshKey_ on completion).
         maybeStartDeferredRefresh();
     });
-    watcher->setFuture(QtConcurrent::run([this, snapshot, readMode, key, cancel] {
-        auto loaded = fetchMdsSignals(snapshot, readMode, [this, key, cancel](const LoadedSignal& item) {
+    watcher->setFuture(QtConcurrent::run([this, fetchSnapshot, readMode, key, cancel] {
+        auto loaded = fetchMdsSignals(fetchSnapshot, readMode, [this, key, cancel](const LoadedSignal& item) {
             if (cancel && cancel->load(std::memory_order_relaxed)) {
                 return;
             }
@@ -259,7 +264,11 @@ bool MainWindow::prewarmConnections()
         return false;
     }
 
-    const LayoutConfig snapshot = expandedShotLayout(config_);
+    const LayoutConfig source = expandedShotLayout(config_);
+    LayoutConfig snapshot;
+    if (!prepareSshLayout(source, &snapshot)) {
+        return false;
+    }
     warmCancel_ = std::make_shared<std::atomic_bool>(false);
     const auto cancel = warmCancel_;
     warmWatcher_.setFuture(QtConcurrent::run([snapshot, cancel] {
@@ -361,6 +370,11 @@ void MainWindow::refreshOne(int column, int row, int signal)
             snapshot.columns[c][r].signalSpecs.clear();
         }
     }
+    LayoutConfig fetchSnapshot;
+    if (!prepareSshLayout(snapshot, &fetchSnapshot)) {
+        activePanelRefreshKey_.clear();
+        return;
+    }
     if (!singleSignalRefresh) {
         plotWidgets_[column][row]->clearSeries();
     }
@@ -371,8 +385,8 @@ void MainWindow::refreshOne(int column, int row, int signal)
     setStatus(singleSignalRefresh
                   ? QString("Fetching signal data: col %1 row %2 source %3").arg(column + 1).arg(row + 1).arg(signal + 1)
                   : QString("Fetching panel data: col %1 row %2").arg(column + 1).arg(row + 1));
-    panelWatcher_.setFuture(QtConcurrent::run([snapshot, readMode, singleSignalRefresh, cancel] {
-        QVector<LoadedSignal> loaded = fetchMdsSignals(snapshot, readMode, {}, cancel);
+    panelWatcher_.setFuture(QtConcurrent::run([fetchSnapshot, readMode, singleSignalRefresh, cancel] {
+        QVector<LoadedSignal> loaded = fetchMdsSignals(fetchSnapshot, readMode, {}, cancel);
         Q_UNUSED(singleSignalRefresh);
         return loaded;
     }));

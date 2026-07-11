@@ -4,6 +4,7 @@
 #pragma once
 
 #include "mdsscope_app.hpp"
+#include "ssh_settings.hpp"
 
 #include <QtConcurrent>
 
@@ -136,6 +137,7 @@ struct CachedAuth {
     QString userName;
     QString password;
     QString token;
+    SshSettings ssh;
 };
 
 void traceMdsLine(const QString& line);
@@ -175,6 +177,7 @@ QIcon gearIcon();
 QIcon fontIcon();
 QIcon saveIcon();
 QIcon loginIcon(bool loggedIn);
+QIcon sshIcon(int state);
 QIcon modeIcon(InteractionMode mode, bool active);
 LayoutConfig parseEnvironment(const QString& path);
 bool writeEnvironmentToml(const LayoutConfig& config, const QString& path, QString* error = nullptr);

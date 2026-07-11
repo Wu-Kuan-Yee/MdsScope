@@ -5,6 +5,7 @@
 #include "shared.hpp"
 #include "theme.hpp"
 #include "point_overlay.hpp"
+#include "ssh_tunnel_manager.hpp"
 
 
 void MainWindow::changeEvent(QEvent* event)
@@ -133,6 +134,11 @@ void MainWindow::buildUi()
     toolbar->addAction(style()->standardIcon(QStyle::SP_BrowserReload), "Refresh", this, &MainWindow::refreshData);
     loginAction_ = toolbar->addAction(loginIcon(false), "Login", this, &MainWindow::openLoginDialog);
     updateLoginActionIcon();
+    sshAction_ = toolbar->addAction(sshIcon(0), "SSH remote access", this, &MainWindow::openSshDialog);
+    connect(sshTunnelManager_, &SshTunnelManager::stateChanged, this, [this] {
+        updateSshActionIcon();
+    });
+    updateSshActionIcon();
     toolbar->addAction(gearIcon(), "Layout setup", this, &MainWindow::openLayoutSetupDialog);
     toolbar->addAction(fontIcon(), "Customize fonts", this, &MainWindow::openCustomizeDialog);
 
@@ -525,12 +531,17 @@ void MainWindow::scheduleTopInfoUpdate(const QString& shot)
 
     pendingTopSummaryShot_ = trimmedShot;
     const int generation = ++topSummaryGeneration_;
-    QThreadPool::globalInstance()->start([this, trimmedShot, generation] {
+    QString apiUrl;
+    if (!prepareSshUrl(readApiUrl(rootPath_), &apiUrl)) {
+        pendingTopSummaryShot_.clear();
+        return;
+    }
+    QThreadPool::globalInstance()->start([this, trimmedShot, generation, apiUrl] {
         QString ip;
         QString pulse;
         QString it;
         QString shotTime;
-        const bool ok = loadShotSummaryFromApi(trimmedShot, &ip, &pulse, &it, &shotTime);
+        const bool ok = loadShotSummaryFromApi(trimmedShot, &ip, &pulse, &it, &shotTime, apiUrl);
         QMetaObject::invokeMethod(this, [this, trimmedShot, generation, ok, ip, pulse, it, shotTime] {
             if (generation != topSummaryGeneration_ || pendingTopSummaryShot_ != trimmedShot) {
                 return;

@@ -178,6 +178,23 @@ The EAST HTTP metadata endpoint is stored in `resources/APIurl`. It is used for
 latest shot lookup and the top-bar summary. Plot data continues to come from
 EAST MDSIP.
 
+### SSH Remote Access
+
+Use the SSH button next to Login to tunnel MDSIP data and EAST metadata when
+they are only reachable from an internal network. Linux, macOS, and Windows are
+supported when a system OpenSSH client is available. The SSH server may run on
+any platform, but it must allow TCP forwarding and reach the required internal
+services.
+
+Authentication supports a password, a selected identity file, or the default
+OpenSSH configuration and `ssh-agent` when both are left empty. Saved SSH
+settings are stored in the machine-bound encrypted user cache.
+
+SSH access is slower than a direct internal-network connection because of
+unavoidable network, encryption, and compression overhead. Users are responsible
+for using only trusted, authorized SSH hosts and for complying with applicable
+network and security policies.
+
 ### Data Export
 
 Data export supports text, CSV, TSV, and JSON formats. By default, exported

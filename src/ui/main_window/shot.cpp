@@ -55,7 +55,11 @@ void MainWindow::latestShot()
 
 void MainWindow::openLoginDialog()
 {
-    LoginDialog dialog(rootPath_, this);
+    QString apiUrl;
+    if (!prepareSshUrl(readApiUrl(rootPath_), &apiUrl)) {
+        return;
+    }
+    LoginDialog dialog(rootPath_, this, apiUrl);
     if (dialog.exec() != QDialog::Accepted) {
         return;
     }
@@ -105,8 +109,14 @@ void MainWindow::fetchLatestShotAsync()
     latestShotFetchRunning_ = true;
     const int generation = ++latestShotGeneration_;
     setStatus("Fetching latest shot...");
-    QThreadPool::globalInstance()->start([this, generation] {
-        const QString latest = latestShotFromApi();
+    QString apiUrl;
+    if (!prepareSshUrl(readApiUrl(rootPath_), &apiUrl)) {
+        latestShotFetchRunning_ = false;
+        setStatus("Latest shot unavailable through SSH");
+        return;
+    }
+    QThreadPool::globalInstance()->start([this, generation, apiUrl] {
+        const QString latest = latestShotFromApi(apiUrl);
         QMetaObject::invokeMethod(this, [this, latest, generation] {
             if (generation != latestShotGeneration_) {
                 latestShotFetchRunning_ = false;
@@ -186,10 +196,10 @@ QString MainWindow::maxShotInConfig() const
     return bestText;
 }
 
-QString MainWindow::latestShotFromApi() const
+QString MainWindow::latestShotFromApi(const QString& apiOverride) const
 {
     const auto properties = readApiSettings(rootPath_);
-    const QString api = properties.value("ApiUrl");
+    const QString api = apiOverride.trimmed().isEmpty() ? properties.value("ApiUrl") : apiOverride.trimmed();
     const QString token = properties.value("Token");
     const QString prefix = properties.value("Authorization_Prefix", properties.value("Init_Prefix", "Bearer"));
     const QString charset = properties.value("Charset", "UTF-8");
@@ -250,10 +260,11 @@ bool MainWindow::loadShotSummaryFromApi(const QString& shot,
                                         QString* ip,
                                         QString* pulse,
                                         QString* it,
-                                        QString* time) const
+                                        QString* time,
+                                        const QString& apiOverride) const
 {
     const auto properties = readApiSettings(rootPath_);
-    const QString api = properties.value("ApiUrl");
+    const QString api = apiOverride.trimmed().isEmpty() ? properties.value("ApiUrl") : apiOverride.trimmed();
     const QString token = properties.value("Token");
     const QString prefix = properties.value("Authorization_Prefix", properties.value("Init_Prefix", "Bearer"));
     const QString charset = properties.value("Charset", "UTF-8");
