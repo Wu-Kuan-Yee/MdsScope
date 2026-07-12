@@ -34,14 +34,22 @@ bool MdsIpClient::writeMessage(QTcpSocket& socket, const QByteArray& packet, QSt
         QElapsedTimer timer;
         timer.start();
         while (socket.bytesToWrite() > 0) {
-            if (currentCanceled()) {
+            if (shouldAbortForCurrentCancel()) {
                 socket.abort();
                 *error = "operation canceled";
                 return false;
             }
             if (!socket.waitForBytesWritten(50)) {
-                if (timer.elapsed() >= kNetworkTimeoutMs) {
+                if (socket.state() != QAbstractSocket::ConnectedState) {
                     *error = socket.errorString();
+                    return false;
+                }
+                if (timer.elapsed() >= kNetworkTimeoutMs) {
+                    // A timed-out socket is desynced from the peer; abort it so it
+                    // cannot be reused as a warm connection with a half-written
+                    // request still pending.
+                    *error = socket.errorString();
+                    socket.abort();
                     return false;
                 }
             }
@@ -53,16 +61,29 @@ bool MdsIpClient::readFully(QTcpSocket& socket, QByteArray* out, qsizetype size,
 {
         QElapsedTimer timer;
         timer.start();
+        out->reserve(size);
         while (out->size() < size) {
-            if (currentCanceled()) {
+            if (shouldAbortForCurrentCancel()) {
                 socket.abort();
                 *error = "operation canceled";
                 return false;
             }
             if (socket.bytesAvailable() <= 0) {
                 if (!socket.waitForReadyRead(50)) {
-                    if (timer.elapsed() >= kNetworkTimeoutMs) {
+                    // No buffered data and the peer is no longer connected: the
+                    // rest of the message will never arrive, so fail fast instead
+                    // of spinning until the timeout elapses.
+                    if (socket.bytesAvailable() <= 0
+                        && socket.state() != QAbstractSocket::ConnectedState) {
                         *error = socket.errorString();
+                        return false;
+                    }
+                    if (timer.elapsed() >= kNetworkTimeoutMs) {
+                        // A timed-out read leaves a partial response buffered; abort
+                        // so the socket is not reused with stale bytes (which would
+                        // misalign the next request's response).
+                        *error = socket.errorString();
+                        socket.abort();
                         return false;
                     }
                     continue;
@@ -144,14 +165,22 @@ bool MdsIpClient::flushQueuedValues(QTcpSocket& socket, QString* error)
         QElapsedTimer timer;
         timer.start();
         while (socket.bytesToWrite() > 0) {
-            if (currentCanceled()) {
+            if (shouldAbortForCurrentCancel()) {
                 socket.abort();
                 *error = "operation canceled";
                 return false;
             }
             if (!socket.waitForBytesWritten(50)) {
-                if (timer.elapsed() >= kNetworkTimeoutMs) {
+                if (socket.state() != QAbstractSocket::ConnectedState) {
                     *error = socket.errorString();
+                    return false;
+                }
+                if (timer.elapsed() >= kNetworkTimeoutMs) {
+                    // A timed-out socket is desynced from the peer; abort it so it
+                    // cannot be reused as a warm connection with a half-written
+                    // request still pending.
+                    *error = socket.errorString();
+                    socket.abort();
                     return false;
                 }
             }

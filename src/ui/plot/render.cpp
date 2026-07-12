@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "mdsscope_internal.hpp"
-#include "point_overlay.hpp"
 #include "helpers.hpp"
 
 QRect PlotWidget::syncedPointDirtyRect(const PointReadout& readout) const
@@ -116,9 +115,17 @@ void PlotWidget::paintEvent(QPaintEvent* event)
     painter.setClipRegion(event->region());
     const qreal dpr = devicePixelRatioF();
     const QSize pixmapSize(qCeil(width() * dpr), qCeil(height() * dpr));
-    if (baseCacheDirty_ || baseCache_.isNull() || baseCacheSize_ != size() || baseCache_.size() != pixmapSize) {
+    // Reallocate the backing pixmap only when the device size actually changes
+    // (widget resize or dpr change). During pan/zoom the size is stable and
+    // only baseCacheDirty_ is set, so the buffer is reused and cleared in place
+    // (refcount is 1 between frames — the prior drawPixmap released its ref),
+    // avoiding a full-window alloc/free every frame.
+    if (baseCache_.isNull() || baseCache_.size() != pixmapSize) {
         baseCache_ = QPixmap(pixmapSize);
         baseCache_.setDevicePixelRatio(dpr);
+        baseCacheDirty_ = true;
+    }
+    if (baseCacheDirty_ || baseCacheSize_ != size()) {
         baseCache_.fill(Qt::transparent);
         QPainter cachePainter(&baseCache_);
         renderBasePlot(cachePainter);
@@ -170,8 +177,6 @@ void PlotWidget::renderBasePlot(QPainter& painter) const
     }
 
     painter.setClipRect(pr.adjusted(1, 1, -1, -1));
-    QVector<QPointF> renderedPixels;
-    renderedPixels.reserve(4096);
     for (int i = 0; i < series_.size(); ++i) {
         if (i < spec_.signalSpecs.size() && spec_.signalSpecs[i].hidden) {
             continue;
@@ -185,23 +190,14 @@ void PlotWidget::renderBasePlot(QPainter& painter) const
         polyline.reserve(displayPoints.size() + 1);
         QPointF pixel = dataToPixel(displayPoints.front(), view, pr);
         polyline.push_back(QPoint(qRound(pixel.x()), qRound(pixel.y())));
-        if (renderedPixels.size() < 4096) {
-            renderedPixels.push_back(pixel);
-        }
         const int pointCount = static_cast<int>(displayPoints.size());
         const int stride = std::max(1, pointCount / std::max(1, static_cast<int>(pr.width() * 2)));
         for (int p = stride; p < displayPoints.size(); p += stride) {
             pixel = dataToPixel(displayPoints[p], view, pr);
             polyline.push_back(QPoint(qRound(pixel.x()), qRound(pixel.y())));
-            if (renderedPixels.size() < 4096) {
-                renderedPixels.push_back(pixel);
-            }
         }
         pixel = dataToPixel(displayPoints.back(), view, pr);
         polyline.push_back(QPoint(qRound(pixel.x()), qRound(pixel.y())));
-        if (renderedPixels.size() < 4096) {
-            renderedPixels.push_back(pixel);
-        }
         painter.setPen(QPen(seriesColor(i), 1));
         painter.drawPolyline(polyline.constData(), polyline.size());
     }
@@ -420,4 +416,3 @@ void PlotWidget::renderBasePlot(QPainter& painter) const
         painter.drawText(pr.adjusted(8, 8, -8, -8), Qt::AlignCenter | Qt::TextWordWrap, text);
     }
 }
-

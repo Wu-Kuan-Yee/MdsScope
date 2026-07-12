@@ -104,6 +104,9 @@ void LoginDialog::loadProperties()
 
 void LoginDialog::tryLogin()
 {
+    if (loginInProgress_) {
+        return;
+    }
     const QString api = properties_.value("ApiUrl");
     const QString charset = properties_.value("Charset", "UTF-8");
 
@@ -114,19 +117,33 @@ void LoginDialog::tryLogin()
 
     const QString userName = userEdit_->text().trimmed();
     const QString password = passwordEdit_->text();
-    const ApiLoginResult result = requestApiToken(api, charset, userName, password);
-    if (result.ok && !result.token.isEmpty()) {
-        CachedAuth auth;
-        loadCachedAuth(&auth);
-        auth.userName = userName;
-        auth.password = password;
-        auth.token = result.token;
-        saveCachedAuth(auth);
-        accept();
-        return;
-    }
-    QMessageBox::warning(this, "Login", result.error.isEmpty() ? QStringLiteral("Failed to login.") : result.error);
-    userEdit_->clear();
-    passwordEdit_->clear();
-    userEdit_->setFocus();
+    loginInProgress_ = true;
+    loginButton_->setEnabled(false);
+    statusLabel_->setText(QStringLiteral("Signing in..."));
+    statusLabel_->show();
+    auto* watcher = new QFutureWatcher<ApiLoginResult>(this);
+    connect(watcher, &QFutureWatcher<ApiLoginResult>::finished, this, [this, watcher, userName, password] {
+        const ApiLoginResult result = watcher->result();
+        watcher->deleteLater();
+        loginInProgress_ = false;
+        loginButton_->setEnabled(true);
+        if (result.ok && !result.token.isEmpty()) {
+            CachedAuth auth;
+            loadCachedAuth(&auth);
+            auth.userName = userName;
+            auth.password = password;
+            auth.token = result.token;
+            saveCachedAuth(auth);
+            accept();
+            return;
+        }
+        statusLabel_->setText(result.error.isEmpty() ? QStringLiteral("Failed to login.") : result.error);
+        statusLabel_->show();
+        userEdit_->clear();
+        passwordEdit_->clear();
+        userEdit_->setFocus();
+    });
+    watcher->setFuture(QtConcurrent::run([api, charset, userName, password] {
+        return requestApiToken(api, charset, userName, password);
+    }));
 }

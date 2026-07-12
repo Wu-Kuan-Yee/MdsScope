@@ -34,7 +34,21 @@ void MainWindow::stepShot(int delta)
     if (!ok) {
         return;
     }
-    const QString nextShot = QString::number(std::max(0, shot + delta));
+    int next = std::max(0, shot + delta);
+    if (delta > 0) {
+        bool latestOk = false;
+        const int latest = latestShot_.trimmed().toInt(&latestOk);
+        if (latestOk && next > latest) {
+            if (shot != latest && shotEdit_->text() != latestShot_) {
+                shotEdit_->setText(latestShot_);
+                applyShot();
+            } else {
+                setStatus(QString("Already at latest shot %1").arg(latestShot_));
+            }
+            return;
+        }
+    }
+    const QString nextShot = QString::number(next);
     if (shotEdit_->text() != nextShot) {
         shotEdit_->setText(nextShot);
     }
@@ -43,14 +57,8 @@ void MainWindow::stepShot(int delta)
 
 void MainWindow::latestShot()
 {
-    if (!latestShot_.isEmpty()) {
-        if (shotEdit_->text() != latestShot_) {
-            shotEdit_->setText(latestShot_);
-        }
-        applyShot();
-        return;
-    }
-    fetchLatestShotAsync();
+    // Latest is an active refresh, not a jump to a possibly stale cached value.
+    fetchLatestShotAsync(true);
 }
 
 void MainWindow::openLoginDialog()
@@ -101,18 +109,25 @@ void MainWindow::updateLoginActionIcon()
     loginAction_->setIcon(loginIcon(loggedIn));
 }
 
-void MainWindow::fetchLatestShotAsync()
+void MainWindow::fetchLatestShotAsync(bool applyLatest)
 {
+    if (applyLatest) {
+        latestShotApplyPending_ = true;
+        setStatus("Fetching latest shot...");
+    }
     if (latestShotFetchRunning_) {
         return;
     }
     latestShotFetchRunning_ = true;
     const int generation = ++latestShotGeneration_;
-    setStatus("Fetching latest shot...");
     QString apiUrl;
     if (!prepareSshUrl(readApiUrl(rootPath_), &apiUrl)) {
         latestShotFetchRunning_ = false;
-        setStatus("Latest shot unavailable through SSH");
+        const bool shouldApply = latestShotApplyPending_;
+        latestShotApplyPending_ = false;
+        if (shouldApply) {
+            setStatus("Latest shot unavailable through SSH");
+        }
         return;
     }
     QThreadPool::globalInstance()->start([this, generation, apiUrl] {
@@ -120,15 +135,29 @@ void MainWindow::fetchLatestShotAsync()
         QMetaObject::invokeMethod(this, [this, latest, generation] {
             if (generation != latestShotGeneration_) {
                 latestShotFetchRunning_ = false;
+                latestShotApplyPending_ = false;
                 return;
             }
             latestShotFetchRunning_ = false;
+            const bool shouldApply = latestShotApplyPending_;
+            latestShotApplyPending_ = false;
             if (latest.isEmpty()) {
-                pendingPrewarmRefresh_ = false;
-                setStatus("Latest shot unavailable");
+                cachedApiSourceUrl_.clear();
+                cachedPreparedApiUrl_.clear();
+                if (shouldApply) {
+                    pendingPrewarmRefresh_ = false;
+                    setStatus("Latest shot unavailable");
+                }
                 return;
             }
             latestShot_ = latest;
+            updateTopInfoLabels();
+            // Refresh IP/pulse/It/time even while the latest shot number stays
+            // unchanged; these values may evolve during an active experiment.
+            scheduleTopInfoUpdate(latestShot_);
+            if (!shouldApply) {
+                return;
+            }
             if (shotEdit_ && shotEdit_->text() != latestShot_) {
                 shotEdit_->setText(latestShot_);
             }

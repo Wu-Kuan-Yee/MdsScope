@@ -3,7 +3,6 @@
 
 #include "mdsscope_internal.hpp"
 #include "mds_client.hpp"
-#include "point_overlay.hpp"
 #include "ssh_tunnel_manager.hpp"
 
 MainWindow::MainWindow(QString rootPath, QWidget* parent)
@@ -12,35 +11,34 @@ MainWindow::MainWindow(QString rootPath, QWidget* parent)
     setWindowIcon(appIcon());
     sshTunnelManager_ = new SshTunnelManager(this);
     environmentPath_ = appEnvironmentDir(rootPath_);
-    ensureSourceIndexCache(rootPath_);
+    // Merging the bundled source index (~22k lines) is only needed once the
+    // user opens the Data Source dialog or a fetch records a signal, both of
+    // which happen well after startup and re-run the merge themselves. Defer it
+    // off the constructor's critical path so it does not block the first frame.
+    QTimer::singleShot(0, this, [this] { ensureSourceIndexCache(rootPath_); });
     exportBasePath_ = QSettings(uiSettingsPath(rootPath_), QSettings::IniFormat)
                           .value("export/base_dir", defaultExportBaseDir())
                           .toString();
     loadFontSettings(rootPath_);
     buildUi();
     applyUiFont();
+    latestShotPollTimer_.setInterval(20'000);
+    connect(&latestShotPollTimer_, &QTimer::timeout, this, [this] {
+        fetchLatestShotAsync(false);
+    });
+    latestShotPollTimer_.start();
     connect(&panelWatcher_, &QFutureWatcher<QVector<LoadedSignal>>::finished, this, [this] {
         if (!activePanelRefreshKey_.isEmpty()) {
             applyPanelLoadedSignals(panelWatcher_.result());
             activePanelRefreshKey_.clear();
         }
-        if (pendingPanelRefresh_) {
-            const int column = pendingPanelColumn_;
-            const int row = pendingPanelRow_;
-            const int signal = pendingPanelSignal_;
-            pendingPanelRefresh_ = false;
-            pendingPanelColumn_ = -1;
-            pendingPanelRow_ = -1;
-            pendingPanelSignal_ = -1;
-            queuedPanelRefreshKey_.clear();
-            refreshOne(column, row, signal);
-        }
-        // A prewarm may have finished while this panel fetch was in flight; the
-        // idle guard keeps pendingPrewarmRefresh_ set until the panel drains, so
-        // launch the deferred initial full refresh now if nothing else is running.
-        maybeStartDeferredRefresh();
+        startPendingFetchIfIdle();
     });
     connect(&warmWatcher_, &QFutureWatcher<void>::finished, this, [this] {
+        if (pendingRefresh_ || pendingPanelRefresh_) {
+            startPendingFetchIfIdle();
+            return;
+        }
         const bool idle = canStartDeferredRefresh();
         if (pendingPrewarmRefresh_ && idle) {
             pendingPrewarmRefresh_ = false;
@@ -57,4 +55,16 @@ MainWindow::MainWindow(QString rootPath, QWidget* parent)
     QTimer::singleShot(16, this, [this] {
         loadDefaultEnvironment(true);
     });
+}
+
+MainWindow::~MainWindow()
+{
+    cancelDataFetch();
+    cancelPanelFetch();
+    cancelPrewarmConnections();
+    ++activeDataFetchGeneration_;
+    ++latestShotGeneration_;
+    ++topSummaryGeneration_;
+    QThreadPool::globalInstance()->clear();
+    QThreadPool::globalInstance()->waitForDone();
 }

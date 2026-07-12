@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "mdsscope_internal.hpp"
-#include "point_overlay.hpp"
 #include "helpers.hpp"
 
 int PlotWidget::legendSeriesAt(const QPointF& pixelPos) const
@@ -276,25 +275,6 @@ bool PlotWidget::stepActivePoint(int delta)
     return changed;
 }
 
-void PlotWidget::setPointX(double x)
-{
-    if (interactionMode_ != InteractionMode::Point) {
-        return;
-    }
-    if (!std::isfinite(x)) {
-        hoverText_.clear();
-        hoverSeriesIndex_ = -1;
-        hoverSeriesLocked_ = false;
-        clearPointOverlay();
-        clearSyncedPoint();
-        return;
-    }
-    setSyncedPointX(x, 0);
-    if (updateHoverForSeriesX(0, x, false)) {
-        updatePointOverlay();
-    }
-}
-
 void PlotWidget::setSyncedPointX(double x, int seriesIndex)
 {
     if (interactionMode_ != InteractionMode::Point || !std::isfinite(x)) {
@@ -361,64 +341,6 @@ void PlotWidget::clearSyncedPoint()
     } else {
         update();
     }
-}
-
-PointReadout PlotWidget::pointReadoutForX(double x, int seriesIndex, QWidget* target, bool includeText) const
-{
-    PointReadout readout;
-    if (!target || interactionMode_ != InteractionMode::Point || !std::isfinite(x)) {
-        return readout;
-    }
-    if (seriesIndex < 0 || seriesIndex >= series_.size() || !series_[seriesIndex].hasData()) {
-        seriesIndex = 0;
-    }
-    QPointF point;
-    QPointF pixel;
-    if (!nearestPointForSeries(seriesIndex, x, nullptr, &point, &pixel, nullptr)) {
-        return readout;
-    }
-
-    const QRectF pr = plotRect();
-    const QPoint topLeft = mapTo(target, pr.topLeft().toPoint());
-    const QPoint bottomRight = mapTo(target, pr.bottomRight().toPoint());
-    readout.plotRect = QRectF(topLeft, bottomRight).normalized();
-    readout.pixel = QPointF(mapTo(target, pixel.toPoint()));
-    readout.data = point;
-    readout.color = seriesColor(seriesIndex);
-    if (includeText) {
-        readout.text = QString("%1, %2").arg(point.x(), 0, 'g', 6).arg(point.y(), 0, 'g', 6);
-    }
-    readout.visible = readout.plotRect.contains(readout.pixel);
-    return readout;
-}
-
-bool PlotWidget::updatePointFromGlobalPosition(const QPointF& globalPos, double* dataX)
-{
-    if (interactionMode_ != InteractionMode::Point) {
-        return false;
-    }
-    const QRectF pr = plotRect();
-    if (!pr.isValid() || pr.width() <= 0.0) {
-        return false;
-    }
-    const QPointF local = mapFromGlobal(globalPos.toPoint());
-    const double xPixel = std::clamp(local.x(), pr.left(), pr.right());
-    const double yPixel = std::clamp(local.y(), pr.top(), pr.bottom());
-    const QPointF clamped(xPixel, yPixel);
-    const double x = pixelToData(clamped, effectiveView(), pr).x();
-    bool changed = false;
-    if (hoverSeriesLocked_ && hoverSeriesIndex_ >= 0 && hoverSeriesIndex_ < series_.size()) {
-        changed = updateHoverForSeriesX(hoverSeriesIndex_, x, false);
-    } else {
-        changed = updateHover(clamped, false);
-    }
-    if (dataX) {
-        *dataX = hoverText_.isEmpty() ? x : hoverData_.x();
-    }
-    if (changed) {
-        updatePointOverlay();
-    }
-    return changed;
 }
 
 bool PlotWidget::updateHover(const QPointF& pixelPos, bool lockSeries)

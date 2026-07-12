@@ -11,10 +11,48 @@
 #include <QNetworkProxy>
 #include <QProcess>
 #include <QProcessEnvironment>
+#include <QScopedValueRollback>
 #include <QTcpServer>
 #include <QTcpSocket>
-#include <QThread>
+#include <QTimer>
 #include <QUrl>
+
+namespace {
+bool waitForProcessStarted(QProcess& process, int timeoutMs)
+{
+    if (process.state() == QProcess::Running) {
+        return true;
+    }
+    if (process.state() == QProcess::NotRunning) {
+        return false;
+    }
+    QEventLoop loop;
+    QTimer timer;
+    timer.setSingleShot(true);
+    QObject::connect(&process, &QProcess::started, &loop, &QEventLoop::quit);
+    QObject::connect(&process, &QProcess::errorOccurred, &loop, &QEventLoop::quit);
+    QObject::connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit);
+    timer.start(timeoutMs);
+    loop.exec();
+    return process.state() == QProcess::Running;
+}
+
+bool waitForProcessFinished(QProcess& process, int timeoutMs)
+{
+    if (process.state() == QProcess::NotRunning) {
+        return true;
+    }
+    QEventLoop loop;
+    QTimer timer;
+    timer.setSingleShot(true);
+    QObject::connect(&process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), &loop, &QEventLoop::quit);
+    QObject::connect(&process, &QProcess::errorOccurred, &loop, &QEventLoop::quit);
+    QObject::connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit);
+    timer.start(timeoutMs);
+    loop.exec();
+    return process.state() == QProcess::NotRunning;
+}
+}
 
 SshTunnelManager::SshTunnelManager(QObject* parent)
     : QObject(parent)
@@ -78,8 +116,21 @@ bool SshTunnelManager::tcpReachable(const QString& host, int port, int timeoutMs
 {
     QTcpSocket socket;
     socket.setProxy(QNetworkProxy::NoProxy);
+    QEventLoop loop;
+    QTimer timer;
+    timer.setSingleShot(true);
+    connect(&socket, &QTcpSocket::connected, &loop, &QEventLoop::quit);
+    connect(&socket, &QTcpSocket::errorOccurred, &loop, &QEventLoop::quit);
+    connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit);
     socket.connectToHost(host, static_cast<quint16>(port));
-    return socket.waitForConnected(timeoutMs);
+    if (socket.state() != QAbstractSocket::ConnectedState
+        && socket.state() != QAbstractSocket::UnconnectedState) {
+        timer.start(timeoutMs);
+        loop.exec();
+    }
+    const bool connected = socket.state() == QAbstractSocket::ConnectedState;
+    socket.abort();
+    return connected;
 }
 
 int SshTunnelManager::reserveLocalPort()
@@ -156,12 +207,12 @@ bool SshTunnelManager::testConnection(const SshSettings& settings, QString* erro
     QStringList args = commonArguments(settings, false);
     args << sshTarget(settings) << QStringLiteral("true");
     process.start(QStringLiteral("ssh"), args);
-    if (!process.waitForStarted(3000)) {
+    if (!waitForProcessStarted(process, 3000)) {
         *error = process.errorString();
         setState(State::Error, *error);
         return false;
     }
-    if (!process.waitForFinished(12000)) {
+    if (!waitForProcessFinished(process, 12000)) {
         process.kill();
         process.waitForFinished(1000);
         *error = QStringLiteral("SSH connection timed out.");
@@ -212,7 +263,7 @@ bool SshTunnelManager::ensureTunnel(const QString& endpoint, QString* localEndpo
          << QStringLiteral("127.0.0.1:%1:%2:%3").arg(localPort).arg(forwardingHost).arg(remotePort)
          << sshTarget(settings_);
     process->start(QStringLiteral("ssh"), args);
-    if (!process->waitForStarted(3000)) {
+    if (!waitForProcessStarted(*process, 3000)) {
         *error = process->errorString();
         process->deleteLater();
         setState(State::Error, *error);
@@ -239,8 +290,9 @@ bool SshTunnelManager::ensureTunnel(const QString& endpoint, QString* localEndpo
             setState(State::Connected, QStringLiteral("SSH tunnel connected"));
             return true;
         }
-        QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents, 25);
-        QThread::msleep(25);
+        QEventLoop tick;
+        QTimer::singleShot(25, &tick, &QEventLoop::quit);
+        tick.exec();
     }
 
     const QString stderrText = QString::fromLocal8Bit(process->readAllStandardError()).trimmed();
@@ -267,6 +319,11 @@ bool SshTunnelManager::prepareLayout(const LayoutConfig& source, LayoutConfig* p
         setState(State::Error, *error);
         return false;
     }
+    if (preparationInProgress_) {
+        *error = QStringLiteral("SSH tunnel preparation is already in progress.");
+        return false;
+    }
+    QScopedValueRollback<bool> preparationGuard(preparationInProgress_, true);
 
     QHash<QString, QString> mapped;
     for (auto& column : prepared->columns) {
@@ -282,6 +339,14 @@ bool SshTunnelManager::prepareLayout(const LayoutConfig& source, LayoutConfig* p
                 QString host;
                 int port = 8000;
                 if (!splitEndpoint(endpoint, &host, &port)) {
+                    continue;
+                }
+                auto existing = tunnels_.find(endpoint);
+                if (existing != tunnels_.end() && existing->process
+                    && existing->process->state() != QProcess::NotRunning) {
+                    const QString localEndpoint = QStringLiteral("127.0.0.1:%1").arg(existing->localPort);
+                    mapped.insert(endpoint, localEndpoint);
+                    signal.serverIp = localEndpoint;
                     continue;
                 }
                 if (settings_.mode == SshMode::Auto && tcpReachable(host, port, 450)) {
@@ -320,6 +385,11 @@ bool SshTunnelManager::prepareUrl(const QString& source, QString* prepared, QStr
         *error = QStringLiteral("SSH is enabled but no SSH host is configured.");
         return false;
     }
+    if (preparationInProgress_) {
+        *error = QStringLiteral("SSH tunnel preparation is already in progress.");
+        return false;
+    }
+    QScopedValueRollback<bool> preparationGuard(preparationInProgress_, true);
 
     const int remotePort = url.port(url.scheme().compare(QStringLiteral("https"), Qt::CaseInsensitive) == 0 ? 443 : 80);
     const QString endpoint = url.host().contains(':')

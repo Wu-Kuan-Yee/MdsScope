@@ -14,12 +14,14 @@ using UniformTimebase = MdsIpClient::UniformTimebase;
 
 QVector<SignalFetchResult> MdsIpClient::fetchGroupResults(const QVector<NativeRequest>& requests, bool openOnly) const
 {
-        CurrentCancelGuard cancelGuard(cancel_);
+        CurrentCancelGuard cancelGuard(cancel_, preserveConnectionsOnCancel_);
         if (requests.isEmpty()) {
             return {};
         }
         if (isCanceled()) {
-            clearCurrentThreadConnections();
+            // Keep the thread-local warm connections: they are on a clean request
+            // boundary here (no partial exchange), so cancelling this group must
+            // not throw away sockets the next fetch will immediately reuse.
             return {};
         }
 
@@ -58,6 +60,16 @@ QVector<SignalFetchResult> MdsIpClient::fetchGroupResults(const QVector<NativeRe
                         break;
                     }
                     if (!cached->socket->waitForConnected(50)) {
+                        // A refused/unreachable host drops straight to
+                        // UnconnectedState; there is nothing left to wait for, so
+                        // fail fast instead of spinning until the timeout. A host
+                        // that silently drops packets stays in ConnectingState and
+                        // still waits out the full timeout.
+                        if (cached->socket->state() == QAbstractSocket::UnconnectedState) {
+                            error = cached->socket->errorString();
+                            resetConnection(cached);
+                            break;
+                        }
                         if (connectTimer.elapsed() >= kNetworkTimeoutMs) {
                             error = cached->socket->errorString();
                             resetConnection(cached);
@@ -80,6 +92,14 @@ QVector<SignalFetchResult> MdsIpClient::fetchGroupResults(const QVector<NativeRe
             }
 
             socketPtr = cached->socket.get();
+            if (openOnly) {
+                traceMdsLine(QString("profile_prewarm socket_reused=%1 connect_ms=%2 handshake_ms=%3 server=%4")
+                                 .arg(usedCachedConnection ? 1 : 0)
+                                 .arg(connectMs)
+                                 .arg(handshakeMs)
+                                 .arg(serverKey(firstSig)));
+                return {};
+            }
             reusedOpenTree = cached->currentTree.compare(firstSig.experiment.trimmed(), Qt::CaseInsensitive) == 0
                              && cached->currentShot == firstPlot.shot.trimmed();
             if (reusedOpenTree) {
@@ -111,6 +131,14 @@ QVector<SignalFetchResult> MdsIpClient::fetchGroupResults(const QVector<NativeRe
                 break;
             }
 
+            if (openOnly && cached && cached->socket
+                && cached->socket->state() == QAbstractSocket::ConnectedState) {
+                // A tree may legitimately not exist for the current latest
+                // shot. The reply was fully consumed, so keep the globally
+                // warmed socket and continue warming the rest of the tree list.
+                return {};
+            }
+
             if (usedCachedConnection && attempt == 0) {
                 resetConnection(cached);
                 error.clear();
@@ -127,6 +155,10 @@ QVector<SignalFetchResult> MdsIpClient::fetchGroupResults(const QVector<NativeRe
         }
 
         if (!socketPtr || !error.isEmpty()) {
+            if (openOnly) {
+                traceMdsLine(QString("profile_prewarm_error server=%1 error=%2")
+                                 .arg(serverKey(firstSig), error.simplified()));
+            }
             QVector<SignalFetchResult> errorResults = groupErrorResults(requests, error);
             emitResults(requests, errorResults);
             return errorResults;
@@ -170,10 +202,16 @@ QVector<SignalFetchResult> MdsIpClient::fetchGroupResults(const QVector<NativeRe
                          .arg(firstPlot.shot)
                          .arg(requests.size()));
 
-        if (openOnly) {
-            return {};
-        }
-
+        // All five thin/batch pipeline features below are compile-time disabled.
+        // Guard the whole section (including the thinRequests copy) with
+        // if constexpr so it is not built on the default Thin fetch path; the
+        // trailing loop reads timebaseCache/fetchedIndexes, so those stay in
+        // scope and simply remain empty when the features are off.
+        QHash<QString, UniformTimebase> timebaseCache;
+        QSet<int> fetchedIndexes;
+        if constexpr (kEnableEastTimebasePrefetch || kEnableEastThinPipeline
+                      || kEnablePipelinedDirectFetch || kEnableMultiSignalBatch
+                      || kEnableEastTimeContextBatch) {
         QVector<NativeRequest> thinRequests;
         thinRequests.reserve(requests.size());
         for (const NativeRequest& request : requests) {
@@ -182,11 +220,10 @@ QVector<SignalFetchResult> MdsIpClient::fetchGroupResults(const QVector<NativeRe
             }
         }
 
-        const QHash<QString, UniformTimebase> timebaseCache = kEnableEastTimebasePrefetch && !thinRequests.isEmpty()
-                                                                  ? prefetchEastTimebases(socket, thinRequests)
-                                                                  : QHash<QString, UniformTimebase>{};
+        if (kEnableEastTimebasePrefetch && !thinRequests.isEmpty()) {
+            timebaseCache = prefetchEastTimebases(socket, thinRequests);
+        }
 
-        QSet<int> fetchedIndexes;
         if (kEnableEastThinPipeline && !thinRequests.isEmpty() && kUseServerSideThin) {
             QVector<SignalFetchResult> pipelinedEastResults = fetchEastThinPipelinedOnOpenSocket(socket, thinRequests, &error);
             if (!pipelinedEastResults.isEmpty()) {
@@ -232,10 +269,12 @@ QVector<SignalFetchResult> MdsIpClient::fetchGroupResults(const QVector<NativeRe
                 results += contextResults;
             }
         }
+        } // if constexpr (thin/batch pipeline features)
 
         for (int i = 0; i < requests.size(); ++i) {
             if (isCanceled()) {
-                clearCurrentThreadConnections();
+                // Cancelled between signals on a clean boundary (previous response
+                // fully read); keep the open socket warm for the next fetch.
                 break;
             }
             const NativeRequest& request = requests[i];

@@ -15,6 +15,7 @@
 #include <QSet>
 #include <QString>
 #include <QStringList>
+#include <QTimer>
 #include <QVector>
 #include <QWidget>
 
@@ -35,8 +36,6 @@ class QRadioButton;
 class QResizeEvent;
 class QToolBar;
 class QToolButton;
-class GlobalPointOverlay;
-class PointOverlay;
 class SshTunnelManager;
 
 enum class InteractionMode {
@@ -162,6 +161,7 @@ private:
     QLineEdit* passwordEdit_ = nullptr;
     QLabel* statusLabel_ = nullptr;
     QPushButton* loginButton_ = nullptr;
+    bool loginInProgress_ = false;
 };
 
 class PlotWidget final : public QWidget {
@@ -185,11 +185,9 @@ public:
     void applyYRangeKeepX(double ymin, double ymax);
     QRectF currentView() const;
     bool hasView() const { return hasView_; }
-    void setPointX(double x);
     void setSyncedPointX(double x, int seriesIndex);
     void clearSyncedPoint();
-    bool updatePointFromGlobalPosition(const QPointF& globalPos, double* dataX = nullptr);
-    PointReadout pointReadoutForX(double x, int seriesIndex, QWidget* target, bool includeText = true) const;
+    void deactivatePointTracking();
     int activePointSeriesIndex() const { return hoverSeriesIndex_; }
 
 signals:
@@ -233,8 +231,6 @@ private:
     QRect zoomRubberBandDirtyRect(const QRectF& band) const;
     QRect syncedPointDirtyRect(const PointReadout& readout) const;
     void invalidatePlotCache();
-    void updatePointOverlay();
-    void clearPointOverlay();
     void scheduleUpdate();
     void schedulePointHoverUpdate(const QPointF& pixelPos);
 
@@ -267,8 +263,8 @@ private:
     bool hoverSeriesLocked_ = false;
     bool pointTrackingActive_ = false;
     bool pointHoverQueued_ = false;
+    int pointHoverGeneration_ = 0;
     QPointF pendingPointHoverPos_;
-    PointOverlay* pointOverlay_ = nullptr;
 };
 
 class MainWindow final : public QMainWindow {
@@ -276,6 +272,7 @@ class MainWindow final : public QMainWindow {
 
 public:
     explicit MainWindow(QString rootPath, QWidget* parent = nullptr);
+    ~MainWindow() override;
 
 protected:
     void changeEvent(QEvent* event) override;
@@ -315,7 +312,7 @@ private:
     void openAboutDialog();
     void applyLoginSuccessStatus(const QString& statusText);
     void updateLoginActionIcon();
-    void fetchLatestShotAsync();
+    void fetchLatestShotAsync(bool applyLatest = true);
     void updateShotControlsFromConfig(const QString& preferredShot = {});
     void setAllPlotShots(const QString& shot);
     QString maxShotInConfig() const;
@@ -331,6 +328,7 @@ private:
     void cancelDataFetch();
     void cancelPanelFetch();
     void cancelPrewarmConnections();
+    void startPendingFetchIfIdle();
     bool prewarmConnections();
     // True when no full/panel/latest-shot fetch is running or queued, i.e. a
     // deferred initial refresh (pendingPrewarmRefresh_) may be launched now.
@@ -342,9 +340,9 @@ private:
     QString refreshKey(DataReadMode readMode) const;
     QString panelRefreshKey(int column, int row, int signal, DataReadMode readMode) const;
     void refreshOne(int column, int row, int signal);
-    void queueLoadedSignal(const LoadedSignal& item);
+    void queueLoadedSignal(LoadedSignal item);
     void flushQueuedLoadedSignals();
-    void applyLoadedSignal(const LoadedSignal& item);
+    void applyLoadedSignal(LoadedSignal item);
     void applyLoadedSignals(const QVector<LoadedSignal>& loaded);
     void applyPanelLoadedSignals(const QVector<LoadedSignal>& loaded);
     void rememberLoadedSourceSignal(const LoadedSignal& item);
@@ -414,6 +412,8 @@ private:
     QAction* loginAction_ = nullptr;
     QAction* sshAction_ = nullptr;
     SshTunnelManager* sshTunnelManager_ = nullptr;
+    QString cachedApiSourceUrl_;
+    QString cachedPreparedApiUrl_;
     QToolButton* openButton_ = nullptr;
     QToolButton* recentEnvironmentButton_ = nullptr;
     QToolButton* aboutButton_ = nullptr;
@@ -422,6 +422,7 @@ private:
     QVector<QVector<PlotWidget*>> plotWidgets_;
     QFutureWatcher<QVector<LoadedSignal>> panelWatcher_;
     QFutureWatcher<void> warmWatcher_;
+    QTimer latestShotPollTimer_;
     QString topSummaryShot_;
     QString topSummaryIp_;
     QString topSummaryPulse_;
@@ -467,8 +468,8 @@ private:
     QSet<QString> rememberedSourceSignals_;
     QString latestShot_;
     bool latestShotFetchRunning_ = false;
+    bool latestShotApplyPending_ = false;
     int latestShotGeneration_ = 0;
-    GlobalPointOverlay* globalPointOverlay_ = nullptr;
     PlotWidget* activePointPlot_ = nullptr;
     PlotWidget* pointSyncSource_ = nullptr;
     bool pointSyncQueued_ = false;

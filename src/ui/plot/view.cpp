@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "mdsscope_internal.hpp"
-#include "point_overlay.hpp"
 #include "helpers.hpp"
 
 void PlotWidget::resetScale(bool repaint)
@@ -10,7 +9,6 @@ void PlotWidget::resetScale(bool repaint)
     hasView_ = false;
     view_ = {};
     invalidatePlotCache();
-    updatePointOverlay();
     if (repaint) {
         update();
     }
@@ -394,4 +392,3 @@ QVector<QPointF> PlotWidget::displayPointsForSeries(const SignalSeries& series, 
     }
     return out;
 }
-

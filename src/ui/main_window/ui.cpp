@@ -4,7 +4,6 @@
 #include "mdsscope_internal.hpp"
 #include "shared.hpp"
 #include "theme.hpp"
-#include "point_overlay.hpp"
 #include "ssh_tunnel_manager.hpp"
 
 
@@ -55,9 +54,6 @@ void MainWindow::schedulePointSync(PlotWidget* source, double x)
                 const int seriesIndex = plot == source ? plot->activePointSeriesIndex() : 0;
                 plot->setSyncedPointX(x, seriesIndex);
             }
-        }
-        if (globalPointOverlay_) {
-            globalPointOverlay_->clearReadouts();
         }
     });
 }
@@ -136,6 +132,8 @@ void MainWindow::buildUi()
     updateLoginActionIcon();
     sshAction_ = toolbar->addAction(sshIcon(0), "SSH remote access", this, &MainWindow::openSshDialog);
     connect(sshTunnelManager_, &SshTunnelManager::stateChanged, this, [this] {
+        cachedApiSourceUrl_.clear();
+        cachedPreparedApiUrl_.clear();
         updateSshActionIcon();
     });
     updateSshActionIcon();
@@ -149,9 +147,6 @@ void MainWindow::buildUi()
     gridLayout_->setContentsMargins(0, 0, 0, 0);
     gridLayout_->setSpacing(0);
     setCentralWidget(gridHost_);
-    globalPointOverlay_ = new GlobalPointOverlay(gridHost_);
-    globalPointOverlay_->setGeometry(gridHost_->rect());
-    globalPointOverlay_->raise();
 
     statusLabel_ = new QLabel(this);
     statusLabel_->setStyleSheet("color: palette(highlight);");
@@ -465,14 +460,16 @@ void MainWindow::setInteractionMode(InteractionMode mode)
             plot->setInteractionMode(mode);
         }
     }
-    if (mode != InteractionMode::Point && globalPointOverlay_) {
-        globalPointOverlay_->clearReadouts();
-    }
 }
 
 void MainWindow::updateTopInfoLabels()
 {
-    QString shot = shotEdit_ ? shotEdit_->text().trimmed() : QString();
+    // The top strip is a live summary of the API's latest shot.  The editable
+    // shot field and plot panels may intentionally remain on an older shot.
+    QString shot = latestShot_.trimmed();
+    if (shot.isEmpty()) {
+        shot = shotEdit_ ? shotEdit_->text().trimmed() : QString();
+    }
     const PlotSpec* plot = nullptr;
     if (selectedColumn_ >= 0 && selectedRow_ >= 0
         && selectedColumn_ < config_.columns.size()
@@ -552,6 +549,10 @@ void MainWindow::scheduleTopInfoUpdate(const QString& shot)
             topSummaryPulse_ = ok ? pulse : QString();
             topSummaryIt_ = ok ? it : QString();
             topSummaryTime_ = ok ? shotTime : QString();
+            if (!ok) {
+                cachedApiSourceUrl_.clear();
+                cachedPreparedApiUrl_.clear();
+            }
             updateTopInfoLabels();
         }, Qt::QueuedConnection);
     });

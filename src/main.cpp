@@ -251,12 +251,21 @@ public:
             if (currentMode_ != ThemeMode::Auto) {
                 return;
             }
+#ifdef Q_OS_LINUX
+            uint scheme = readPortalColorScheme();
+            if (scheme == 0) {
+                scheme = readQtColorScheme();
+            }
+            if (scheme != 0) {
+                setSystemScheme(scheme);
+            }
+#else
             setSystemScheme(readCurrentColorScheme());
+#endif
         });
-        pollTimer_.start(3000);
-        QTimer::singleShot(0, this, [this] { setSystemScheme(readCurrentColorScheme()); });
-        QTimer::singleShot(750, this, [this] { setSystemScheme(readCurrentColorScheme()); });
-        QTimer::singleShot(2000, this, [this] { setSystemScheme(readCurrentColorScheme()); });
+        if (currentMode_ == ThemeMode::Auto) {
+            pollTimer_.start(10000);
+        }
     }
 
     ~SystemThemeWatcher() override
@@ -282,6 +291,11 @@ public:
         }
         currentMode_ = mode;
         QSettings().setValue(QString::fromLatin1(kThemeModeSetting), static_cast<int>(mode));
+        if (currentMode_ == ThemeMode::Auto) {
+            pollTimer_.start(10000);
+        } else {
+            pollTimer_.stop();
+        }
         applyCurrentTheme();
     }
 
@@ -717,10 +731,13 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    MainWindow window(workDir.absolutePath());
-    window.resize(1440, 920);
-    window.show();
-    const int code = app.exec();
+    int code = 0;
+    {
+        MainWindow window(workDir.absolutePath());
+        window.resize(1440, 920);
+        window.show();
+        code = app.exec();
+    }
     shutdownMdsScopeWorkers();
     return code;
 }

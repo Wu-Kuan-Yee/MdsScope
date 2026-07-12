@@ -6,9 +6,13 @@
 QVector<LoadedSignal> fetchMdsSignals(const LayoutConfig& snapshot,
                                       DataReadMode readMode,
                                       LoadedSignalCallback callback,
-                                      std::shared_ptr<std::atomic_bool> cancel)
+                                      std::shared_ptr<std::atomic_bool> cancel,
+                                      bool preserveConnectionsOnCancel)
 {
-    mds_client_internal::MdsIpClient client(readMode, std::move(callback), std::move(cancel));
+    mds_client_internal::MdsIpClient client(readMode,
+                                            std::move(callback),
+                                            std::move(cancel),
+                                            preserveConnectionsOnCancel);
     return client.fetchAll(snapshot);
 }
 
@@ -27,4 +31,9 @@ SignalSeries fetchMdsSignal(const PlotSpec& plot, const SignalSpec& sig, DataRea
 void clearMdsCurrentThreadConnections()
 {
     mds_client_internal::MdsIpClient::clearCurrentThreadConnections();
+}
+
+void shutdownMdsConnectionWorkers()
+{
+    mds_client_internal::MdsIpClient::shutdownWorkers();
 }

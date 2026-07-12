@@ -3,7 +3,7 @@
 
 cmake_minimum_required(VERSION 3.16)
 
-project(MdsScope VERSION 5.6 LANGUAGES CXX)
+project(MdsScope VERSION 5.7 LANGUAGES CXX)
 
 execute_process(
     COMMAND git rev-parse --short=9 HEAD
@@ -135,7 +135,6 @@ add_executable(MdsScope
     src/ui/main_window/shared.hpp
     src/ui/main_window/theme.hpp
     src/ui/plot/helpers.hpp
-    src/ui/point_overlay.hpp
 )
 
 add_executable(transfer

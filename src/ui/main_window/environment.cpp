@@ -221,7 +221,15 @@ bool MainWindow::loadEnvironmentFile(const QString& path,
     const QString previousShot = shotEdit_ ? shotEdit_->text().trimmed() : QString();
     const bool shouldFetchLatest = useLatestWhenNoCurrentShot && previousShot.isEmpty();
     pendingPrewarmRefresh_ = false;
-    cancelPrewarmConnections();
+    clearDataPause();
+    cancelDataFetch();
+    cancelPanelFetch();
+    // Do NOT cancel prewarm connections here: if the user manually loads a
+    // configuration right after init (the 3-5s window while they decide what to
+    // load), prewarm may still be running in the background preparing the
+    // connections this new configuration will need. Let it finish instead of
+    // discarding that work, so the first fetch reuses the warm sockets.
+    ++activeDataFetchGeneration_;
     activeRefreshKey_.clear();
     activePanelRefreshKey_.clear();
     pendingRefresh_ = false;

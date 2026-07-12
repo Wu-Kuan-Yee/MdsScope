@@ -11,21 +11,44 @@ using SignalFetchResult = MdsIpClient::SignalFetchResult;
 
 constexpr int kGroupFetchThreadLimit = 16;
 
+QThreadPool*& groupFetchPoolStorage()
+{
+    static QThreadPool* pool = nullptr;
+    return pool;
+}
+
+QMutex& groupFetchPoolMutex()
+{
+    static QMutex mutex;
+    return mutex;
+}
+
 QThreadPool* groupFetchPool()
 {
-    static QThreadPool* pool = [] {
-        auto* created = new QThreadPool();
-        created->setMaxThreadCount(kGroupFetchThreadLimit);
-        return created;
-    }();
+    QMutexLocker locker(&groupFetchPoolMutex());
+    QThreadPool*& pool = groupFetchPoolStorage();
+    if (!pool) {
+        pool = new QThreadPool();
+        pool->setMaxThreadCount(kGroupFetchThreadLimit);
+        // MDS sockets are cached in worker-thread local storage.  Qt expires
+        // idle pool threads after 30 seconds by default, which silently drops
+        // the sockets and makes a later configuration load cold again.  Keep
+        // these dedicated workers alive for the lifetime of the client pool;
+        // shutdownWorkers() still closes every socket explicitly on exit.
+        pool->setExpiryTimeout(-1);
+    }
     return pool;
 }
 
 
 MdsIpClient::MdsIpClient(DataReadMode readMode,
                          ResultCallback callback,
-                         std::shared_ptr<std::atomic_bool> cancel)
-    : readMode_(readMode), callback_(std::move(callback)), cancel_(std::move(cancel))
+                         std::shared_ptr<std::atomic_bool> cancel,
+                         bool preserveConnectionsOnCancel)
+    : readMode_(readMode)
+    , callback_(std::move(callback))
+    , cancel_(std::move(cancel))
+    , preserveConnectionsOnCancel_(preserveConnectionsOnCancel)
 {
 }
 
@@ -42,6 +65,34 @@ void MdsIpClient::clearCurrentThreadConnections()
             }
         }
         connections.clear();
+    }
+
+void MdsIpClient::shutdownWorkers()
+{
+        QThreadPool* pool = groupFetchPoolStorage();
+        if (!pool) {
+            return;
+        }
+        QVector<QFuture<void>> futures;
+        futures.reserve(kGroupFetchThreadLimit);
+        QSemaphore ready;
+        QSemaphore release;
+        for (int i = 0; i < kGroupFetchThreadLimit; ++i) {
+            futures.push_back(QtConcurrent::run(pool, [&ready, &release] {
+                ready.release();
+                release.acquire();
+                clearCurrentThreadConnections();
+            }));
+        }
+        ready.acquire(kGroupFetchThreadLimit);
+        release.release(kGroupFetchThreadLimit);
+        for (auto& future : futures) {
+            future.waitForFinished();
+        }
+        pool->clear();
+        pool->waitForDone();
+        delete pool;
+        groupFetchPoolStorage() = nullptr;
     }
 
 QVector<LoadedSignal> MdsIpClient::fetchAll(const LayoutConfig& snapshot) const
@@ -100,7 +151,8 @@ QVector<LoadedSignal> MdsIpClient::fetchAll(const LayoutConfig& snapshot) const
         constexpr int kMaxGlobalSockets = 16;
         for (int start = 0; start < chunks.size(); start += kMaxGlobalSockets) {
             if (isCanceled()) {
-                clearCurrentThreadConnections();
+                // Between chunk batches: worker sockets are idle on a clean
+                // boundary. Keep them warm so a follow-up fetch reuses them.
                 break;
             }
             const int count = std::min(kMaxGlobalSockets, static_cast<int>(chunks.size()) - start);
@@ -148,34 +200,43 @@ void MdsIpClient::warmConnections(const LayoutConfig& snapshot) const
                     request.sig = sig;
                     request.readMode = effectiveSignalReadMode(readMode_, sig);
                     request.maxPoints = maxPointsForSignal(plot, sig);
-                    representatives.insert(groupKey(request), std::move(request));
+                    representatives.insert(serverKey(sig), std::move(request));
                 }
             }
         }
 
+        constexpr int kMaxGlobalSockets = 16;
         QVector<NativeRequest> warmRequests;
         warmRequests.reserve(representatives.size());
         for (auto it = representatives.begin(); it != representatives.end(); ++it) {
             warmRequests.push_back(std::move(it.value()));
         }
-
-        constexpr int kMaxGlobalSockets = 16;
-        for (int start = 0; start < warmRequests.size(); start += kMaxGlobalSockets) {
+        for (const NativeRequest& request : std::as_const(warmRequests)) {
             if (isCanceled()) {
-                clearCurrentThreadConnections();
+                // Prewarm cancelled: keep whatever connections already warmed up
+                // instead of discarding them.
                 break;
             }
-            const int count = std::min(kMaxGlobalSockets, static_cast<int>(warmRequests.size()) - start);
-            const int warmCount = std::max(count, kMaxGlobalSockets);
             QVector<QFuture<void>> futures;
-            futures.reserve(warmCount);
-            for (int i = 0; i < warmCount; ++i) {
-                QVector<NativeRequest> warmChunk;
-                warmChunk.push_back(warmRequests[start + (i % count)]);
-                futures.push_back(QtConcurrent::run(groupFetchPool(), [this, warmChunk = std::move(warmChunk)] {
+            futures.reserve(kMaxGlobalSockets);
+            QSemaphore ready;
+            QSemaphore release;
+            QSemaphore handshakeSlots(8);
+            for (int i = 0; i < kMaxGlobalSockets; ++i) {
+                QVector<NativeRequest> warmChunk{request};
+                futures.push_back(QtConcurrent::run(groupFetchPool(), [this, &ready, &release, &handshakeSlots, warmChunk = std::move(warmChunk)] {
+                    ready.release();
+                    release.acquire();
+                    handshakeSlots.acquire();
                     fetchGroupResults(warmChunk, true);
+                    handshakeSlots.release();
                 }));
             }
+            // Do not let already-warm workers consume the whole queue.  The
+            // barrier forces the pool to place one task on every worker before
+            // any task performs the handshake.
+            ready.acquire(kMaxGlobalSockets);
+            release.release(kMaxGlobalSockets);
             for (auto& future : futures) {
                 future.waitForFinished();
             }
@@ -221,6 +282,17 @@ bool MdsIpClient::currentCanceled()
 {
         const std::atomic_bool* cancel = currentCancel();
         return cancel && cancel->load(std::memory_order_relaxed);
+}
+
+bool& MdsIpClient::currentPreserveConnectionsOnCancel()
+{
+        thread_local bool preserve = false;
+        return preserve;
+    }
+
+bool MdsIpClient::shouldAbortForCurrentCancel()
+{
+        return currentCanceled() && !currentPreserveConnectionsOnCancel();
     }
 
 QString MdsIpClient::groupKey(const NativeRequest& request)
@@ -234,7 +306,7 @@ QString MdsIpClient::groupKey(const NativeRequest& request)
                + request.plot.shot.trimmed();
     }
 
-int MdsIpClient::maxPointsForSignal(const PlotSpec& plot, const SignalSpec& sig)
+int MdsIpClient::maxPointsForSignal(const PlotSpec& plot, const SignalSpec&)
 {
         const int configured = plot.extractionPoints > 0 ? plot.extractionPoints : 2000;
         return configured;
@@ -326,11 +398,15 @@ std::unique_ptr<MdsIpClient::SemaphoreGuard> MdsIpClient::fullLargeDownloadGuard
 CachedMdsConnection* MdsIpClient::threadLocalConnection(const SignalSpec& sig)
 {
         auto& connections = threadLocalConnections();
+        constexpr std::size_t kMaxCachedServersPerThread = 8;
         const QString key = serverKey(sig);
         for (const auto& connection : connections) {
             if (connection->key == key) {
                 return connection.get();
             }
+        }
+        if (connections.size() >= kMaxCachedServersPerThread) {
+            connections.erase(connections.begin());
         }
         auto connection = std::make_unique<CachedMdsConnection>();
         connection->key = key;
@@ -540,8 +616,10 @@ bool MdsIpClient::shouldStreamResult(const SignalFetchResult& result)
 
 void MdsIpClient::retryTransientFailures(const QHash<int, NativeRequest>& requestsByLoadedIndex, QVector<LoadedSignal>* loaded) const
 {
+        // Retries are the rare exception (usually zero), so reserving for the
+        // full loaded set would allocate a large buffer that is almost always
+        // left near-empty; let the small vector grow on demand instead.
         QVector<NativeRequest> retryRequests;
-        retryRequests.reserve(loaded->size());
         for (int i = 0; i < loaded->size(); ++i) {
             if (shouldRetrySignal((*loaded)[i]) && requestsByLoadedIndex.contains(i)) {
                 retryRequests.push_back(requestsByLoadedIndex.value(i));
