@@ -464,12 +464,10 @@ void MainWindow::setInteractionMode(InteractionMode mode)
 
 void MainWindow::updateTopInfoLabels()
 {
-    // The top strip is a live summary of the API's latest shot.  The editable
-    // shot field and plot panels may intentionally remain on an older shot.
-    QString shot = latestShot_.trimmed();
-    if (shot.isEmpty()) {
-        shot = shotEdit_ ? shotEdit_->text().trimmed() : QString();
-    }
+    // The top strip describes the shot currently displayed by the plots.
+    // latestShot_ is maintained independently by the background poll and is
+    // only applied when the user explicitly chooses Latest.
+    QString shot = shotEdit_ ? shotEdit_->text().trimmed() : QString();
     const PlotSpec* plot = nullptr;
     if (selectedColumn_ >= 0 && selectedRow_ >= 0
         && selectedColumn_ < config_.columns.size()
