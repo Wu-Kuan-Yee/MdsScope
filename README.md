@@ -115,8 +115,10 @@ macOS:   ~/Library/Application Support/mdsscope/
 Windows: %LOCALAPPDATA%\MdsScope\
 ```
 
-`auth.cache` is not plaintext; it stores the username, password, and token in an
-encrypted local cache bound to the current machine/user.
+`auth.cache` does not store credentials in plaintext. Its contents are
+obfuscated and bound to the current machine/user to reduce accidental
+disclosure. It is not designed to protect credentials from software running
+with the same user privileges.
 
 MdsScope supports native `*.toml` files and legacy WebScope-compatible
 `*.webscp` files. The default template is `init.toml`; saving from the GUI keeps
