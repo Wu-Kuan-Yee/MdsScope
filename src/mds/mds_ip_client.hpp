@@ -62,9 +62,11 @@ public:
 
     explicit MdsIpClient(DataReadMode readMode = DataReadMode::Thin,
                          ResultCallback callback = {},
-                         std::shared_ptr<std::atomic_bool> cancel = {});
+                         std::shared_ptr<std::atomic_bool> cancel = {},
+                         bool preserveConnectionsOnCancel = false);
 
     static void clearCurrentThreadConnections();
+    static void shutdownWorkers();
 
     QVector<LoadedSignal> fetchAll(const LayoutConfig& snapshot) const;
 
@@ -76,6 +78,7 @@ private:
     DataReadMode readMode_ = DataReadMode::Thin;
     ResultCallback callback_;
     std::shared_ptr<std::atomic_bool> cancel_;
+    bool preserveConnectionsOnCancel_ = false;
     static constexpr bool kEnableMultiSignalBatch = false;
     static constexpr bool kEnableCombinedSignalFetch = false;
     static constexpr bool kUseServerSideThin = true;
@@ -116,15 +119,18 @@ private:
 
     class CurrentCancelGuard {
     public:
-        explicit CurrentCancelGuard(const std::shared_ptr<std::atomic_bool>& cancel)
+        CurrentCancelGuard(const std::shared_ptr<std::atomic_bool>& cancel, bool preserveConnections)
             : previous_(currentCancel())
+            , previousPreserve_(currentPreserveConnectionsOnCancel())
         {
             currentCancel() = cancel.get();
+            currentPreserveConnectionsOnCancel() = preserveConnections;
         }
 
         ~CurrentCancelGuard()
         {
             currentCancel() = previous_;
+            currentPreserveConnectionsOnCancel() = previousPreserve_;
         }
 
         CurrentCancelGuard(const CurrentCancelGuard&) = delete;
@@ -132,11 +138,16 @@ private:
 
     private:
         const std::atomic_bool* previous_ = nullptr;
+        bool previousPreserve_ = false;
     };
 
     static const std::atomic_bool*& currentCancel();
 
+    static bool& currentPreserveConnectionsOnCancel();
+
     static bool currentCanceled();
+
+    static bool shouldAbortForCurrentCancel();
 
     static QString groupKey(const NativeRequest& request);
 

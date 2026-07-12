@@ -3,6 +3,20 @@
 
 #include "mdsscope_internal.hpp"
 
+namespace {
+QMutex& sourceIndexMutex()
+{
+    static QMutex mutex;
+    return mutex;
+}
+
+QHash<QString, QSet<QString>>& sourceIndexContents()
+{
+    static QHash<QString, QSet<QString>> contents;
+    return contents;
+}
+}
+
 void traceMdsLine(const QString& line)
 {
     if (!qEnvironmentVariableIsSet("MDSSCOPE_MDS_TRACE") && !qEnvironmentVariableIsSet("WEBSCOPE_MDS_TRACE")) {
@@ -72,14 +86,28 @@ static bool appendUniqueLine(const QString& path, const QString& value, Qt::Case
         return false;
     }
 
-    QFile readFile(path);
-    if (readFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        QTextStream in(&readFile);
-        while (!in.atEnd()) {
-            if (in.readLine().trimmed().compare(trimmed, caseSensitivity) == 0) {
-                return false;
+    QMutexLocker locker(&sourceIndexMutex());
+    const QString cacheKey = QFileInfo(path).absoluteFilePath()
+                             + (caseSensitivity == Qt::CaseInsensitive ? QStringLiteral("|i") : QStringLiteral("|s"));
+    auto& cache = sourceIndexContents();
+    if (!cache.contains(cacheKey)) {
+        QSet<QString> existing;
+        QFile readFile(path);
+        if (readFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            QTextStream in(&readFile);
+            while (!in.atEnd()) {
+                const QString line = in.readLine().trimmed();
+                if (!line.isEmpty()) {
+                    existing.insert(caseSensitivity == Qt::CaseInsensitive ? line.toLower() : line);
+                }
             }
         }
+        cache.insert(cacheKey, std::move(existing));
+    }
+    QSet<QString>& existing = cache[cacheKey];
+    const QString normalized = caseSensitivity == Qt::CaseInsensitive ? trimmed.toLower() : trimmed;
+    if (existing.contains(normalized)) {
+        return false;
     }
 
     QDir().mkpath(QFileInfo(path).absolutePath());
@@ -89,6 +117,7 @@ static bool appendUniqueLine(const QString& path, const QString& value, Qt::Case
     }
     QTextStream out(&writeFile);
     out << trimmed << '\n';
+    existing.insert(normalized);
     return true;
 }
 
@@ -257,4 +286,3 @@ void saveFontSettings(const QString& rootPath)
     settings.setValue("font/unit_size", fonts.unitSize);
     settings.setValue("font/ui_size", fonts.uiSize);
 }
-

@@ -284,8 +284,8 @@ QString firstShotFromJsonValue(const QJsonValue& value)
     }
     if (value.isObject()) {
         const auto obj = value.toObject();
-        for (const QString& key : {"shot", "shotNo", "shotno", "treeShot", "value", "name"}) {
-            const QString shot = firstShotFromJsonValue(obj.value(key));
+        for (const char* key : {"shot", "shotNo", "shotno", "treeShot", "value", "name"}) {
+            const QString shot = firstShotFromJsonValue(obj.value(QString::fromLatin1(key)));
             if (!shot.isEmpty()) {
                 return shot;
             }

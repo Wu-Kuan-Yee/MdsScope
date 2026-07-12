@@ -40,11 +40,19 @@ bool MainWindow::prepareSshUrl(const QString& source, QString* prepared)
         *prepared = source;
         return true;
     }
+    if (!cachedPreparedApiUrl_.isEmpty() && cachedApiSourceUrl_ == source) {
+        *prepared = cachedPreparedApiUrl_;
+        return true;
+    }
     QString error;
     if (sshTunnelManager_->prepareUrl(source, prepared, &error)) {
+        cachedApiSourceUrl_ = source;
+        cachedPreparedApiUrl_ = *prepared;
         updateSshActionIcon();
         return true;
     }
+    cachedApiSourceUrl_.clear();
+    cachedPreparedApiUrl_.clear();
     updateSshActionIcon();
     setStatus(error.isEmpty() ? QStringLiteral("SSH API tunnel failed") : error);
     return false;

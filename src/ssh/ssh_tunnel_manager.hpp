@@ -62,4 +62,5 @@ private:
     State state_ = State::Unconfigured;
     QString lastError_;
     QHash<QString, Tunnel> tunnels_;
+    bool preparationInProgress_ = false;
 };

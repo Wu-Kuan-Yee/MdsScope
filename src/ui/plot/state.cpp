@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "mdsscope_internal.hpp"
-#include "point_overlay.hpp"
 #include "helpers.hpp"
 
 PlotWidget::PlotWidget(QWidget* parent)
@@ -27,8 +26,8 @@ void PlotWidget::setSpec(PlotSpec spec)
     hoverSeriesIndex_ = -1;
     hoverSeriesLocked_ = false;
     pointTrackingActive_ = false;
+    ++pointHoverGeneration_;
     pointHoverQueued_ = false;
-    clearPointOverlay();
     hasView_ = false;
     view_ = {};
     update();
@@ -44,14 +43,19 @@ void PlotWidget::setSeries(int index, SignalSeries series)
     if (index >= series_.size()) {
         series_.resize(index + 1);
     }
-    rebuildMinMaxIndex(series);
+    const int pointCount = series.pointCount();
+    const int expectedBlocks = (pointCount + kMinMaxBlockSize - 1) / kMinMaxBlockSize;
+    const bool indexValid = pointCount < kMinMaxBlockSize * 4
+                            ? series.minMaxBlockSize == 0
+                            : series.minMaxBlockSize == kMinMaxBlockSize
+                                  && series.minYBlocks.size() == expectedBlocks
+                                  && series.maxYBlocks.size() == expectedBlocks;
+    if (!indexValid) {
+        rebuildMinMaxIndex(series);
+    }
     series_[index] = std::move(series);
     dataBoundsDirty_ = true;
     invalidatePlotCache();
-    if (!hasView_) {
-        view_ = dataBounds();
-        expandFlatRange(view_);
-    }
     scheduleUpdate();
 }
 
@@ -68,8 +72,8 @@ void PlotWidget::clearSeries()
     hoverSeriesIndex_ = -1;
     hoverSeriesLocked_ = false;
     pointTrackingActive_ = false;
+    ++pointHoverGeneration_;
     pointHoverQueued_ = false;
-    clearPointOverlay();
     scheduleUpdate();
 }
 
@@ -95,31 +99,30 @@ void PlotWidget::schedulePointHoverUpdate(const QPointF& pixelPos)
         return;
     }
     pointHoverQueued_ = true;
-    QTimer::singleShot(16, this, [this] {
+    const int generation = pointHoverGeneration_;
+    QTimer::singleShot(16, this, [this, generation] {
+        if (generation != pointHoverGeneration_) {
+            return;
+        }
         pointHoverQueued_ = false;
         if (interactionMode_ != InteractionMode::Point || !pointTrackingActive_ || !hoverSeriesLocked_) {
             return;
         }
         const bool changed = updateHover(pendingPointHoverPos_);
-        if (changed) {
-            updatePointOverlay();
-        }
         if (changed && !hoverText_.isEmpty()) {
             emit pointXChanged(hoverData_.x());
         }
     });
 }
 
-void PlotWidget::updatePointOverlay()
+void PlotWidget::deactivatePointTracking()
 {
-    clearPointOverlay();
-}
-
-void PlotWidget::clearPointOverlay()
-{
-    if (pointOverlay_) {
-        pointOverlay_->clearPoint();
-    }
+    pointTrackingActive_ = false;
+    ++pointHoverGeneration_;
+    pointHoverQueued_ = false;
+    hoverText_.clear();
+    hoverSeriesIndex_ = -1;
+    hoverSeriesLocked_ = false;
 }
 
 void PlotWidget::setSelected(bool selected)
@@ -165,8 +168,8 @@ void PlotWidget::setInteractionMode(InteractionMode mode)
         hoverSeriesIndex_ = -1;
         hoverSeriesLocked_ = false;
         pointTrackingActive_ = false;
+        ++pointHoverGeneration_;
         pointHoverQueued_ = false;
-        clearPointOverlay();
         clearSyncedPoint();
     }
     if (oldZoomDirty.isValid() && !oldZoomDirty.isEmpty()) {

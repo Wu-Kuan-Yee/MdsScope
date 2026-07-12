@@ -235,16 +235,7 @@ int runMdsScopeBenchmark(const QString& configPath,
 
 void shutdownMdsScopeWorkers()
 {
-    QVector<QFuture<void>> futures;
-    futures.reserve(16);
-    for (int i = 0; i < 16; ++i) {
-        futures.push_back(QtConcurrent::run([] {
-            clearMdsCurrentThreadConnections();
-        }));
-    }
-    for (auto& future : futures) {
-        future.waitForFinished();
-    }
     QThreadPool::globalInstance()->clear();
-    QThreadPool::globalInstance()->waitForDone(3000);
+    QThreadPool::globalInstance()->waitForDone();
+    shutdownMdsConnectionWorkers();
 }

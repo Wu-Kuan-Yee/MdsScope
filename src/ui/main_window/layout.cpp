@@ -5,7 +5,6 @@
 #include "layout_dialog.hpp"
 #include "shared.hpp"
 #include "signal_dialogs.hpp"
-#include "point_overlay.hpp"
 
 namespace {
 struct PreservedPanelData {
@@ -39,9 +38,6 @@ void MainWindow::rebuildGrid()
     singlePanelMaximized_ = false;
     maximizedColumn_ = -1;
     maximizedRow_ = -1;
-    if (globalPointOverlay_) {
-        globalPointOverlay_->clearReadouts();
-    }
     syncDisplayConfig();
     plotWidgets_.clear();
     plotWidgets_.resize(displayConfig_.columns.size());
@@ -71,6 +67,9 @@ void MainWindow::rebuildGrid()
             connect(plot, &PlotWidget::selected, this, [this, plot, c, r] {
                 selectPlot(c, r);
                 if (pointButton_ && pointButton_->isChecked()) {
+                    if (activePointPlot_ && activePointPlot_ != plot) {
+                        activePointPlot_->deactivatePointTracking();
+                    }
                     activePointPlot_ = plot;
                 }
             });
@@ -85,6 +84,12 @@ void MainWindow::rebuildGrid()
             });
             connect(plot, &PlotWidget::pointXChanged, this, [this, plot](double x) {
                 if (!(pointButton_ && pointButton_->isChecked())) {
+                    return;
+                }
+                // A plot keeps its local point-tracking state after another
+                // panel is selected. Ignore those stale senders so moving over
+                // a previously selected panel cannot take ownership back.
+                if (activePointPlot_ != plot) {
                     return;
                 }
                 if (!std::isfinite(x)) {
@@ -103,7 +108,6 @@ void MainWindow::rebuildGrid()
                     }
                     return;
                 }
-                activePointPlot_ = plot;
                 schedulePointSync(plot, x);
             });
         }

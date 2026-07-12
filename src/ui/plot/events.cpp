@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "mdsscope_internal.hpp"
-#include "point_overlay.hpp"
 #include "helpers.hpp"
 
 void PlotWidget::mousePressEvent(QMouseEvent* event)
@@ -40,9 +39,6 @@ void PlotWidget::mousePressEvent(QMouseEvent* event)
                 changed = updateHoverForSeriesX(0, dataX, true) || changed;
             }
         }
-        if (changed) {
-            updatePointOverlay();
-        }
         if (changed && !hoverText_.isEmpty()) {
             emit pointXChanged(hoverData_.x());
         }
@@ -56,11 +52,11 @@ void PlotWidget::keyPressEvent(QKeyEvent* event)
         if (event->key() == Qt::Key_Escape) {
             if (pointTrackingActive_) {
                 pointTrackingActive_ = false;
+                ++pointHoverGeneration_;
                 pointHoverQueued_ = false;
                 hoverText_.clear();
                 hoverSeriesIndex_ = -1;
                 hoverSeriesLocked_ = false;
-                clearPointOverlay();
                 emit pointTrackingStopped();
                 event->accept();
                 return;
@@ -205,8 +201,8 @@ void PlotWidget::wheelEvent(QWheelEvent* event)
     invalidatePlotCache();
     if (interactionMode_ == InteractionMode::Point && pointTrackingActive_ && hoverSeriesLocked_) {
         schedulePointHoverUpdate(event->position());
-    } else if (updateHover(event->position())) {
-        updatePointOverlay();
+    } else {
+        updateHover(event->position());
     }
     update();
 }
@@ -215,16 +211,12 @@ void PlotWidget::resizeEvent(QResizeEvent* event)
 {
     QWidget::resizeEvent(event);
     invalidatePlotCache();
-    if (pointOverlay_) {
-        pointOverlay_->setGeometry(rect());
-        updatePointOverlay();
-    }
 }
 
 void PlotWidget::leaveEvent(QEvent*)
 {
     if (interactionMode_ == InteractionMode::Point && pointTrackingActive_) {
+        ++pointHoverGeneration_;
         pointHoverQueued_ = false;
     }
 }
-

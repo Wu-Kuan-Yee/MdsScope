@@ -399,7 +399,7 @@ SignalSeries MdsIpClient::fetchEastTimeContextSignalOnOpenSocket(QTcpSocket& soc
                                                     const PlotSpec& plot,
                                                     const SignalSpec& sig,
                                                     int maxPoints,
-                                                    const QHash<QString, UniformTimebase>* timebaseCache,
+                                                    const QHash<QString, UniformTimebase>*,
                                                     QString* error) const
 {
         SignalSeries result;
