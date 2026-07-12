@@ -151,10 +151,6 @@ void MainWindow::fetchLatestShotAsync(bool applyLatest)
                 return;
             }
             latestShot_ = latest;
-            updateTopInfoLabels();
-            // Refresh IP/pulse/It/time even while the latest shot number stays
-            // unchanged; these values may evolve during an active experiment.
-            scheduleTopInfoUpdate(latestShot_);
             if (!shouldApply) {
                 return;
             }
