@@ -242,12 +242,14 @@ fitness for a particular purpose, or non-infringement.
 
 The authors and contributors are not responsible for incorrect analysis,
 operational decisions, data loss, service disruption, unauthorized access, or
-any other direct or indirect consequences arising from use of this software.
+any other direct or indirect consequences arising from use of this software, to
+the fullest extent permitted by applicable law.
 
-Users are responsible for ensuring they have permission to access any MDSIP
-servers, HTTP APIs, shot data, configuration files, and tokens used with this
-application. Do not publish private endpoints, tokens, or restricted
-experimental data.
+SSH forwarding and web bookmarks are general-purpose, user-configured features.
+The project provides no target web addresses, credentials, or access
+authorization, and does not operate destination systems or relay user traffic.
+Users are solely responsible for accessing only authorized systems and
+complying with applicable laws and institutional policies.
 
 ## References
 
