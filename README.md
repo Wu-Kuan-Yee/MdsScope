@@ -197,6 +197,12 @@ unavoidable network, encryption, and compression overhead. Users are responsible
 for using only trusted, authorized SSH hosts and for complying with applicable
 network and security policies.
 
+The browser button next to SSH lets users save named HTTP or HTTPS addresses,
+edit them, and open them in the system default browser. No target addresses are included by default.
+When an SSH data tunnel is already connected, saved web addresses use the same
+SSH forwarding path; otherwise they open normally. URLs with explicit ports are
+supported.
+
 ### Data Export
 
 Data export supports text, CSV, TSV, and JSON formats. By default, exported

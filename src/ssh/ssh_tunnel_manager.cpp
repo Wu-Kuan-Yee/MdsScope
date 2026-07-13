@@ -252,7 +252,10 @@ bool SshTunnelManager::ensureTunnel(const QString& endpoint, QString* localEndpo
         return false;
     }
 
-    setState(State::Connecting, QStringLiteral("Connecting through SSH..."));
+    const bool keepConnectedState = !tunnels_.isEmpty();
+    if (!keepConnectedState) {
+        setState(State::Connecting, QStringLiteral("Connecting through SSH..."));
+    }
     auto* process = new QProcess(this);
     configureAskPass(process, settings_);
     QStringList args = commonArguments(settings_, true);
@@ -266,7 +269,9 @@ bool SshTunnelManager::ensureTunnel(const QString& endpoint, QString* localEndpo
     if (!waitForProcessStarted(*process, 3000)) {
         *error = process->errorString();
         process->deleteLater();
-        setState(State::Error, *error);
+        if (!keepConnectedState) {
+            setState(State::Error, *error);
+        }
         return false;
     }
 
@@ -283,7 +288,11 @@ bool SshTunnelManager::ensureTunnel(const QString& endpoint, QString* localEndpo
             tunnels_.insert(endpoint, tunnel);
             connect(process, &QProcess::finished, this, [this, endpoint, process](int, QProcess::ExitStatus) {
                 tunnels_.remove(endpoint);
-                setState(State::Error, QStringLiteral("SSH tunnel disconnected"));
+                if (tunnels_.isEmpty()) {
+                    setState(State::Error, QStringLiteral("SSH tunnel disconnected"));
+                } else {
+                    setState(State::Connected, QStringLiteral("SSH tunnel connected"));
+                }
                 process->deleteLater();
             });
             *localEndpoint = QStringLiteral("127.0.0.1:%1").arg(localPort);
@@ -300,7 +309,9 @@ bool SshTunnelManager::ensureTunnel(const QString& endpoint, QString* localEndpo
     process->waitForFinished(1000);
     process->deleteLater();
     *error = stderrText.isEmpty() ? QStringLiteral("SSH tunnel setup timed out.") : stderrText;
-    setState(State::Error, *error);
+    if (!keepConnectedState) {
+        setState(State::Error, *error);
+    }
     return false;
 }
 
@@ -367,19 +378,41 @@ bool SshTunnelManager::prepareLayout(const LayoutConfig& source, LayoutConfig* p
 
 bool SshTunnelManager::prepareUrl(const QString& source, QString* prepared, QString* error)
 {
+    return prepareUrlImpl(source, prepared, error, true);
+}
+
+bool SshTunnelManager::prepareUrlViaSsh(const QString& source, QString* prepared, QString* error)
+{
+    return prepareUrlImpl(source, prepared, error, false);
+}
+
+bool SshTunnelManager::prepareUrlImpl(const QString& source,
+                                      QString* prepared,
+                                      QString* error,
+                                      bool allowDirect)
+{
     if (!prepared) {
         return false;
     }
     *prepared = source;
     const QUrl url(source);
     if (!url.isValid() || url.host().isEmpty()) {
-        *error = QStringLiteral("Invalid API URL.");
+        *error = QStringLiteral("Invalid URL.");
+        return false;
+    }
+    const QString scheme = url.scheme().toLower();
+    if (scheme != QStringLiteral("http") && scheme != QStringLiteral("https")) {
+        *error = QStringLiteral("SSH web tunneling supports HTTP and HTTPS URLs only.");
         return false;
     }
 
     reloadSettings();
-    if (settings_.mode == SshMode::Disabled) {
+    if (settings_.mode == SshMode::Disabled && allowDirect) {
         return true;
+    }
+    if (settings_.mode == SshMode::Disabled) {
+        *error = QStringLiteral("SSH is disabled.");
+        return false;
     }
     if (settings_.host.trimmed().isEmpty()) {
         *error = QStringLiteral("SSH is enabled but no SSH host is configured.");
@@ -391,7 +424,7 @@ bool SshTunnelManager::prepareUrl(const QString& source, QString* prepared, QStr
     }
     QScopedValueRollback<bool> preparationGuard(preparationInProgress_, true);
 
-    const int remotePort = url.port(url.scheme().compare(QStringLiteral("https"), Qt::CaseInsensitive) == 0 ? 443 : 80);
+    const int remotePort = url.port(scheme == QStringLiteral("https") ? 443 : 80);
     const QString endpoint = url.host().contains(':')
                                  ? QStringLiteral("[%1]:%2").arg(url.host()).arg(remotePort)
                                  : QStringLiteral("%1:%2").arg(url.host()).arg(remotePort);
@@ -402,12 +435,8 @@ bool SshTunnelManager::prepareUrl(const QString& source, QString* prepared, QStr
         && existing->process->state() != QProcess::NotRunning) {
         localEndpoint = QStringLiteral("127.0.0.1:%1").arg(existing->localPort);
     } else {
-        if (settings_.mode == SshMode::Auto && tcpReachable(url.host(), remotePort, 450)) {
+        if (allowDirect && settings_.mode == SshMode::Auto && tcpReachable(url.host(), remotePort, 450)) {
             return true;
-        }
-        if (url.scheme().compare(QStringLiteral("http"), Qt::CaseInsensitive) != 0) {
-            *error = QStringLiteral("Automatic API tunneling currently supports HTTP URLs only.");
-            return false;
         }
         if (!ensureTunnel(endpoint, &localEndpoint, error)) {
             return false;

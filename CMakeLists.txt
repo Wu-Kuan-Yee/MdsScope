@@ -3,7 +3,7 @@
 
 cmake_minimum_required(VERSION 3.16)
 
-project(MdsScope VERSION 5.7.1 LANGUAGES CXX)
+project(MdsScope VERSION 5.8 LANGUAGES CXX)
 
 execute_process(
     COMMAND git rev-parse --short=9 HEAD
@@ -118,6 +118,8 @@ add_executable(MdsScope
     src/ui/main_window/shared.cpp
     src/ui/main_window/shot.cpp
     src/ui/main_window/ssh.cpp
+    src/ui/main_window/web_access.cpp
+    src/ui/main_window/web_bookmarks.cpp
     src/ui/main_window/ui.cpp
     src/mdsscope_app.hpp
     src/core/mdsscope_internal.hpp

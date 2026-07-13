@@ -339,6 +339,34 @@ QIcon sshIcon(int state)
     return QIcon(pixmap);
 }
 
+QIcon browserIcon()
+{
+    QPixmap pixmap(22, 22);
+    pixmap.fill(Qt::transparent);
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+
+    const QColor frame("#2563eb");
+    painter.setPen(QPen(frame, 1.7, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.setBrush(Qt::NoBrush);
+    painter.drawRoundedRect(QRectF(1.5, 3.0, 19.0, 16.0), 2.0, 2.0);
+    painter.drawLine(QPointF(2.0, 7.5), QPointF(20.0, 7.5));
+
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(frame);
+    painter.drawEllipse(QPointF(5.0, 5.3), 0.8, 0.8);
+    painter.drawEllipse(QPointF(8.0, 5.3), 0.8, 0.8);
+    painter.drawEllipse(QPointF(11.0, 5.3), 0.8, 0.8);
+
+    painter.setPen(QPen(frame, 1.25, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.setBrush(Qt::NoBrush);
+    painter.drawEllipse(QPointF(11.0, 13.2), 4.0, 3.6);
+    painter.drawLine(QPointF(7.2, 13.2), QPointF(14.8, 13.2));
+    painter.drawArc(QRectF(9.2, 9.6, 3.6, 7.2), 90 * 16, 180 * 16);
+    painter.drawArc(QRectF(9.2, 9.6, 3.6, 7.2), 270 * 16, 180 * 16);
+    return QIcon(pixmap);
+}
+
 QIcon modeIcon(InteractionMode mode, bool active)
 {
     QPixmap pixmap(24, 24);

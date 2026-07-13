@@ -34,6 +34,7 @@ public:
     bool testConnection(const SshSettings& settings, QString* error);
     bool prepareLayout(const LayoutConfig& source, LayoutConfig* prepared, QString* error);
     bool prepareUrl(const QString& source, QString* prepared, QString* error);
+    bool prepareUrlViaSsh(const QString& source, QString* prepared, QString* error);
     void disconnectAll();
 
 signals:
@@ -56,6 +57,7 @@ private:
     static void configureAskPass(QProcess* process, const SshSettings& settings);
 
     bool ensureTunnel(const QString& endpoint, QString* localEndpoint, QString* error);
+    bool prepareUrlImpl(const QString& source, QString* prepared, QString* error, bool allowDirect);
     void setState(State state, const QString& detail = {});
 
     SshSettings settings_;
