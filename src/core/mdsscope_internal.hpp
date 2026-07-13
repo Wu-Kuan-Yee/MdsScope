@@ -178,6 +178,7 @@ QIcon fontIcon();
 QIcon saveIcon();
 QIcon loginIcon(bool loggedIn);
 QIcon sshIcon(int state);
+QIcon browserIcon();
 QIcon modeIcon(InteractionMode mode, bool active);
 LayoutConfig parseEnvironment(const QString& path);
 bool writeEnvironmentToml(const LayoutConfig& config, const QString& path, QString* error = nullptr);

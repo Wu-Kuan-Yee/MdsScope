@@ -73,6 +73,8 @@ void MainWindow::buildUi()
 
     auto* toolbar = addToolBar("Tools");
     toolbar->setMovable(false);
+    toolbar->toggleViewAction()->setVisible(false);
+    toolbar->setContextMenuPolicy(Qt::PreventContextMenu);
     toolbar->setIconSize(QSize(24, 24));
     toolbar->setToolButtonStyle(Qt::ToolButtonIconOnly);
     toolbar->setStyleSheet(
@@ -137,6 +139,17 @@ void MainWindow::buildUi()
         updateSshActionIcon();
     });
     updateSshActionIcon();
+    QAction* internalWebAction = toolbar->addAction(browserIcon(), "Internal web pages");
+    if (auto* internalWebButton = qobject_cast<QToolButton*>(toolbar->widgetForAction(internalWebAction))) {
+        internalWebButton->setObjectName(QStringLiteral("internalWebButton"));
+        internalWebButton->setStyleSheet(
+            QStringLiteral("QToolButton#internalWebButton::menu-indicator { image: none; width: 0px; }"));
+        internalWebMenu_ = new QMenu(internalWebButton);
+        connect(internalWebMenu_, &QMenu::aboutToShow, this, &MainWindow::refreshInternalWebMenu);
+        internalWebButton->setMenu(internalWebMenu_);
+        internalWebButton->setPopupMode(QToolButton::InstantPopup);
+        refreshInternalWebMenu();
+    }
     toolbar->addAction(gearIcon(), "Layout setup", this, &MainWindow::openLayoutSetupDialog);
     toolbar->addAction(fontIcon(), "Customize fonts", this, &MainWindow::openCustomizeDialog);
 

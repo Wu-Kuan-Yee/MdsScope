@@ -38,6 +38,11 @@ class QToolBar;
 class QToolButton;
 class SshTunnelManager;
 
+struct InternalWebBookmark {
+    QString alias;
+    QString url;
+};
+
 enum class InteractionMode {
     Zoom,
     Point,
@@ -306,6 +311,13 @@ private:
     void latestShot();
     void openLoginDialog();
     void openSshDialog();
+    void openInternalWebPage(const QString& source);
+    QVector<InternalWebBookmark> savedInternalWebPages() const;
+    void saveInternalWebPages(const QVector<InternalWebBookmark>& bookmarks) const;
+    void addInternalWebPage();
+    void editInternalWebPage();
+    void removeInternalWebPage();
+    void refreshInternalWebMenu();
     bool prepareSshLayout(const LayoutConfig& source, LayoutConfig* prepared);
     bool prepareSshUrl(const QString& source, QString* prepared);
     void updateSshActionIcon();
@@ -396,6 +408,7 @@ private:
     LayoutConfig config_;
     LayoutConfig displayConfig_;
     QMenu* recentEnvironmentMenu_ = nullptr;
+    QMenu* internalWebMenu_ = nullptr;
     QListWidget* environmentList_ = nullptr;
     QWidget* gridHost_ = nullptr;
     QGridLayout* gridLayout_ = nullptr;
