@@ -5,3 +5,4 @@ resources/environment/*
 !resources/environment/init.toml
 !resources/environment/init.webscp
 output/
+/release-note.md
