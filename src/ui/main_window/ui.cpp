@@ -400,43 +400,43 @@ void MainWindow::showPanelContextMenu(PlotWidget* plot, int column, int row, con
     }
     selectPlot(column, row);
 
-    QMenu menu(this);
-    QAction* maxAction = menu.addAction("Max");
-    QAction* showAllAction = menu.addAction("Show All Panels");
+    QMenu* menu = new QMenu(this);
+    QAction* maxAction = menu->addAction("Max");
+    QAction* showAllAction = menu->addAction("Show All Panels");
     showAllAction->setEnabled(singlePanelMaximized_);
-    menu.addSeparator();
-    QAction* panelSetupAction = menu.addAction("Panel Setup");
-    QAction* dataSourceAction = menu.addAction("Data Source Setup");
-    QAction* exportDataAction = menu.addAction("Export Data");
-    menu.addSeparator();
-    QAction* resetCurrentAction = menu.addAction("Reset Current Scale");
-    QAction* resetAllAction = menu.addAction("Reset All Panels");
-    QAction* sameXAction = menu.addAction("All Same X Scale");
-    QAction* sameYAction = menu.addAction("All Same Y Scale");
+    menu->addSeparator();
+    QAction* panelSetupAction = menu->addAction("Panel Setup");
+    QAction* dataSourceAction = menu->addAction("Data Source Setup");
+    QAction* exportDataAction = menu->addAction("Export Data");
+    menu->addSeparator();
+    QAction* resetCurrentAction = menu->addAction("Reset Current Scale");
+    QAction* resetAllAction = menu->addAction("Reset All Panels");
+    QAction* sameXAction = menu->addAction("All Same X Scale");
+    QAction* sameYAction = menu->addAction("All Same Y Scale");
 
-    const QAction* chosen = menu.exec(plot->mapToGlobal(pos));
-    if (!chosen) {
-        return;
+    const QAction* chosen = menu->exec(plot->mapToGlobal(pos));
+    if (chosen) {
+        if (chosen == maxAction) {
+            maximizeCurrentPanel();
+        } else if (chosen == showAllAction) {
+            showAllPanels();
+        } else if (chosen == panelSetupAction) {
+            panelSetupForCurrentPanel();
+        } else if (chosen == dataSourceAction) {
+            dataSourceSetupForCurrentPanel();
+        } else if (chosen == exportDataAction) {
+            exportCurrentPanelData();
+        } else if (chosen == resetCurrentAction) {
+            resetCurrentScale();
+        } else if (chosen == resetAllAction) {
+            resetScales();
+        } else if (chosen == sameXAction) {
+            applyScaleToAll();
+        } else if (chosen == sameYAction) {
+            applyYScaleToAll();
+        }
     }
-    if (chosen == maxAction) {
-        maximizeCurrentPanel();
-    } else if (chosen == showAllAction) {
-        showAllPanels();
-    } else if (chosen == panelSetupAction) {
-        panelSetupForCurrentPanel();
-    } else if (chosen == dataSourceAction) {
-        dataSourceSetupForCurrentPanel();
-    } else if (chosen == exportDataAction) {
-        exportCurrentPanelData();
-    } else if (chosen == resetCurrentAction) {
-        resetCurrentScale();
-    } else if (chosen == resetAllAction) {
-        resetScales();
-    } else if (chosen == sameXAction) {
-        applyScaleToAll();
-    } else if (chosen == sameYAction) {
-        applyYScaleToAll();
-    }
+    menu->deleteLater();
 }
 
 void MainWindow::openCustomizeDialog()
