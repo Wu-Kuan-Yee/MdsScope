@@ -162,6 +162,7 @@ private:
     QString rootPath_;
     QString apiOverride_;
     QHash<QString, QString> properties_;
+    QLineEdit* apiEdit_ = nullptr;
     QLineEdit* userEdit_ = nullptr;
     QLineEdit* passwordEdit_ = nullptr;
     QLabel* statusLabel_ = nullptr;
@@ -180,6 +181,7 @@ public:
     QVector<SignalSeries> seriesSnapshot() const;
     void setSeries(int index, SignalSeries series);
     void clearSeries();
+    bool event(QEvent* event) override;
     void setSelected(bool selected);
     void setLargeDisplayMode(bool enabled);
     void refreshStyle();
@@ -420,6 +422,7 @@ private:
     QLabel* itInfoLabel_ = nullptr;
     QLabel* timeInfoLabel_ = nullptr;
     QComboBox* shotCombo_ = nullptr;
+    QToolButton* shotHistoryBtn_ = nullptr;
     QLineEdit* shotEdit_ = nullptr;
     QComboBox* dataModeCombo_ = nullptr;
     QAction* loginAction_ = nullptr;

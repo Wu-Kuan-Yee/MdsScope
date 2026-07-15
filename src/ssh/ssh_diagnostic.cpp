@@ -15,6 +15,8 @@
 #include <QTimer>
 #include <QUrl>
 
+#ifndef Q_OS_IOS
+
 namespace {
 QJsonObject postJson(const QString& url,
                      const QByteArray& authorization,
@@ -169,3 +171,15 @@ int runSshApiTest(const QString& rootPath)
         << "\ttime=" << scalarText(data.value(QStringLiteral("curr_time"))) << Qt::endl;
     return 0;
 }
+
+#else
+
+int runSshTunnelBenchmark(const QString&, const QString&) {
+    return 1;
+}
+
+int runSshApiTest(const QString&) {
+    return 1;
+}
+
+#endif // Q_OS_IOS

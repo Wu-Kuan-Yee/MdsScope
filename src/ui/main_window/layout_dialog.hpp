@@ -109,8 +109,12 @@ public:
         : QWidget(parent)
         , editable_(editable)
     {
-        setMinimumSize(620, 420);
         setFocusPolicy(Qt::StrongFocus);
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+        setMinimumSize(320, 240);
+#else
+        setMinimumSize(620, 420);
+#endif
         for (int c = 0; c < config.columns.size(); ++c) {
             QVector<Item> col;
             for (int r = 0; r < config.columns[c].size(); ++r) {
@@ -453,8 +457,10 @@ public:
         : QDialog(parent)
     {
         setWindowTitle("Layout Setup");
+#if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
         resize(900, 560);
-#ifdef Q_OS_ANDROID
+#endif
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
         auto* mainLayout = new QVBoxLayout(this);
 #else
         auto* mainLayout = new QHBoxLayout(this);
@@ -463,7 +469,7 @@ public:
         mainLayout->addWidget(canvas_, 1);
 
         auto* side = new QWidget(this);
-#ifdef Q_OS_ANDROID
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
         auto* sideLayout = new QVBoxLayout(side);
         
         auto* row1 = new QHBoxLayout;

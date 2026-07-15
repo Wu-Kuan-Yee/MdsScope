@@ -11,6 +11,9 @@ PlotWidget::PlotWidget(QWidget* parent)
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     setMouseTracking(true);
     setFocusPolicy(Qt::ClickFocus);
+    setAttribute(Qt::WA_AcceptTouchEvents);
+    grabGesture(Qt::TapAndHoldGesture);
+    grabGesture(Qt::PinchGesture);
 }
 
 void PlotWidget::setSpec(PlotSpec spec)

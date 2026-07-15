@@ -23,7 +23,7 @@ SshDialog::SshDialog(SshTunnelManager* manager, QWidget* parent)
 {
     setWindowTitle(QStringLiteral("SSH Remote Access"));
     setModal(true);
-#ifndef Q_OS_ANDROID
+#if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
     setMinimumWidth(460);
 #endif
 

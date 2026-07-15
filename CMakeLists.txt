@@ -178,6 +178,14 @@ if(APPLE)
     )
     if(NOT IOS)
     set_target_properties(MdsScope PROPERTIES
+        MACOSX_BUNDLE_INFO_PLIST "${PROJECT_SOURCE_DIR}/packaging/macos/Info.plist"
+    )
+    else()
+    set_target_properties(MdsScope PROPERTIES
+        XCODE_ATTRIBUTE_INFOPLIST_KEY_NSAppTransportSecurity "<dict><key>NSAllowsArbitraryLoads</key><true/></dict>"
+    )
+    endif()
+    set_target_properties(MdsScope PROPERTIES
         MACOSX_BUNDLE TRUE
         MACOSX_BUNDLE_BUNDLE_NAME "MdsScope"
         MACOSX_BUNDLE_GUI_IDENTIFIER "org.mdsscope.MdsScope"
@@ -186,7 +194,6 @@ if(APPLE)
         MACOSX_BUNDLE_BUNDLE_VERSION "${MDS_SCOPE_GIT_VERSION}"
         MACOSX_BUNDLE_COPYRIGHT "Copyright 2026 Weikang Wang"
     )
-    endif()
 endif()
 
 target_include_directories(MdsScope PRIVATE
@@ -224,15 +231,12 @@ if(IOS)
         MACOSX_BUNDLE_BUNDLE_VERSION "${MDS_SCOPE_GIT_VERSION}"
         MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
         XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "org.mdsscope.MdsScope"
-        XCODE_ATTRIBUTE_INFOPLIST_FILE "${CMAKE_CURRENT_SOURCE_DIR}/packaging/ios/Info.plist"
         XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "14.0"
         XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
         XCODE_ATTRIBUTE_SUPPORTED_PLATFORMS "iphoneos iphonesimulator"
         XCODE_ATTRIBUTE_CODE_SIGN_STYLE "Automatic"
         XCODE_ATTRIBUTE_ENABLE_BITCODE "NO"
     )
-    target_sources(MdsScope PRIVATE packaging/ios/LaunchScreen.storyboard)
-    set_source_files_properties(packaging/ios/LaunchScreen.storyboard PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
 endif()
 
 target_compile_definitions(MdsScope PRIVATE

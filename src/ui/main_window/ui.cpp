@@ -159,13 +159,20 @@ void MainWindow::buildUi()
     gridLayout_ = new QGridLayout(gridHost_);
     gridLayout_->setContentsMargins(0, 0, 0, 0);
     gridLayout_->setSpacing(0);
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+    auto* scrollArea = new QScrollArea(this);
+    scrollArea->setWidgetResizable(true);
+    scrollArea->setWidget(gridHost_);
+    setCentralWidget(scrollArea);
+#else
     setCentralWidget(gridHost_);
+#endif
 
     statusLabel_ = new QLabel(this);
     statusLabel_->setStyleSheet("color: palette(highlight);");
 
     toolbar->addSeparator();
-#ifdef Q_OS_ANDROID
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
     addToolBarBreak(Qt::TopToolBarArea);
     auto* topControls = addToolBar("Info");
     topControls->setMovable(false);
@@ -187,7 +194,7 @@ void MainWindow::buildUi()
         "QLabel { margin-left: 2px; margin-right: 2px; }"
     );
 #endif
-#ifdef Q_OS_ANDROID
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
     topControls->addWidget(new QLabel("Rate", topControls));
 #else
     topLayout->addWidget(new QLabel("Rate", topControls));
@@ -197,7 +204,7 @@ void MainWindow::buildUi()
     dataModeCombo_->addItem("Medium", static_cast<int>(DataReadMode::Medium));
     dataModeCombo_->addItem("Full", static_cast<int>(DataReadMode::Full));
     dataModeCombo_->setCurrentIndex(0);
-#ifndef Q_OS_ANDROID
+#if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
     dataModeCombo_->setFixedWidth(90);
     topLayout->addWidget(dataModeCombo_);
 #else
@@ -211,14 +218,14 @@ void MainWindow::buildUi()
     timeInfoLabel_ = new QLabel("Time: --", topControls);
     for (QLabel* label : {topInfoLabel_, ipInfoLabel_, pulseInfoLabel_, itInfoLabel_, timeInfoLabel_}) {
         label->setStyleSheet("color: palette(highlight);");
-#ifdef Q_OS_ANDROID
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
         topControls->addWidget(label);
 #else
         topLayout->addWidget(label);
 #endif
     }
     
-#ifdef Q_OS_ANDROID
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
     auto* spacer = new QWidget(topControls);
     spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     topControls->addWidget(spacer);
@@ -242,7 +249,7 @@ void MainWindow::buildUi()
         "  padding: 0px;"
         "  margin-left: 8px;"
         "}");
-#ifdef Q_OS_ANDROID
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
     topControls->addWidget(aboutButton_);
 #else
     topLayout->addWidget(aboutButton_);
@@ -253,11 +260,13 @@ void MainWindow::buildUi()
     addToolBar(Qt::BottomToolBarArea, bottomToolBar);
     bottomToolBar->setMovable(false);
     bottomToolBar->setContextMenuPolicy(Qt::PreventContextMenu);
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS) || defined(Q_OS_WIN)
     bottomToolBar->setStyleSheet(
         "QPushButton { padding: 1px 8px; min-height: 18px; }"
         "QLineEdit, QComboBox { min-height: 18px; padding: 0px 2px; }"
         "QToolButton { margin: 0px; padding: 1px; min-width: 30px; min-height: 28px; }"
     );
+#endif
     zoomButton_ = new QToolButton(bottomToolBar);
     pointButton_ = new QToolButton(bottomToolBar);
     for (QToolButton* button : {zoomButton_, pointButton_}) {
@@ -271,28 +280,41 @@ void MainWindow::buildUi()
     pointButton_->setChecked(true);
     bottomToolBar->addWidget(zoomButton_);
     bottomToolBar->addWidget(pointButton_);
-    bottomToolBar->addWidget(new QLabel("Shot", bottomToolBar));
+#if defined(Q_OS_IOS) || defined(Q_OS_ANDROID)
+    shotEdit_ = new QLineEdit(bottomToolBar);
+    shotEdit_->setPlaceholderText("Shot");
+    shotEdit_->setMinimumWidth(120);
+    shotEdit_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    
+    shotHistoryBtn_ = new QToolButton(bottomToolBar);
+    shotHistoryBtn_->setIcon(QIcon::fromTheme("history"));
+    shotHistoryBtn_->setPopupMode(QToolButton::InstantPopup);
+    shotHistoryBtn_->setMenu(new QMenu(shotHistoryBtn_));
+    
+    bottomToolBar->addWidget(new QLabel("Shot: ", bottomToolBar));
+    bottomToolBar->addWidget(shotEdit_);
+    bottomToolBar->addWidget(shotHistoryBtn_);
+#else
     shotCombo_ = new QComboBox(bottomToolBar);
     shotCombo_->setEditable(true);
     shotCombo_->setInsertPolicy(QComboBox::NoInsert);
     shotCombo_->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
     shotCombo_->setMaxVisibleItems(10);
     shotCombo_->view()->setTextElideMode(Qt::ElideMiddle);
-#ifdef Q_OS_ANDROID
-    shotCombo_->view()->setMinimumWidth(180);
-    shotCombo_->setMinimumWidth(120);
-    shotCombo_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-#else
+    
     shotCombo_->view()->setMinimumWidth(260);
     shotCombo_->view()->setMaximumWidth(520);
-#endif
+    
     shotEdit_ = shotCombo_->lineEdit();
+    bottomToolBar->addWidget(new QLabel("Shot: ", bottomToolBar));
+    bottomToolBar->addWidget(shotCombo_);
+#endif
     refreshShotHistory();
     auto resizeShotEdit = [this] {
         if (!shotEdit_ || !shotCombo_) {
             return;
         }
-#ifndef Q_OS_ANDROID
+#if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
         const QFontMetrics fm(shotEdit_->font());
         const int textWidth = fm.horizontalAdvance(shotEdit_->text().trimmed().isEmpty()
                                                        ? QStringLiteral("143850-143858")
@@ -301,17 +323,18 @@ void MainWindow::buildUi()
 #endif
     };
     resizeShotEdit();
-    bottomToolBar->addWidget(shotCombo_);
 
-#ifdef Q_OS_ANDROID
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
     addToolBarBreak(Qt::BottomToolBarArea);
     auto* bottomToolBar2 = addToolBar("Controls Actions");
     addToolBar(Qt::BottomToolBarArea, bottomToolBar2);
     bottomToolBar2->setMovable(false);
     bottomToolBar2->setContextMenuPolicy(Qt::PreventContextMenu);
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS) || defined(Q_OS_WIN)
     bottomToolBar2->setStyleSheet(
         "QPushButton { padding: 1px 8px; min-height: 18px; }"
     );
+#endif
 #else
     auto* bottomToolBar2 = bottomToolBar;
 #endif
@@ -323,7 +346,7 @@ void MainWindow::buildUi()
     auto* latest = new QPushButton("Latest", bottomToolBar2);
     stopButton_ = stop;
     stop->setText("Continue");
-#ifndef Q_OS_ANDROID
+#if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
     stop->setFixedWidth(stop->sizeHint().width() + 16);
 #endif
     stop->setText("Stop");
@@ -333,7 +356,7 @@ void MainWindow::buildUi()
     bottomToolBar2->addWidget(stop);
     bottomToolBar2->addWidget(latest);
     
-#ifdef Q_OS_ANDROID
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
     addToolBarBreak(Qt::BottomToolBarArea);
     auto* bottomToolBar3 = addToolBar("Controls Status");
     addToolBar(Qt::BottomToolBarArea, bottomToolBar3);
@@ -355,6 +378,9 @@ void MainWindow::buildUi()
     connect(stop, &QPushButton::clicked, this, &MainWindow::onStopOrContinue);
     connect(shotEdit_, &QLineEdit::returnPressed, this, &MainWindow::applyShot);
     connect(shotEdit_, &QLineEdit::textChanged, this, [resizeShotEdit] { resizeShotEdit(); });
+#if defined(Q_OS_IOS) || defined(Q_OS_ANDROID)
+    connect(shotEdit_, &QLineEdit::returnPressed, this, &MainWindow::applyShot);
+#else
     connect(shotCombo_, &QComboBox::activated, this, [this](int index) {
         const QString shot = shotCombo_->itemData(index).toString();
         if (!shot.isEmpty()) {
@@ -362,6 +388,7 @@ void MainWindow::buildUi()
         }
         applyShot();
     });
+#endif
     connect(dataModeCombo_, &QComboBox::currentIndexChanged, this, [this] { refreshData(); });
     connect(aboutButton_, &QToolButton::clicked, this, &MainWindow::openAboutDialog);
 }
