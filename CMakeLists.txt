@@ -330,6 +330,7 @@ if(APPLE)
 else()
     install(TARGETS MdsScope
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        LIBRARY DESTINATION lib
         BUNDLE DESTINATION .
     )
     if(TARGET transfer)
