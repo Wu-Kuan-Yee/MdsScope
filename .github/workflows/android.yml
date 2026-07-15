@@ -1,0 +1,55 @@
+name: Android APK Build
+
+on:
+  push:
+    branches: [ "main", "feature/v5.8-cross-platform" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup Java JDK
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+
+    - name: Accept Android licenses
+      run: yes | sdkmanager --licenses || true
+
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: '6.5.3'
+        target: 'android'
+        arch: 'android_armv8'
+
+    - name: Configure CMake
+      run: |
+        cmake -B build-android -S . \
+          -DCMAKE_TOOLCHAIN_FILE=${{ env.Qt6_DIR }}/lib/cmake/Qt6/qt.toolchain.cmake \
+          -DQT_ANDROID_ABIS="arm64-v8a" \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DQT_HOST_PATH=${{ env.Qt6_DIR }}/../gcc_64
+
+    - name: Build APK
+      run: |
+        cmake --build build-android --target MdsScope_make_apk -j4
+
+    - name: Upload APK Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: MdsScope-Android-APK
+        path: build-android/**/*.apk
