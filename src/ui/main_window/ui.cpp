@@ -416,25 +416,27 @@ void MainWindow::showPanelContextMenu(PlotWidget* plot, int column, int row, con
 
     const QAction* chosen = menu->exec(plot->mapToGlobal(pos));
     if (chosen) {
-        if (chosen == maxAction) {
-            maximizeCurrentPanel();
-        } else if (chosen == showAllAction) {
-            showAllPanels();
-        } else if (chosen == panelSetupAction) {
-            panelSetupForCurrentPanel();
-        } else if (chosen == dataSourceAction) {
-            dataSourceSetupForCurrentPanel();
-        } else if (chosen == exportDataAction) {
-            exportCurrentPanelData();
-        } else if (chosen == resetCurrentAction) {
-            resetCurrentScale();
-        } else if (chosen == resetAllAction) {
-            resetScales();
-        } else if (chosen == sameXAction) {
-            applyScaleToAll();
-        } else if (chosen == sameYAction) {
-            applyYScaleToAll();
-        }
+        QTimer::singleShot(0, this, [=]() {
+            if (chosen == maxAction) {
+                maximizeCurrentPanel();
+            } else if (chosen == showAllAction) {
+                showAllPanels();
+            } else if (chosen == panelSetupAction) {
+                panelSetupForCurrentPanel();
+            } else if (chosen == dataSourceAction) {
+                dataSourceSetupForCurrentPanel();
+            } else if (chosen == exportDataAction) {
+                exportCurrentPanelData();
+            } else if (chosen == resetCurrentAction) {
+                resetCurrentScale();
+            } else if (chosen == resetAllAction) {
+                resetScales();
+            } else if (chosen == sameXAction) {
+                applyScaleToAll();
+            } else if (chosen == sameYAction) {
+                applyYScaleToAll();
+            }
+        });
     }
     menu->deleteLater();
 }
