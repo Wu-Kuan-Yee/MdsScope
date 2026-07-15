@@ -8,7 +8,11 @@ LoginDialog::LoginDialog(QString rootPath, QWidget* parent, QString apiOverride)
 {
     setWindowTitle("Login");
     setModal(true);
+#ifdef Q_OS_ANDROID
+    setMinimumWidth(280);
+#else
     setFixedWidth(420);
+#endif
     QString styleSheet =
         "QDialog { background: palette(base); }"
         "QLabel#title { font-size: 24px; font-weight: 600; color: palette(text); }"
