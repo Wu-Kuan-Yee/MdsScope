@@ -29,7 +29,7 @@ jobs:
     - name: Accept Android licenses and fix SDK versions
       run: |
         yes | sdkmanager --licenses || true
-        rm -rf $ANDROID_HOME/platforms/android-36* $ANDROID_HOME/platforms/android-35* || true
+        rm -rf $ANDROID_HOME/platforms/android-36* $ANDROID_HOME/platforms/android-35* $ANDROID_HOME/platforms/android-34* || true
         sdkmanager --uninstall "platforms;android-36-ext19" "platforms;android-36" || true
         sdkmanager "platforms;android-33" || true
 
