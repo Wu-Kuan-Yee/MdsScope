@@ -88,7 +88,9 @@ bool editWebAddress(QWidget* parent,
     QDialog dialog(parent);
     dialog.setWindowTitle(title);
     dialog.setWindowIcon(appIcon());
+#ifndef Q_OS_ANDROID
     dialog.setMinimumWidth(440);
+#endif
 
     auto* layout = new QVBoxLayout(&dialog);
     auto* form = new QFormLayout;
@@ -128,7 +130,9 @@ bool editSavedWebAddresses(QWidget* parent, QVector<InternalWebBookmark>* bookma
     QDialog dialog(parent);
     dialog.setWindowTitle(QStringLiteral("Edit"));
     dialog.setWindowIcon(appIcon());
+#ifndef Q_OS_ANDROID
     dialog.setMinimumWidth(680);
+#endif
 
     constexpr int kNameRole = Qt::UserRole;
     constexpr int kAddressRole = Qt::UserRole + 1;

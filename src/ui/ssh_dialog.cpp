@@ -23,7 +23,9 @@ SshDialog::SshDialog(SshTunnelManager* manager, QWidget* parent)
 {
     setWindowTitle(QStringLiteral("SSH Remote Access"));
     setModal(true);
+#ifndef Q_OS_ANDROID
     setMinimumWidth(460);
+#endif
 
     CachedAuth auth;
     const bool hasCachedAuth = loadCachedAuth(&auth);

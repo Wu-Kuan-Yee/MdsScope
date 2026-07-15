@@ -15,13 +15,21 @@ public:
         : QDialog(parent)
     {
         setWindowTitle("Export Data");
+#ifndef Q_OS_ANDROID
         resize(900, 560);
+#endif
+#ifdef Q_OS_ANDROID
+        auto* mainLayout = new QVBoxLayout(this);
+#else
         auto* mainLayout = new QHBoxLayout(this);
+#endif
         if (signalPlot) {
             signalMode_ = true;
             signalList_ = new QListWidget(this);
             signalList_->setSelectionMode(QAbstractItemView::NoSelection);
+#ifndef Q_OS_ANDROID
             signalList_->setMinimumWidth(320);
+#endif
             signalList_->setMaximumWidth(420);
             signalList_->setStyleSheet("QListWidget::indicator { width: 18px; height: 18px; }"
                                        "QListWidget::item { padding: 6px 4px; }");
