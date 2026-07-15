@@ -454,11 +454,29 @@ public:
     {
         setWindowTitle("Layout Setup");
         resize(900, 560);
+#ifdef Q_OS_ANDROID
+        auto* mainLayout = new QVBoxLayout(this);
+#else
         auto* mainLayout = new QHBoxLayout(this);
+#endif
         canvas_ = new LayoutCanvas(config, this);
         mainLayout->addWidget(canvas_, 1);
 
         auto* side = new QWidget(this);
+#ifdef Q_OS_ANDROID
+        auto* sideLayout = new QHBoxLayout(side);
+        auto* addPanelButton = new QPushButton("Add", side);
+        auto* deleteButton = new QPushButton("Delete", side);
+        auto* resetButton = new QPushButton("Reset", side);
+        auto* applyButton = new QPushButton("Apply", side);
+        auto* cancelButton = new QPushButton("Cancel", side);
+        sideLayout->addWidget(addPanelButton);
+        sideLayout->addWidget(deleteButton);
+        sideLayout->addWidget(resetButton);
+        sideLayout->addStretch(1);
+        sideLayout->addWidget(applyButton);
+        sideLayout->addWidget(cancelButton);
+#else
         auto* sideLayout = new QVBoxLayout(side);
         auto* addPanelButton = new QPushButton("Add new panel", side);
         auto* deleteButton = new QPushButton("Delete selected", side);
@@ -472,6 +490,7 @@ public:
         sideLayout->addStretch(1);
         sideLayout->addWidget(applyButton);
         sideLayout->addWidget(cancelButton);
+#endif
         mainLayout->addWidget(side);
 
         connect(addPanelButton, &QPushButton::clicked, canvas_, &LayoutCanvas::createPendingPanelAtRight);

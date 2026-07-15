@@ -280,7 +280,8 @@ void MainWindow::buildUi()
     shotCombo_->view()->setTextElideMode(Qt::ElideMiddle);
 #ifdef Q_OS_ANDROID
     shotCombo_->view()->setMinimumWidth(180);
-    shotCombo_->view()->setMaximumWidth(280);
+    shotCombo_->setMinimumWidth(120);
+    shotCombo_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
 #else
     shotCombo_->view()->setMinimumWidth(260);
     shotCombo_->view()->setMaximumWidth(520);
