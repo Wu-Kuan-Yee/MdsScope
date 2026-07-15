@@ -414,31 +414,30 @@ void MainWindow::showPanelContextMenu(PlotWidget* plot, int column, int row, con
     QAction* sameXAction = menu->addAction("All Same X Scale");
     QAction* sameYAction = menu->addAction("All Same Y Scale");
 
-    const QAction* chosen = menu->exec(plot->mapToGlobal(pos));
-    if (chosen) {
-        QTimer::singleShot(0, this, [=]() {
-            if (chosen == maxAction) {
-                maximizeCurrentPanel();
-            } else if (chosen == showAllAction) {
-                showAllPanels();
-            } else if (chosen == panelSetupAction) {
-                panelSetupForCurrentPanel();
-            } else if (chosen == dataSourceAction) {
-                dataSourceSetupForCurrentPanel();
-            } else if (chosen == exportDataAction) {
-                exportCurrentPanelData();
-            } else if (chosen == resetCurrentAction) {
-                resetCurrentScale();
-            } else if (chosen == resetAllAction) {
-                resetScales();
-            } else if (chosen == sameXAction) {
-                applyScaleToAll();
-            } else if (chosen == sameYAction) {
-                applyYScaleToAll();
-            }
-        });
-    }
-    menu->deleteLater();
+    connect(menu, &QMenu::triggered, this, [=](QAction* chosen) {
+        if (chosen == maxAction) {
+            maximizeCurrentPanel();
+        } else if (chosen == showAllAction) {
+            showAllPanels();
+        } else if (chosen == panelSetupAction) {
+            panelSetupForCurrentPanel();
+        } else if (chosen == dataSourceAction) {
+            dataSourceSetupForCurrentPanel();
+        } else if (chosen == exportDataAction) {
+            exportCurrentPanelData();
+        } else if (chosen == resetCurrentAction) {
+            resetCurrentScale();
+        } else if (chosen == resetAllAction) {
+            resetScales();
+        } else if (chosen == sameXAction) {
+            applyScaleToAll();
+        } else if (chosen == sameYAction) {
+            applyYScaleToAll();
+        }
+    }, Qt::QueuedConnection);
+
+    connect(menu, &QMenu::aboutToHide, menu, &QObject::deleteLater);
+    menu->popup(plot->mapToGlobal(pos));
 }
 
 void MainWindow::openCustomizeDialog()
