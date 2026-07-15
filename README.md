@@ -15,7 +15,7 @@ configuration, MDSIP defaults, login flow, and HTTP metadata API target EAST.
 - Three sampling quality modes: **thin** (fast preview), **medium** (high-resolution), and **full** (complete data).
 - Apply single-shot or batch-shot expressions globally.
 - Use EAST HTTP metadata for latest shot and top-bar shot summary.
-- Run on Linux, macOS, and Windows.
+- Run on Linux, macOS, Windows, iOS, and Android.
 
 ### Sampling Quality Modes
 
@@ -33,7 +33,7 @@ The mode can be set globally via the top toolbar dropdown, or overridden per sig
 
 - CMake 3.16 or newer
 - A C++23 compiler
-- Qt 6.4 or newer with Core, Widgets, Network, and Concurrent
+- Qt 6.4 or newer with Core, Widgets, Network, and Concurrent (Qt 6.8+ recommended for iOS/Android)
 - Qt 6 DBus on Linux
 
 ### Dependency Installation
@@ -82,6 +82,21 @@ Windows:
 cmake -S . -B build -G "Visual Studio 17 2022" -A x64
 cmake --build build --config Release
 .\build\Release\MdsScope.exe
+```
+
+iOS (requires Xcode and Qt for iOS):
+
+```bash
+/path/to/Qt/6.x.x/ios/bin/qt-cmake -S . -B build-ios -G Xcode -DCMAKE_SYSTEM_NAME=iOS
+cmake --build build-ios --config Release
+```
+
+Android (requires Android SDK/NDK and Qt for Android):
+
+```bash
+export ANDROID_NDK_ROOT=/path/to/android/sdk/ndk/xx.y.zzzz
+/path/to/Qt/6.x.x/android_arm64_v8a/bin/qt-cmake -S . -B build-android -DCMAKE_SYSTEM_NAME=Android -DCMAKE_ANDROID_NDK=$ANDROID_NDK_ROOT
+cmake --build build-android
 ```
 
 Install from a source build when needed:
