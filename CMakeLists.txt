@@ -213,6 +213,7 @@ target_include_directories(MdsScope PRIVATE
 
 # ─── Android deployment ────────────────────────────────────────────────────
 if(ANDROID)
+    file(COPY "${PROJECT_SOURCE_DIR}/resources" DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/packaging/android/assets")
     set_target_properties(MdsScope PROPERTIES
         QT_ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/packaging/android"
         QT_ANDROID_MIN_SDK_VERSION 26
