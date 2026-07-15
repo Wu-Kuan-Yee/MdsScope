@@ -9,7 +9,7 @@
 #include <QApplication>
 #include <QColor>
 #include <QCoreApplication>
-#ifdef Q_OS_LINUX
+#if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
 #include <QDBusConnection>
 #include <QDBusInterface>
 #include <QDBusReply>
@@ -239,7 +239,7 @@ public:
         currentMode_ = readStoredThemeMode();
         currentScheme_ = resolveColorScheme(readCurrentColorScheme());
         applyCurrentTheme();
-#ifdef Q_OS_LINUX
+#if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
         QDBusConnection::sessionBus().connect(QStringLiteral("org.freedesktop.portal.Desktop"),
                                               QStringLiteral("/org/freedesktop/portal/desktop"),
                                               QStringLiteral("org.freedesktop.portal.Settings"),
@@ -251,7 +251,7 @@ public:
             if (currentMode_ != ThemeMode::Auto) {
                 return;
             }
-#ifdef Q_OS_LINUX
+#if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
             uint scheme = readPortalColorScheme();
             if (scheme == 0) {
                 scheme = readQtColorScheme();
@@ -299,7 +299,7 @@ public:
         applyCurrentTheme();
     }
 
-#ifdef Q_OS_LINUX
+#if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
 private slots:
     void settingChanged(const QString& group, const QString& key, const QDBusVariant& value)
     {
@@ -310,7 +310,7 @@ private slots:
 #endif
 
 private:
-#if defined(Q_OS_LINUX) || ((defined(Q_OS_MACOS) || defined(Q_OS_MAC)) && !defined(Q_OS_IOS))
+#if (defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)) || ((defined(Q_OS_MACOS) || defined(Q_OS_MAC)) && !defined(Q_OS_IOS))
     static QString processOutput(const QString& program, const QStringList& arguments)
     {
         QProcess process;
@@ -324,7 +324,7 @@ private:
     }
 #endif
 
-#ifdef Q_OS_LINUX
+#if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
     static uint readQtColorScheme()
     {
 #if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
@@ -482,7 +482,7 @@ private:
         if (scheme == 1 || scheme == 2) {
             return scheme;
         }
-#ifdef Q_OS_LINUX
+#if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
         return readFallbackColorScheme();
 #elif (defined(Q_OS_MACOS) || defined(Q_OS_MAC)) && !defined(Q_OS_IOS)
         return readMacColorScheme();
@@ -495,7 +495,7 @@ private:
 
     static uint readCurrentColorScheme()
     {
-#ifdef Q_OS_LINUX
+#if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
         uint scheme = readPortalColorScheme();
         return scheme != 0 ? scheme : readFallbackColorScheme();
 #elif (defined(Q_OS_MACOS) || defined(Q_OS_MAC)) && !defined(Q_OS_IOS)

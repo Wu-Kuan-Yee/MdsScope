@@ -18,7 +18,7 @@ inline void openExternalUrlQuietly(const QString& urlText)
         return;
     }
 
-#if defined(Q_OS_LINUX)
+#if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
     QProcess opener;
     opener.setProgram(QStringLiteral("xdg-open"));
     opener.setArguments({url.toString()});
