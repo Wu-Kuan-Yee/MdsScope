@@ -40,7 +40,7 @@ jobs:
       with:
         version: '6.4.3'
         target: 'android'
-        arch: 'android_armv8'
+        arch: 'android_arm64_v8a'
 
     - name: Configure CMake
       run: |
