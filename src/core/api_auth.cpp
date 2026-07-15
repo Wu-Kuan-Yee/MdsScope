@@ -3,6 +3,7 @@
 
 #include "mdsscope_internal.hpp"
 #include "text_utils.hpp"
+#include <QSettings>
 
 QHash<QString, QString> defaultApiProperties()
 {
@@ -24,6 +25,12 @@ QString apiUrlPath(const QString& rootPath)
 
 QString readApiUrl(const QString& rootPath)
 {
+    QString overrideUrl = QSettings().value("ApiUrlOverride").toString().trimmed();
+    if (!overrideUrl.isEmpty()) {
+        return overrideUrl;
+    }
+
+    // Try original path
     QFile file(apiUrlPath(rootPath));
     if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         while (!file.atEnd()) {
@@ -33,8 +40,20 @@ QString readApiUrl(const QString& rootPath)
             }
         }
     }
+    
+    // Try explicit Qt resource path (bypasses any QDir absolutePath stripping bugs)
+    QFile resFile(QStringLiteral(":/resources/APIurl"));
+    if (resFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        while (!resFile.atEnd()) {
+            const QString line = QString::fromUtf8(resFile.readLine()).trimmed();
+            if (!line.isEmpty() && !line.startsWith('#')) {
+                return javaUnescape(line);
+            }
+        }
+    }
 
-    return {};
+    // Ultimate fallback if resources are completely broken
+    return QStringLiteral("http://202.127.204.26:80/api");
 }
 
 QHash<QString, QString> readApiSettings(const QString& rootPath)
@@ -76,8 +95,8 @@ bool tokenExpiresSoon(const QString& token)
 
 QString authCachePath()
 {
-    QDir().mkpath(appCacheDir());
-    return QDir(appCacheDir()).filePath("auth.cache");
+    QDir().mkpath(appConfigDir());
+    return QDir(appConfigDir()).filePath("auth.cache");
 }
 
 QByteArray localAuthKey()
@@ -93,6 +112,8 @@ QByteArray localAuthKey()
     material += QSysInfo::machineHostName().toUtf8();
     material += '|';
     material += qgetenv("USER");
+#elif defined(Q_OS_IOS)
+    material += "MdsScope_iOS_Stable_Auth_Key_V1";
 #else
     QFile machineId("/etc/machine-id");
     if (machineId.open(QIODevice::ReadOnly | QIODevice::Text)) {
@@ -102,7 +123,9 @@ QByteArray localAuthKey()
     material += qgetenv("USER");
 #endif
     material += '|';
+#if !defined(Q_OS_IOS)
     material += QDir::homePath().toUtf8();
+#endif
     material += "|MdsScope EAST auth cache";
     return QCryptographicHash::hash(material, QCryptographicHash::Sha256);
 }
@@ -212,7 +235,11 @@ ApiLoginResult requestApiToken(const QString& api,
     }
 
     QNetworkAccessManager manager;
-    QNetworkRequest request(QUrl(api.trimmed() + "/login"));
+    QString baseUrl = api.trimmed();
+    if (baseUrl.endsWith('/')) {
+        baseUrl.chop(1);
+    }
+    QNetworkRequest request(QUrl(baseUrl + "/login"));
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json; charset=" + charset);
     request.setRawHeader("User-Agent", "MdsScope/0.1");
     request.setTransferTimeout(5000);

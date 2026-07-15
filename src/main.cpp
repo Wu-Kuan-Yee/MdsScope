@@ -9,6 +9,7 @@
 #include <QApplication>
 #include <QColor>
 #include <QCoreApplication>
+#include <QNetworkProxyFactory>
 #if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
 #include <QDBusConnection>
 #include <QDBusInterface>
@@ -100,6 +101,9 @@ QString applicationStyleSheet(const QPalette& palette)
                "QMainWindow, QDialog, QWidget {"
                "  background: %1;"
                "  color: %2;"
+               "}"
+               "QLabel {"
+               "  background: transparent;"
                "}"
                "QToolBar, QStatusBar {"
                "  background: %1;"
@@ -533,8 +537,8 @@ private:
 
 QDir runtimeRootDir()
 {
-#ifdef Q_OS_ANDROID
-    return QDir(QStringLiteral(":/"));
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+    return QDir(QStringLiteral(":/resources"));
 #endif
     auto runtimeResourceRootPath = [](const QDir& base) -> QString {
         if (base.exists("environment")) {
@@ -624,7 +628,11 @@ bool ensureApiLoginBeforeMain(const QString& rootPath)
 
     LoginDialog dialog(rootPath, nullptr, api);
     dialog.setWindowIcon(appIcon());
-    return dialog.exec() == QDialog::Accepted;
+    
+    QApplication::setQuitOnLastWindowClosed(false);
+    const bool accepted = dialog.exec() == QDialog::Accepted;
+    
+    return accepted;
 }
 }
 
@@ -729,17 +737,25 @@ int main(int argc, char* argv[])
         return code;
     }
 
-    if (!ensureApiLoginBeforeMain(workDir.absolutePath())) {
+    qDebug() << "Before ensureApiLoginBeforeMain";
+    if (!ensureApiLoginBeforeMain(workDir.path())) {
+        qDebug() << "ensureApiLoginBeforeMain returned false";
         shutdownMdsScopeWorkers();
         return 1;
     }
+    qDebug() << "ensureApiLoginBeforeMain returned true";
 
     int code = 0;
     {
-        MainWindow window(workDir.absolutePath());
+        qDebug() << "Creating MainWindow";
+        MainWindow window(workDir.path());
         window.resize(1440, 920);
+        qDebug() << "Showing MainWindow";
         window.show();
+        QApplication::setQuitOnLastWindowClosed(true);
+        qDebug() << "Entering app.exec()";
         code = app.exec();
+        qDebug() << "Exited app.exec() with code" << code;
     }
     shutdownMdsScopeWorkers();
     return code;

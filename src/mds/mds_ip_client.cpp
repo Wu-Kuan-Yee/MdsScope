@@ -314,13 +314,16 @@ int MdsIpClient::maxPointsForSignal(const PlotSpec& plot, const SignalSpec&)
 
 QString MdsIpClient::serverHost(QString server)
 {
-        server = server.trimmed();
-        const int colon = server.lastIndexOf(':');
-        if (colon > 0) {
-            return server.left(colon);
-        }
-        return server;
+    server = server.trimmed();
+    const int colon = server.lastIndexOf(':');
+    if (colon > 0) {
+        server = server.left(colon);
     }
+    if (server.compare(QStringLiteral("mds.ipp.ac.cn"), Qt::CaseInsensitive) == 0) {
+        return QStringLiteral("202.127.204.12");
+    }
+    return server;
+}
 
 int MdsIpClient::serverPort(const QString& server)
 {

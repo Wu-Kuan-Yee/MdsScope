@@ -115,6 +115,13 @@ void MainWindow::rebuildGrid()
         gridLayout_->setColumnStretch(c, 1);
     }
     gridLayout_->setRowStretch(0, 1);
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+    int maxRows = 1;
+    for (const auto& col : config_.columns) {
+        maxRows = std::max(maxRows, static_cast<int>(col.size()));
+    }
+    gridHost_->setMinimumHeight(maxRows * 250);
+#endif
     gridHost_->updateGeometry();
 }
 

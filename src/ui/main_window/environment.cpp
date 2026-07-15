@@ -198,19 +198,38 @@ void MainWindow::rememberShotExpression(const QString& shot)
 
 void MainWindow::refreshShotHistory()
 {
-    if (!shotCombo_ || !shotEdit_) {
+    if (!shotEdit_) {
         return;
     }
     const QString current = shotEdit_->text();
+    const QStringList history = recentShotExpressions();
+#if defined(Q_OS_IOS) || defined(Q_OS_ANDROID)
+    shotEdit_->setText(current);
+    if (shotHistoryBtn_) {
+        QMenu* menu = shotHistoryBtn_->menu();
+        if (menu) {
+            menu->clear();
+            for (const QString& shot : history) {
+                menu->addAction(shot, this, [this, shot]() {
+                    shotEdit_->setText(shot);
+                    applyShot();
+                });
+            }
+        }
+    }
+#else
+    if (!shotCombo_) {
+        return;
+    }
     QSignalBlocker comboBlocker(shotCombo_);
-    QSignalBlocker editBlocker(shotEdit_);
     shotCombo_->clear();
     const QFontMetrics fm(shotCombo_->font());
-    for (const QString& shot : recentShotExpressions()) {
+    for (const QString& shot : history) {
         shotCombo_->addItem(fm.elidedText(shot, Qt::ElideMiddle, 300), shot);
         shotCombo_->setItemData(shotCombo_->count() - 1, shot, Qt::ToolTipRole);
     }
     shotCombo_->setEditText(current);
+#endif
 }
 
 bool MainWindow::loadEnvironmentFile(const QString& path,
@@ -297,6 +316,19 @@ void MainWindow::saveCurrentEnvironment()
 
 void MainWindow::saveCurrentEnvironmentAs()
 {
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+    bool ok;
+    QString name = QInputDialog::getText(this, "Save As", "Enter config name:", QLineEdit::Normal, "MyLayout", &ok);
+    if (!ok || name.trimmed().isEmpty()) {
+        return;
+    }
+    QString path = QDir(appEnvironmentDir(rootPath_)).filePath(name.trimmed());
+    if (saveEnvironmentFile(path)) {
+        config_.filePath = path.endsWith(".toml") ? path : path + ".toml";
+        loadEnvironmentFile(config_.filePath);
+        setStatus("Saved " + QFileInfo(config_.filePath).fileName());
+    }
+#else
     const QString path = QFileDialog::getSaveFileName(this, "Save MdsScope Config", rememberedFileDialogDir(), "MdsScope Config (*.toml)");
     if (path.isEmpty()) {
         return;
@@ -308,6 +340,7 @@ void MainWindow::saveCurrentEnvironmentAs()
         loadEnvironmentFile(config_.filePath);
         setStatus("Saved " + QFileInfo(config_.filePath).fileName());
     }
+#endif
 }
 
 bool MainWindow::saveEnvironmentFile(const QString& path) const

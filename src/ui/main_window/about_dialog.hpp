@@ -295,7 +295,7 @@ public:
         const QFont baseFont(fonts.family, fonts.uiSize);
         const QFontMetrics baseMetrics(baseFont);
         setFont(baseFont);
-#ifndef Q_OS_ANDROID
+#if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
         setMinimumWidth(280);
         setFixedWidth(std::max(620, baseMetrics.horizontalAdvance(QStringLiteral("Git Version 3.0.r000.g000000000.dirty")) + 210));
 #endif
@@ -352,7 +352,7 @@ public:
         subtitle->setFont(baseFont);
         subtitle->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
         subtitle->setWordWrap(true);
-#ifndef Q_OS_ANDROID
+#if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
         subtitle->setMinimumWidth(230);
 #endif
         headerLayout->addStretch(1);
@@ -384,8 +384,8 @@ public:
             valueLabel->setOpenExternalLinks(false);
             valueLabel->setTextFormat(rich ? Qt::RichText : Qt::PlainText);
             valueLabel->setWordWrap(true);
-#ifndef Q_OS_ANDROID
-#ifndef Q_OS_ANDROID
+#if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
+#if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
             valueLabel->setMinimumWidth(300);
 #endif
 #endif

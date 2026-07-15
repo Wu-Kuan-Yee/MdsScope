@@ -39,6 +39,9 @@ QString appConfigDir()
 #elif (defined(Q_OS_MACOS) || defined(Q_OS_MAC)) && !defined(Q_OS_IOS)
     const QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     return path.isEmpty() ? QDir::home().filePath("Library/Application Support/MdsScope") : path;
+#elif defined(Q_OS_IOS) || defined(Q_OS_ANDROID)
+    const QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    return path.isEmpty() ? QDir::home().filePath(".config/mdsscope") : path;
 #else
     return QDir::home().filePath(".config/mdsscope");
 #endif
@@ -52,6 +55,9 @@ QString appCacheDir()
 #elif (defined(Q_OS_MACOS) || defined(Q_OS_MAC)) && !defined(Q_OS_IOS)
     const QString path = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
     return path.isEmpty() ? QDir::home().filePath("Library/Caches/MdsScope") : path;
+#elif defined(Q_OS_IOS) || defined(Q_OS_ANDROID)
+    const QString path = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
+    return path.isEmpty() ? QDir::home().filePath(".cache/mdsscope") : path;
 #else
     return QDir::home().filePath(".cache/mdsscope");
 #endif

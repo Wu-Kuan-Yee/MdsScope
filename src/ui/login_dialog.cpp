@@ -2,16 +2,22 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "mdsscope_internal.hpp"
+#include <QNetworkProxy>
 
 LoginDialog::LoginDialog(QString rootPath, QWidget* parent, QString apiOverride)
     : QDialog(parent), rootPath_(std::move(rootPath)), apiOverride_(std::move(apiOverride))
 {
     setWindowTitle("Login");
     setModal(true);
-#ifdef Q_OS_ANDROID
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
     setMinimumWidth(280);
 #else
     setFixedWidth(420);
+#endif
+#ifdef Q_OS_IOS
+    // Send a dummy request to a domain to trigger the iOS China network permission prompt
+    auto* dummyManager = new QNetworkAccessManager(this);
+    dummyManager->get(QNetworkRequest(QUrl("http://captive.apple.com/hotspot-detect.html")));
 #endif
     QString styleSheet =
         "QDialog { background: palette(base); }"
@@ -50,27 +56,37 @@ LoginDialog::LoginDialog(QString rootPath, QWidget* parent, QString apiOverride)
 
     layout->addSpacing(8);
 
-    auto* form = new QFormLayout;
-    form->setLabelAlignment(Qt::AlignLeft);
-    form->setFormAlignment(Qt::AlignLeft | Qt::AlignTop);
-    form->setHorizontalSpacing(16);
-    form->setVerticalSpacing(10);
+    auto* form = new QVBoxLayout;
+    form->setSpacing(10);
+    
+    apiEdit_ = new QLineEdit(this);
+    apiEdit_->setPlaceholderText("http://202.127.204.26:80/api");
+    
     userEdit_ = new QLineEdit(this);
     userEdit_->setPlaceholderText("Username");
     passwordEdit_ = new QLineEdit(this);
     passwordEdit_->setPlaceholderText("Password");
     passwordEdit_->setEchoMode(QLineEdit::Password);
-    form->addRow("Username", userEdit_);
-    form->addRow("Password", passwordEdit_);
+    
+    auto* apiLabel = new QLabel("API URL", this);
+    auto* userLabel = new QLabel("Username", this);
+    auto* passLabel = new QLabel("Password", this);
+    
+    form->addWidget(apiLabel);
+    form->addWidget(apiEdit_);
+    form->addWidget(userLabel);
+    form->addWidget(userEdit_);
+    form->addWidget(passLabel);
+    form->addWidget(passwordEdit_);
     layout->addLayout(form);
 
-    auto* buttons = new QHBoxLayout;
-    buttons->addStretch();
+    auto* buttons = new QVBoxLayout;
+    buttons->setSpacing(10);
     auto* cancel = new QPushButton("Cancel", this);
     loginButton_ = new QPushButton("Login", this);
     loginButton_->setObjectName("primary");
-    buttons->addWidget(cancel);
     buttons->addWidget(loginButton_);
+    buttons->addWidget(cancel);
     layout->addLayout(buttons);
 
     connect(loginButton_, &QPushButton::clicked, this, &LoginDialog::tryLogin);
@@ -86,11 +102,14 @@ void LoginDialog::loadProperties()
     if (!apiOverride_.trimmed().isEmpty()) {
         properties_.insert(QStringLiteral("ApiUrl"), apiOverride_.trimmed());
     }
-    if (properties_.value("ApiUrl").trimmed().isEmpty()) {
+    
+    QString currentApi = properties_.value("ApiUrl").trimmed();
+    apiEdit_->setText(currentApi);
+
+    if (currentApi.isEmpty()) {
         statusLabel_->setText("Missing API configuration.");
         statusLabel_->show();
         loginButton_->setEnabled(false);
-        return;
     }
     CachedAuth auth;
     if (loadCachedAuth(&auth)) {
@@ -111,10 +130,10 @@ void LoginDialog::tryLogin()
     if (loginInProgress_) {
         return;
     }
-    const QString api = properties_.value("ApiUrl");
+    const QString api = apiEdit_->text().trimmed();
     const QString charset = properties_.value("Charset", "UTF-8");
 
-    if (api.trimmed().isEmpty()) {
+    if (api.isEmpty()) {
         QMessageBox::warning(this, "Login", "Missing API URL.");
         return;
     }
@@ -123,31 +142,70 @@ void LoginDialog::tryLogin()
     const QString password = passwordEdit_->text();
     loginInProgress_ = true;
     loginButton_->setEnabled(false);
+    loginButton_->setText(QStringLiteral("Signing in..."));
     statusLabel_->setText(QStringLiteral("Signing in..."));
     statusLabel_->show();
-    auto* watcher = new QFutureWatcher<ApiLoginResult>(this);
-    connect(watcher, &QFutureWatcher<ApiLoginResult>::finished, this, [this, watcher, userName, password] {
-        const ApiLoginResult result = watcher->result();
-        watcher->deleteLater();
+
+    auto* manager = new QNetworkAccessManager(this);
+    manager->setProxy(QNetworkProxy::NoProxy);
+    QString baseUrl = api.trimmed();
+    if (baseUrl.endsWith('/')) {
+        baseUrl.chop(1);
+    }
+    QNetworkRequest request(QUrl(baseUrl + "/login"));
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json; charset=" + charset);
+    request.setRawHeader("User-Agent", "MdsScope/1.0");
+
+    QJsonObject payload;
+    payload.insert("userName", userName.trimmed());
+    payload.insert("password", password);
+
+    QNetworkReply* reply = manager->post(request, QJsonDocument(payload).toJson(QJsonDocument::Compact));
+
+    connect(reply, &QNetworkReply::finished, this, [this, reply, userName, password, api]() {
+        reply->deleteLater();
+        reply->manager()->deleteLater();
         loginInProgress_ = false;
         loginButton_->setEnabled(true);
-        if (result.ok && !result.token.isEmpty()) {
-            CachedAuth auth;
-            loadCachedAuth(&auth);
-            auth.userName = userName;
-            auth.password = password;
-            auth.token = result.token;
-            saveCachedAuth(auth);
-            accept();
-            return;
+        loginButton_->setText(QStringLiteral("Login"));
+
+        if (reply->error() == QNetworkReply::NoError) {
+            QByteArray rawResponse = reply->readAll();
+            QJsonParseError err;
+            QJsonDocument doc = QJsonDocument::fromJson(rawResponse, &err);
+            if (err.error == QJsonParseError::NoError && doc.isObject()) {
+                QJsonObject json = doc.object();
+                bool ok = json.value("code").toString() == "20000" || json.value("code").toInt() == 20000;
+                QString token = json.value("data").toObject().value("token").toString();
+                if (ok && !token.isEmpty()) {
+                    CachedAuth auth;
+                    loadCachedAuth(&auth);
+                    auth.userName = userName;
+                    auth.password = password;
+                    auth.token = token;
+                    saveCachedAuth(auth);
+                    QSettings().setValue("ApiUrlOverride", api);
+                    accept();
+                    return;
+                }
+                
+                // If it's valid JSON but not 20000 or token is empty, show the real message!
+                QString msg = json.value("message").toString();
+                if (!msg.isEmpty()) {
+                    statusLabel_->setText(msg);
+                    QMessageBox::warning(this, "Login Failed", msg);
+                    return;
+                }
+            }
+            QString debugMsg = QString("Invalid response.\nError: %1\nRaw: %2")
+                                   .arg(err.errorString())
+                                   .arg(QString::fromUtf8(rawResponse).left(200));
+            statusLabel_->setText("Invalid response from server.");
+            QMessageBox::warning(this, "Login Failed", debugMsg);
+        } else {
+            statusLabel_->setText(reply->errorString());
+            QMessageBox::warning(this, "Login Error", reply->errorString());
         }
-        statusLabel_->setText(result.error.isEmpty() ? QStringLiteral("Failed to login.") : result.error);
         statusLabel_->show();
-        userEdit_->clear();
-        passwordEdit_->clear();
-        userEdit_->setFocus();
     });
-    watcher->setFuture(QtConcurrent::run([api, charset, userName, password] {
-        return requestApiToken(api, charset, userName, password);
-    }));
 }

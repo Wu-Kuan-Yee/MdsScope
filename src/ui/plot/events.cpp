@@ -3,6 +3,61 @@
 
 #include "mdsscope_internal.hpp"
 #include "helpers.hpp"
+#include <QGestureEvent>
+#include <QPinchGesture>
+
+bool PlotWidget::event(QEvent* event)
+{
+    if (event->type() == QEvent::Gesture) {
+        if (auto* ge = static_cast<QGestureEvent*>(event)) {
+            bool handled = false;
+            
+            if (QGesture* pinch = ge->gesture(Qt::PinchGesture)) {
+                auto* pinchGesture = static_cast<QPinchGesture*>(pinch);
+                if (pinchGesture->state() == Qt::GestureUpdated || pinchGesture->state() == Qt::GestureFinished) {
+                    const QRectF pr = plotRect();
+                    if (pr.isValid()) {
+                        QRectF view = effectiveView();
+                        
+                        if (pinchGesture->changeFlags() & QPinchGesture::ScaleFactorChanged) {
+                            const QPointF center = pixelToData(pinchGesture->centerPoint(), view, pr);
+                            // Dampen the scale factor: 0.5 provides a moderate reduction in sensitivity
+                            double rawScale = pinchGesture->scaleFactor();
+                            double factor = 1.0 / std::pow(rawScale, 0.5);
+                            if (factor > 0 && factor != 1.0) {
+                                const double left = center.x() - (center.x() - view.left()) * factor;
+                                const double right = center.x() + (view.right() - center.x()) * factor;
+                                const double bottom = center.y() - (center.y() - view.top()) * factor;
+                                const double top = center.y() + (view.bottom() - center.y()) * factor;
+                                view = QRectF(QPointF(left, bottom), QPointF(right, top)).normalized();
+                            }
+                        }
+                        
+                        expandFlatRange(view);
+                        view_ = view;
+                        hasView_ = true;
+                        invalidatePlotCache();
+                        update();
+                    }
+                }
+                handled = true;
+            }
+            
+            if (QGesture* tap = ge->gesture(Qt::TapAndHoldGesture)) {
+                if (tap->state() == Qt::GestureFinished) {
+                    emit customContextMenuRequested(mapFromGlobal(tap->hotSpot().toPoint()));
+                }
+                handled = true;
+            }
+            
+            if (handled) {
+                ge->accept();
+                return true;
+            }
+        }
+    }
+    return QWidget::event(event);
+}
 
 void PlotWidget::mousePressEvent(QMouseEvent* event)
 {
@@ -188,16 +243,40 @@ void PlotWidget::wheelEvent(QWheelEvent* event)
         return;
     }
     QRectF view = effectiveView();
-    const QPointF center = pixelToData(event->position(), view, pr);
-    const double factor = event->angleDelta().y() > 0 ? 0.82 : 1.22;
-    const double left = center.x() - (center.x() - view.left()) * factor;
-    const double right = center.x() + (view.right() - center.x()) * factor;
-    const double bottom = center.y() - (center.y() - view.top()) * factor;
-    const double top = center.y() + (view.bottom() - center.y()) * factor;
-    view = QRectF(QPointF(left, bottom), QPointF(right, top));
-    expandFlatRange(view);
-    view_ = view;
-    hasView_ = true;
+
+    const bool isTrackpad = !event->pixelDelta().isNull() || event->phase() != Qt::NoScrollPhase;
+    bool shouldZoom = true;
+
+    // For trackpads, two-finger scroll pans by default, and pinch zooms.
+    // We allow zooming with trackpad scroll only if Ctrl/Cmd is pressed.
+    if (isTrackpad && !event->modifiers().testFlag(Qt::ControlModifier)) {
+        shouldZoom = false;
+    }
+
+    if (shouldZoom) {
+        const QPointF center = pixelToData(event->position(), view, pr);
+        const double steps = event->angleDelta().y() / 120.0;
+        const double factor = std::pow(1.22, -steps);
+        const double left = center.x() - (center.x() - view.left()) * factor;
+        const double right = center.x() + (view.right() - center.x()) * factor;
+        const double bottom = center.y() - (center.y() - view.top()) * factor;
+        const double top = center.y() + (view.bottom() - center.y()) * factor;
+        view = QRectF(QPointF(left, bottom), QPointF(right, top));
+        expandFlatRange(view);
+        view_ = view;
+        hasView_ = true;
+    } else {
+        QPointF delta = event->pixelDelta();
+        if (delta.isNull()) {
+            delta = event->angleDelta() / 8.0;
+        }
+        const double dx = -delta.x() / pr.width() * view.width();
+        const double dy = delta.y() / pr.height() * view.height();
+        view.translate(dx, dy);
+        view_ = view;
+        hasView_ = true;
+    }
+
     invalidatePlotCache();
     if (interactionMode_ == InteractionMode::Point && pointTrackingActive_ && hoverSeriesLocked_) {
         schedulePointHoverUpdate(event->position());
@@ -205,6 +284,7 @@ void PlotWidget::wheelEvent(QWheelEvent* event)
         updateHover(event->position());
     }
     update();
+    event->accept();
 }
 
 void PlotWidget::resizeEvent(QResizeEvent* event)

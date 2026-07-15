@@ -88,7 +88,7 @@ bool editWebAddress(QWidget* parent,
     QDialog dialog(parent);
     dialog.setWindowTitle(title);
     dialog.setWindowIcon(appIcon());
-#ifndef Q_OS_ANDROID
+#if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
     dialog.setMinimumWidth(440);
 #endif
 
@@ -130,7 +130,7 @@ bool editSavedWebAddresses(QWidget* parent, QVector<InternalWebBookmark>* bookma
     QDialog dialog(parent);
     dialog.setWindowTitle(QStringLiteral("Edit"));
     dialog.setWindowIcon(appIcon());
-#ifndef Q_OS_ANDROID
+#if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
     dialog.setMinimumWidth(680);
 #endif
 

@@ -17,6 +17,8 @@
 #include <QTimer>
 #include <QUrl>
 
+#ifndef Q_OS_IOS
+
 namespace {
 bool waitForProcessStarted(QProcess& process, int timeoutMs)
 {
@@ -483,3 +485,51 @@ void SshTunnelManager::setState(State state, const QString& detail)
     lastError_ = state == State::Error ? detail : QString();
     emit stateChanged(state_, detail);
 }
+
+#else
+
+SshTunnelManager::SshTunnelManager(QObject* parent) : QObject(parent), state_(State::Ready) {}
+SshTunnelManager::~SshTunnelManager() = default;
+void SshTunnelManager::reloadSettings() {}
+bool SshTunnelManager::testConnection(const SshSettings&, QString* error) {
+    if (error) *error = "SSH tunneling is not supported on iOS.";
+    return false;
+}
+bool SshTunnelManager::prepareLayout(const LayoutConfig& source, LayoutConfig* prepared, QString*) {
+    *prepared = source;
+    return true;
+}
+bool SshTunnelManager::prepareUrl(const QString& source, QString* prepared, QString*) {
+    *prepared = source;
+    return true;
+}
+bool SshTunnelManager::prepareUrlViaSsh(const QString&, QString*, QString* error) {
+    if (error) *error = "SSH tunneling is not supported on iOS.";
+    return false;
+}
+void SshTunnelManager::disconnectAll() {}
+bool SshTunnelManager::splitEndpoint(const QString&, QString*, int*) { return false; }
+bool SshTunnelManager::tcpReachable(const QString&, int, int) { return false; }
+int SshTunnelManager::reserveLocalPort() { return -1; }
+QString SshTunnelManager::sshTarget(const SshSettings&) { return {}; }
+QStringList SshTunnelManager::commonArguments(const SshSettings&, bool) { return {}; }
+void SshTunnelManager::configureAskPass(QProcess*, const SshSettings&) {}
+bool SshTunnelManager::ensureTunnel(const QString&, QString*, QString* error) {
+    if (error) *error = "SSH tunneling is not supported on iOS.";
+    return false;
+}
+bool SshTunnelManager::prepareUrlImpl(const QString& source, QString* prepared, QString* error, bool allowDirect) {
+    if (allowDirect) {
+        *prepared = source;
+        return true;
+    }
+    if (error) *error = "SSH tunneling is not supported on iOS.";
+    return false;
+}
+void SshTunnelManager::setState(State state, const QString& detail) {
+    state_ = state;
+    lastError_ = detail;
+    emit stateChanged(state, detail);
+}
+
+#endif // Q_OS_IOS

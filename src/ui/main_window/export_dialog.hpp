@@ -15,10 +15,10 @@ public:
         : QDialog(parent)
     {
         setWindowTitle("Export Data");
-#ifndef Q_OS_ANDROID
+#if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
         resize(900, 560);
 #endif
-#ifdef Q_OS_ANDROID
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
         auto* mainLayout = new QVBoxLayout(this);
 #else
         auto* mainLayout = new QHBoxLayout(this);
@@ -27,7 +27,7 @@ public:
             signalMode_ = true;
             signalList_ = new QListWidget(this);
             signalList_->setSelectionMode(QAbstractItemView::NoSelection);
-#ifndef Q_OS_ANDROID
+#if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
             signalList_->setMinimumWidth(320);
 #endif
             signalList_->setMaximumWidth(420);
