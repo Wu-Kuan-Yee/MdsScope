@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "mdsscope_internal.hpp"
+#include <QTimer>
 #include "helpers.hpp"
 #include <QGestureEvent>
 #include <QPinchGesture>
@@ -45,7 +46,10 @@ bool PlotWidget::event(QEvent* event)
             
             if (QGesture* tap = ge->gesture(Qt::TapAndHoldGesture)) {
                 if (tap->state() == Qt::GestureFinished) {
-                    emit customContextMenuRequested(mapFromGlobal(tap->hotSpot().toPoint()));
+                    QPoint pos = mapFromGlobal(tap->hotSpot().toPoint());
+                    QTimer::singleShot(0, this, [this, pos]() {
+                        emit customContextMenuRequested(pos);
+                    });
                 }
                 handled = true;
             }
