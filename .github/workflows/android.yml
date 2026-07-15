@@ -29,10 +29,16 @@ jobs:
     - name: Accept Android licenses
       run: yes | sdkmanager --licenses || true
 
-    - name: Install Qt
+    - name: Install Qt Host Tools
       uses: jurplel/install-qt-action@v3
       with:
-        version: '6.5.3'
+        version: '6.4.3'
+        target: 'desktop'
+
+    - name: Install Qt Android
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: '6.4.3'
         target: 'android'
         arch: 'android_armv8'
 
