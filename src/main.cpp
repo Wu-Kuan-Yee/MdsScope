@@ -534,7 +534,7 @@ private:
 QDir runtimeRootDir()
 {
 #ifdef Q_OS_ANDROID
-    return QDir(QStringLiteral("assets:/"));
+    return QDir(QStringLiteral(":/"));
 #endif
     auto runtimeResourceRootPath = [](const QDir& base) -> QString {
         if (base.exists("environment")) {

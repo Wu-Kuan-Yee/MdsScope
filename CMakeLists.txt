@@ -157,37 +157,24 @@ set_target_properties(transfer PROPERTIES AUTOMOC OFF)
 endif()
 set_target_properties(MdsScope PROPERTIES WIN32_EXECUTABLE TRUE)
 
-if(APPLE)
-    file(GLOB MDS_SCOPE_SOURCE_INDEX_SIGNALS CONFIGURE_DEPENDS
+    file(GLOB MDS_SCOPE_SOURCE_INDEX_SIGNALS RELATIVE "${PROJECT_SOURCE_DIR}" CONFIGURE_DEPENDS
         "${PROJECT_SOURCE_DIR}/resources/source_index/signals/*.txt"
     )
+    qt_add_resources(MdsScope "app_resources"
+        PREFIX "/"
+        FILES
+            resources/APIurl
+            resources/environment/init.toml
+            resources/environment/init.webscp
+            resources/source_index/trees.txt
+            ${MDS_SCOPE_SOURCE_INDEX_SIGNALS}
+    )
+
+if(APPLE)
     set(MDS_SCOPE_MACOS_ICON "${PROJECT_SOURCE_DIR}/packaging/macos/mdsscope.icns")
-    set(MDS_SCOPE_MACOS_ENVIRONMENT_FILES
-        "${PROJECT_SOURCE_DIR}/resources/environment/init.toml"
-        "${PROJECT_SOURCE_DIR}/resources/environment/init.webscp"
-    )
-    set(MDS_SCOPE_MACOS_RESOURCE_FILES
-        "${MDS_SCOPE_MACOS_ICON}"
-        "${PROJECT_SOURCE_DIR}/resources/APIurl"
-        "${PROJECT_SOURCE_DIR}/resources/source_index/trees.txt"
-        ${MDS_SCOPE_MACOS_ENVIRONMENT_FILES}
-        ${MDS_SCOPE_SOURCE_INDEX_SIGNALS}
-    )
-    target_sources(MdsScope PRIVATE ${MDS_SCOPE_MACOS_RESOURCE_FILES})
+    target_sources(MdsScope PRIVATE "${MDS_SCOPE_MACOS_ICON}")
     set_source_files_properties("${MDS_SCOPE_MACOS_ICON}" PROPERTIES
         MACOSX_PACKAGE_LOCATION "Resources"
-    )
-    set_source_files_properties("${PROJECT_SOURCE_DIR}/resources/APIurl" PROPERTIES
-        MACOSX_PACKAGE_LOCATION "Resources"
-    )
-    set_source_files_properties("${PROJECT_SOURCE_DIR}/resources/source_index/trees.txt" PROPERTIES
-        MACOSX_PACKAGE_LOCATION "Resources/source_index"
-    )
-    set_source_files_properties(${MDS_SCOPE_MACOS_ENVIRONMENT_FILES} PROPERTIES
-        MACOSX_PACKAGE_LOCATION "Resources/environment"
-    )
-    set_source_files_properties(${MDS_SCOPE_SOURCE_INDEX_SIGNALS} PROPERTIES
-        MACOSX_PACKAGE_LOCATION "Resources/source_index/signals"
     )
     if(NOT IOS)
     set_target_properties(MdsScope PROPERTIES
