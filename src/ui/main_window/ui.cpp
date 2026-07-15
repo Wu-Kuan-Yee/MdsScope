@@ -165,36 +165,44 @@ void MainWindow::buildUi()
     statusLabel_->setStyleSheet("color: palette(highlight);");
 
     toolbar->addSeparator();
+#ifdef Q_OS_ANDROID
+    addToolBarBreak(Qt::TopToolBarArea);
+    auto* topControls = addToolBar("Info");
+    topControls->setMovable(false);
+    topControls->setContextMenuPolicy(Qt::PreventContextMenu);
+    topControls->setStyleSheet(
+        "QPushButton { padding: 1px 8px; min-height: 18px; }"
+        "QLineEdit, QComboBox { min-height: 18px; padding: 0px 2px; }"
+        "QLabel { margin-left: 2px; margin-right: 2px; }"
+    );
+#else
     auto* topControls = new QWidget(toolbar);
     topControls->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     auto* topLayout = new QHBoxLayout(topControls);
     topLayout->setContentsMargins(2, 0, 2, 0);
     topLayout->setSpacing(3);
     topControls->setStyleSheet(
-        "QPushButton {"
-        "  padding: 1px 8px;"
-        "  min-height: 18px;"
-        "}"
-        "QLineEdit, QComboBox {"
-        "  min-height: 18px;"
-        "  padding: 0px 2px;"
-        "}"
+        "QPushButton { padding: 1px 8px; min-height: 18px; }"
+        "QLineEdit, QComboBox { min-height: 18px; padding: 0px 2px; }"
         "QLabel { margin-left: 2px; margin-right: 2px; }"
-        "QToolButton#aboutButton {"
-        "  border: 1px solid transparent;"
-        "  border-radius: 15px;"
-        "  background: transparent;"
-        "  padding: 0px;"
-        "  margin-left: 8px;"
-        "}");
+    );
+#endif
+#ifdef Q_OS_ANDROID
+    topControls->addWidget(new QLabel("Rate", topControls));
+#else
     topLayout->addWidget(new QLabel("Rate", topControls));
+#endif
     dataModeCombo_ = new QComboBox(topControls);
     dataModeCombo_->addItem("Thin", static_cast<int>(DataReadMode::Thin));
     dataModeCombo_->addItem("Medium", static_cast<int>(DataReadMode::Medium));
     dataModeCombo_->addItem("Full", static_cast<int>(DataReadMode::Full));
     dataModeCombo_->setCurrentIndex(0);
+#ifndef Q_OS_ANDROID
     dataModeCombo_->setFixedWidth(90);
     topLayout->addWidget(dataModeCombo_);
+#else
+    topControls->addWidget(dataModeCombo_);
+#endif
 
     topInfoLabel_ = new QLabel("Shot: --", topControls);
     ipInfoLabel_ = new QLabel("Ip: --", topControls);
@@ -203,36 +211,55 @@ void MainWindow::buildUi()
     timeInfoLabel_ = new QLabel("Time: --", topControls);
     for (QLabel* label : {topInfoLabel_, ipInfoLabel_, pulseInfoLabel_, itInfoLabel_, timeInfoLabel_}) {
         label->setStyleSheet("color: palette(highlight);");
+#ifdef Q_OS_ANDROID
+        topControls->addWidget(label);
+#else
         topLayout->addWidget(label);
+#endif
     }
+    
+#ifdef Q_OS_ANDROID
+    auto* spacer = new QWidget(topControls);
+    spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    topControls->addWidget(spacer);
+    topControls->addWidget(new ThemeModeButton(topControls));
+#else
     topLayout->addStretch(1);
     topLayout->addWidget(new ThemeModeButton(topControls));
+#endif
+    
     aboutButton_ = new QToolButton(topControls);
     aboutButton_->setObjectName("aboutButton");
     aboutButton_->setIcon(infoIcon());
     aboutButton_->setIconSize(QSize(28, 28));
     aboutButton_->setFixedSize(34, 34);
     aboutButton_->setToolTip("About MdsScope");
+    aboutButton_->setStyleSheet(
+        "QToolButton#aboutButton {"
+        "  border: 1px solid transparent;"
+        "  border-radius: 15px;"
+        "  background: transparent;"
+        "  padding: 0px;"
+        "  margin-left: 8px;"
+        "}");
+#ifdef Q_OS_ANDROID
+    topControls->addWidget(aboutButton_);
+#else
     topLayout->addWidget(aboutButton_);
     toolbar->addWidget(topControls);
+#endif
 
-    auto* bottom = new QWidget(this);
-    auto* bottomLayout = new QHBoxLayout(bottom);
-    bottomLayout->setContentsMargins(4, 1, 4, 1);
-    bottomLayout->setSpacing(5);
-    bottom->setMaximumHeight(34);
-    bottom->setStyleSheet(
-        "QPushButton {"
-        "  padding: 1px 8px;"
-        "  min-height: 18px;"
-        "}"
-        "QLineEdit, QComboBox {"
-        "  min-height: 18px;"
-        "  padding: 0px 2px;"
-        "}"
-        "QToolButton { margin: 0px; padding: 1px; min-width: 30px; min-height: 28px; }");
-    zoomButton_ = new QToolButton(bottom);
-    pointButton_ = new QToolButton(bottom);
+    auto* bottomToolBar = addToolBar("Controls");
+    addToolBar(Qt::BottomToolBarArea, bottomToolBar);
+    bottomToolBar->setMovable(false);
+    bottomToolBar->setContextMenuPolicy(Qt::PreventContextMenu);
+    bottomToolBar->setStyleSheet(
+        "QPushButton { padding: 1px 8px; min-height: 18px; }"
+        "QLineEdit, QComboBox { min-height: 18px; padding: 0px 2px; }"
+        "QToolButton { margin: 0px; padding: 1px; min-width: 30px; min-height: 28px; }"
+    );
+    zoomButton_ = new QToolButton(bottomToolBar);
+    pointButton_ = new QToolButton(bottomToolBar);
     for (QToolButton* button : {zoomButton_, pointButton_}) {
         button->setCheckable(true);
         button->setAutoExclusive(true);
@@ -242,49 +269,80 @@ void MainWindow::buildUi()
     zoomButton_->setToolTip("Zoom / Move (Ctrl+Z): drag to zoom, middle-drag or Shift-drag to move");
     pointButton_->setToolTip("Point (Ctrl+P): click to activate, Esc to exit");
     pointButton_->setChecked(true);
-    bottomLayout->addWidget(zoomButton_);
-    bottomLayout->addWidget(pointButton_);
-    bottomLayout->addWidget(new QLabel("Shot", bottom));
-    shotCombo_ = new QComboBox(bottom);
+    bottomToolBar->addWidget(zoomButton_);
+    bottomToolBar->addWidget(pointButton_);
+    bottomToolBar->addWidget(new QLabel("Shot", bottomToolBar));
+    shotCombo_ = new QComboBox(bottomToolBar);
     shotCombo_->setEditable(true);
     shotCombo_->setInsertPolicy(QComboBox::NoInsert);
     shotCombo_->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
     shotCombo_->setMaxVisibleItems(10);
     shotCombo_->view()->setTextElideMode(Qt::ElideMiddle);
+#ifdef Q_OS_ANDROID
+    shotCombo_->view()->setMinimumWidth(180);
+    shotCombo_->view()->setMaximumWidth(280);
+#else
     shotCombo_->view()->setMinimumWidth(260);
     shotCombo_->view()->setMaximumWidth(520);
+#endif
     shotEdit_ = shotCombo_->lineEdit();
     refreshShotHistory();
     auto resizeShotEdit = [this] {
         if (!shotEdit_ || !shotCombo_) {
             return;
         }
+#ifndef Q_OS_ANDROID
         const QFontMetrics fm(shotEdit_->font());
         const int textWidth = fm.horizontalAdvance(shotEdit_->text().trimmed().isEmpty()
                                                        ? QStringLiteral("143850-143858")
                                                        : shotEdit_->text().trimmed());
         shotCombo_->setFixedWidth(std::clamp(textWidth + 52, 120, 620));
+#endif
     };
     resizeShotEdit();
-    bottomLayout->addWidget(shotCombo_);
-    auto* apply = new QPushButton("Apply", bottom);
-    auto* prev = new QPushButton("Prev", bottom);
-    auto* next = new QPushButton("Next", bottom);
-    auto* stop = new QPushButton("Stop", bottom);
-    auto* latest = new QPushButton("Latest", bottom);
+    bottomToolBar->addWidget(shotCombo_);
+
+#ifdef Q_OS_ANDROID
+    addToolBarBreak(Qt::BottomToolBarArea);
+    auto* bottomToolBar2 = addToolBar("Controls Actions");
+    addToolBar(Qt::BottomToolBarArea, bottomToolBar2);
+    bottomToolBar2->setMovable(false);
+    bottomToolBar2->setContextMenuPolicy(Qt::PreventContextMenu);
+    bottomToolBar2->setStyleSheet(
+        "QPushButton { padding: 1px 8px; min-height: 18px; }"
+    );
+#else
+    auto* bottomToolBar2 = bottomToolBar;
+#endif
+
+    auto* apply = new QPushButton("Apply", bottomToolBar2);
+    auto* prev = new QPushButton("Prev", bottomToolBar2);
+    auto* next = new QPushButton("Next", bottomToolBar2);
+    auto* stop = new QPushButton("Stop", bottomToolBar2);
+    auto* latest = new QPushButton("Latest", bottomToolBar2);
     stopButton_ = stop;
-    // Fix the width to the wider "Continue" label (plus padding) so toggling
-    // the text never clips it or shifts the buttons to its right.
     stop->setText("Continue");
+#ifndef Q_OS_ANDROID
     stop->setFixedWidth(stop->sizeHint().width() + 16);
+#endif
     stop->setText("Stop");
-    bottomLayout->addWidget(apply);
-    bottomLayout->addWidget(prev);
-    bottomLayout->addWidget(next);
-    bottomLayout->addWidget(stop);
-    bottomLayout->addWidget(latest);
-    bottomLayout->addWidget(statusLabel_, 1);
-    statusBar()->addWidget(bottom, 1);
+    bottomToolBar2->addWidget(apply);
+    bottomToolBar2->addWidget(prev);
+    bottomToolBar2->addWidget(next);
+    bottomToolBar2->addWidget(stop);
+    bottomToolBar2->addWidget(latest);
+    
+#ifdef Q_OS_ANDROID
+    addToolBarBreak(Qt::BottomToolBarArea);
+    auto* bottomToolBar3 = addToolBar("Controls Status");
+    addToolBar(Qt::BottomToolBarArea, bottomToolBar3);
+    bottomToolBar3->setMovable(false);
+    bottomToolBar3->setContextMenuPolicy(Qt::PreventContextMenu);
+#else
+    auto* bottomToolBar3 = bottomToolBar;
+#endif
+    
+    bottomToolBar3->addWidget(statusLabel_);
     setInteractionMode(InteractionMode::Point);
 
     connect(zoomButton_, &QToolButton::clicked, this, [this] { setInteractionMode(InteractionMode::Zoom); });
