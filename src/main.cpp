@@ -310,7 +310,7 @@ private slots:
 #endif
 
 private:
-#if defined(Q_OS_LINUX) || defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+#if defined(Q_OS_LINUX) || ((defined(Q_OS_MACOS) || defined(Q_OS_MAC)) && !defined(Q_OS_IOS))
     static QString processOutput(const QString& program, const QStringList& arguments)
     {
         QProcess process;
@@ -457,7 +457,7 @@ private:
     }
 #endif
 
-#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+#if (defined(Q_OS_MACOS) || defined(Q_OS_MAC)) && !defined(Q_OS_IOS)
     static uint readMacColorScheme()
     {
         const QString output = processOutput(QStringLiteral("defaults"),
@@ -484,7 +484,7 @@ private:
         }
 #ifdef Q_OS_LINUX
         return readFallbackColorScheme();
-#elif defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+#elif (defined(Q_OS_MACOS) || defined(Q_OS_MAC)) && !defined(Q_OS_IOS)
         return readMacColorScheme();
 #elif defined(Q_OS_WIN)
         return readWindowsColorScheme();
@@ -498,7 +498,7 @@ private:
 #ifdef Q_OS_LINUX
         uint scheme = readPortalColorScheme();
         return scheme != 0 ? scheme : readFallbackColorScheme();
-#elif defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+#elif (defined(Q_OS_MACOS) || defined(Q_OS_MAC)) && !defined(Q_OS_IOS)
         return readMacColorScheme();
 #elif defined(Q_OS_WIN)
         return readWindowsColorScheme();
@@ -545,7 +545,7 @@ QDir runtimeRootDir()
     };
 
     QDir dir(QCoreApplication::applicationDirPath());
-#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+#if (defined(Q_OS_MACOS) || defined(Q_OS_MAC)) && !defined(Q_OS_IOS)
     QDir bundleResources(dir);
     if (bundleResources.cdUp() && bundleResources.cd("Resources")) {
         const QString resourceRoot = runtimeResourceRootPath(bundleResources);
