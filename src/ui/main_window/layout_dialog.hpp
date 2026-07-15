@@ -464,18 +464,25 @@ public:
 
         auto* side = new QWidget(this);
 #ifdef Q_OS_ANDROID
-        auto* sideLayout = new QHBoxLayout(side);
+        auto* sideLayout = new QVBoxLayout(side);
+        
+        auto* row1 = new QHBoxLayout;
         auto* addPanelButton = new QPushButton("Add", side);
         auto* deleteButton = new QPushButton("Delete", side);
         auto* resetButton = new QPushButton("Reset", side);
+        row1->addWidget(addPanelButton);
+        row1->addWidget(deleteButton);
+        row1->addWidget(resetButton);
+        
+        auto* row2 = new QHBoxLayout;
         auto* applyButton = new QPushButton("Apply", side);
         auto* cancelButton = new QPushButton("Cancel", side);
-        sideLayout->addWidget(addPanelButton);
-        sideLayout->addWidget(deleteButton);
-        sideLayout->addWidget(resetButton);
-        sideLayout->addStretch(1);
-        sideLayout->addWidget(applyButton);
-        sideLayout->addWidget(cancelButton);
+        row2->addStretch(1);
+        row2->addWidget(applyButton);
+        row2->addWidget(cancelButton);
+        
+        sideLayout->addLayout(row1);
+        sideLayout->addLayout(row2);
 #else
         auto* sideLayout = new QVBoxLayout(side);
         auto* addPanelButton = new QPushButton("Add new panel", side);

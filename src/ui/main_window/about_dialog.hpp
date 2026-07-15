@@ -295,9 +295,8 @@ public:
         const QFont baseFont(fonts.family, fonts.uiSize);
         const QFontMetrics baseMetrics(baseFont);
         setFont(baseFont);
-#ifdef Q_OS_ANDROID
+#ifndef Q_OS_ANDROID
         setMinimumWidth(280);
-#else
         setFixedWidth(std::max(620, baseMetrics.horizontalAdvance(QStringLiteral("Git Version 3.0.r000.g000000000.dirty")) + 210));
 #endif
         QFont titleFont = baseFont;
@@ -353,7 +352,9 @@ public:
         subtitle->setFont(baseFont);
         subtitle->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
         subtitle->setWordWrap(true);
+#ifndef Q_OS_ANDROID
         subtitle->setMinimumWidth(230);
+#endif
         headerLayout->addStretch(1);
         headerLayout->addWidget(subtitle, 1);
         layout->addWidget(header);
@@ -384,7 +385,9 @@ public:
             valueLabel->setTextFormat(rich ? Qt::RichText : Qt::PlainText);
             valueLabel->setWordWrap(true);
 #ifndef Q_OS_ANDROID
+#ifndef Q_OS_ANDROID
             valueLabel->setMinimumWidth(300);
+#endif
 #endif
             if (rich) {
                 connect(valueLabel, &QLabel::linkActivated, valueLabel, [](const QString& url) {
