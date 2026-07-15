@@ -415,26 +415,28 @@ void MainWindow::showPanelContextMenu(PlotWidget* plot, int column, int row, con
     QAction* sameYAction = menu->addAction("All Same Y Scale");
 
     connect(menu, &QMenu::triggered, this, [=](QAction* chosen) {
-        if (chosen == maxAction) {
-            maximizeCurrentPanel();
-        } else if (chosen == showAllAction) {
-            showAllPanels();
-        } else if (chosen == panelSetupAction) {
-            panelSetupForCurrentPanel();
-        } else if (chosen == dataSourceAction) {
-            dataSourceSetupForCurrentPanel();
-        } else if (chosen == exportDataAction) {
-            exportCurrentPanelData();
-        } else if (chosen == resetCurrentAction) {
-            resetCurrentScale();
-        } else if (chosen == resetAllAction) {
-            resetScales();
-        } else if (chosen == sameXAction) {
-            applyScaleToAll();
-        } else if (chosen == sameYAction) {
-            applyYScaleToAll();
-        }
-    }, Qt::QueuedConnection);
+        QTimer::singleShot(150, this, [=]() {
+            if (chosen == maxAction) {
+                maximizeCurrentPanel();
+            } else if (chosen == showAllAction) {
+                showAllPanels();
+            } else if (chosen == panelSetupAction) {
+                panelSetupForCurrentPanel();
+            } else if (chosen == dataSourceAction) {
+                dataSourceSetupForCurrentPanel();
+            } else if (chosen == exportDataAction) {
+                exportCurrentPanelData();
+            } else if (chosen == resetCurrentAction) {
+                resetCurrentScale();
+            } else if (chosen == resetAllAction) {
+                resetScales();
+            } else if (chosen == sameXAction) {
+                applyScaleToAll();
+            } else if (chosen == sameYAction) {
+                applyYScaleToAll();
+            }
+        });
+    });
 
     connect(menu, &QMenu::aboutToHide, menu, &QObject::deleteLater);
     menu->popup(plot->mapToGlobal(pos));
