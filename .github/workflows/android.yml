@@ -29,7 +29,8 @@ jobs:
     - name: Accept Android licenses and fix SDK versions
       run: |
         yes | sdkmanager --licenses || true
-        sdkmanager --uninstall "platforms;android-36" "platforms;android-35" "platforms;android-VanillaIceCream" || true
+        rm -rf $ANDROID_HOME/platforms/android-36* $ANDROID_HOME/platforms/android-35* || true
+        sdkmanager --uninstall "platforms;android-36-ext19" "platforms;android-36" || true
 
     - name: Install Qt Host Tools
       uses: jurplel/install-qt-action@v3
