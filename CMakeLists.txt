@@ -69,7 +69,7 @@ set(CMAKE_AUTOMOC ON)
 include(GNUInstallDirs)
 
 find_package(Qt6 6.4 REQUIRED COMPONENTS Core Widgets Network Concurrent)
-if(UNIX AND NOT APPLE)
+if(UNIX AND NOT APPLE AND NOT ANDROID)
     find_package(Qt6 6.4 REQUIRED COMPONENTS DBus)
 endif()
 
@@ -139,6 +139,7 @@ add_executable(MdsScope
     src/ui/plot/helpers.hpp
 )
 
+if(NOT ANDROID AND NOT IOS)
 add_executable(transfer
     src/transfer.cpp
     src/core/api_auth.cpp
@@ -153,6 +154,7 @@ add_executable(transfer
 )
 
 set_target_properties(transfer PROPERTIES AUTOMOC OFF)
+endif()
 set_target_properties(MdsScope PROPERTIES WIN32_EXECUTABLE TRUE)
 
 if(APPLE)
@@ -187,6 +189,7 @@ if(APPLE)
     set_source_files_properties(${MDS_SCOPE_SOURCE_INDEX_SIGNALS} PROPERTIES
         MACOSX_PACKAGE_LOCATION "Resources/source_index/signals"
     )
+    if(NOT IOS)
     set_target_properties(MdsScope PROPERTIES
         MACOSX_BUNDLE TRUE
         MACOSX_BUNDLE_BUNDLE_NAME "MdsScope"
@@ -196,6 +199,7 @@ if(APPLE)
         MACOSX_BUNDLE_BUNDLE_VERSION "${MDS_SCOPE_GIT_VERSION}"
         MACOSX_BUNDLE_COPYRIGHT "Copyright 2026 Weikang Wang"
     )
+    endif()
 endif()
 
 target_include_directories(MdsScope PRIVATE
@@ -206,11 +210,49 @@ target_include_directories(MdsScope PRIVATE
     src/ssh
 )
 
+
+# ─── Android deployment ────────────────────────────────────────────────────
+if(ANDROID)
+    set_target_properties(MdsScope PROPERTIES
+        QT_ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/packaging/android"
+        QT_ANDROID_MIN_SDK_VERSION 26
+        QT_ANDROID_TARGET_SDK_VERSION 34
+    )
+    target_sources(MdsScope PRIVATE
+        packaging/android/AndroidManifest.xml
+        packaging/android/res/values/strings.xml
+        packaging/android/res/values/styles.xml
+        packaging/android/res/xml/network_security_config.xml
+    )
+    set_target_properties(MdsScope PROPERTIES QT_ANDROID_EXTRA_LIBS "")
+endif()
+
+# ─── iOS deployment ────────────────────────────────────────────────────────
+if(IOS)
+    set_target_properties(MdsScope PROPERTIES
+        MACOSX_BUNDLE TRUE
+        MACOSX_BUNDLE_GUI_IDENTIFIER "org.mdsscope.MdsScope"
+        MACOSX_BUNDLE_BUNDLE_NAME "MdsScope"
+        MACOSX_BUNDLE_BUNDLE_VERSION "${MDS_SCOPE_GIT_VERSION}"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+        XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "org.mdsscope.MdsScope"
+        XCODE_ATTRIBUTE_INFOPLIST_FILE "${CMAKE_CURRENT_SOURCE_DIR}/packaging/ios/Info.plist"
+        XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "14.0"
+        XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
+        XCODE_ATTRIBUTE_SUPPORTED_PLATFORMS "iphoneos iphonesimulator"
+        XCODE_ATTRIBUTE_CODE_SIGN_STYLE "Automatic"
+        XCODE_ATTRIBUTE_ENABLE_BITCODE "NO"
+    )
+    target_sources(MdsScope PRIVATE packaging/ios/LaunchScreen.storyboard)
+    set_source_files_properties(packaging/ios/LaunchScreen.storyboard PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
+endif()
+
 target_compile_definitions(MdsScope PRIVATE
     MDSSCOPE_VERSION="${PROJECT_VERSION}"
     MDSSCOPE_GIT_VERSION="${MDS_SCOPE_GIT_VERSION}"
 )
 
+if(NOT ANDROID AND NOT IOS)
 target_include_directories(transfer PRIVATE
     src
     src/core
@@ -218,6 +260,7 @@ target_include_directories(transfer PRIVATE
     src/ui
     src/ssh
 )
+endif()
 
 target_link_libraries(MdsScope PRIVATE
     Qt6::Core
@@ -226,16 +269,20 @@ target_link_libraries(MdsScope PRIVATE
     Qt6::Concurrent
 )
 
+if(NOT ANDROID AND NOT IOS)
 target_link_libraries(transfer PRIVATE
     Qt6::Core
     Qt6::Widgets
     Qt6::Network
     Qt6::Concurrent
 )
+endif()
 
-if(UNIX AND NOT APPLE)
+if(UNIX AND NOT APPLE AND NOT ANDROID)
     target_link_libraries(MdsScope PRIVATE Qt6::DBus)
-    target_link_libraries(transfer PRIVATE Qt6::DBus)
+    if(NOT ANDROID AND NOT IOS)
+        target_link_libraries(transfer PRIVATE Qt6::DBus)
+    endif()
 endif()
 
 if(APPLE)
@@ -248,10 +295,12 @@ if(APPLE)
         RENAME MdsScope
         COMPONENT tools
     )
+    if(TARGET transfer)
     install(TARGETS transfer
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
         COMPONENT tools
     )
+    endif()
 
     install(FILES
         "${PROJECT_SOURCE_DIR}/resources/environment/init.toml"
@@ -279,10 +328,13 @@ if(APPLE)
         FILES_MATCHING PATTERN "*.txt"
     )
 else()
-    install(TARGETS MdsScope transfer
+    install(TARGETS MdsScope
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
         BUNDLE DESTINATION .
     )
+    if(TARGET transfer)
+        install(TARGETS transfer RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    endif()
 
     install(FILES
         "${PROJECT_SOURCE_DIR}/resources/environment/init.toml"
@@ -319,6 +371,7 @@ else()
     )
 endif()
 
+if(NOT ANDROID AND NOT IOS)
 set(CPACK_PACKAGE_NAME "mdsscope")
 set(CPACK_PACKAGE_VENDOR "MdsScope")
 set(CPACK_PACKAGE_CONTACT "MdsScope Maintainers")
@@ -335,3 +388,4 @@ set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
 set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
 
 include(CPack)
+endif()

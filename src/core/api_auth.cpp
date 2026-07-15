@@ -87,7 +87,7 @@ QByteArray localAuthKey()
     material += qgetenv("COMPUTERNAME");
     material += '|';
     material += qgetenv("USERNAME");
-#elif defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+#elif (defined(Q_OS_MACOS) || defined(Q_OS_MAC)) && !defined(Q_OS_IOS)
     material += QSysInfo::machineUniqueId();
     material += '|';
     material += QSysInfo::machineHostName().toUtf8();
