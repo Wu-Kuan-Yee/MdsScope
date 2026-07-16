@@ -124,7 +124,9 @@ SshSettings SshDialog::currentSettings() const
 bool SshDialog::validateSettings(const SshSettings& settings)
 {
     if (settings.mode != SshMode::Disabled && settings.host.isEmpty()) {
-        QMessageBox::warning(this, QStringLiteral("SSH Remote Access"), QStringLiteral("Enter an SSH host or disable SSH."));
+        statusLabel_->setStyleSheet("color: red;");
+        statusLabel_->setText("Enter an SSH host or disable SSH.");
+        statusLabel_->show();
         hostEdit_->setFocus();
         return false;
     }
@@ -137,7 +139,9 @@ bool SshDialog::validateSettings(const SshSettings& settings)
         }
         const QFileInfo info(identity);
         if (!info.isFile() || !info.isReadable()) {
-            QMessageBox::warning(this, QStringLiteral("SSH Remote Access"), QStringLiteral("The selected identity file is not readable."));
+            statusLabel_->setStyleSheet("color: red;");
+            statusLabel_->setText("The selected identity file is not readable.");
+            statusLabel_->show();
             identityEdit_->setFocus();
             return false;
         }
@@ -151,7 +155,9 @@ bool SshDialog::saveSettings(const SshSettings& settings)
     loadCachedAuth(&auth);
     auth.ssh = settings;
     if (!saveCachedAuth(auth)) {
-        QMessageBox::warning(this, QStringLiteral("SSH Remote Access"), QStringLiteral("Could not save the encrypted SSH settings."));
+        statusLabel_->setStyleSheet("color: red;");
+        statusLabel_->setText("Could not save the encrypted SSH settings.");
+        statusLabel_->show();
         return false;
     }
     manager_->disconnectAll();

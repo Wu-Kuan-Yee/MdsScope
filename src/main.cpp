@@ -629,7 +629,6 @@ bool ensureApiLoginBeforeMain(const QString& rootPath)
     LoginDialog dialog(rootPath, nullptr, api);
     dialog.setWindowIcon(appIcon());
     
-    QApplication::setQuitOnLastWindowClosed(false);
     const bool accepted = dialog.exec() == QDialog::Accepted;
     
     return accepted;
@@ -752,7 +751,6 @@ int main(int argc, char* argv[])
         window.resize(1440, 920);
         qDebug() << "Showing MainWindow";
         window.show();
-        QApplication::setQuitOnLastWindowClosed(true);
         qDebug() << "Entering app.exec()";
         code = app.exec();
         qDebug() << "Exited app.exec() with code" << code;

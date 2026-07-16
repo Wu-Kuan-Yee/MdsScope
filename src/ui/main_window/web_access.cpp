@@ -63,7 +63,7 @@ void MainWindow::openInternalWebPage(const QString& source)
     };
 
     if (!prepareUrl(source)) {
-        QMessageBox::warning(this,
+        showSafeWarning(this,
                              QStringLiteral("Internal Web Access"),
                              error.isEmpty() ? QStringLiteral("Could not establish the SSH tunnel.") : error);
         setStatus(QStringLiteral("Internal web access failed"));
@@ -78,7 +78,7 @@ void MainWindow::openInternalWebPage(const QString& source)
                 break;
             }
             if (!prepareUrl(target)) {
-                QMessageBox::warning(this,
+                showSafeWarning(this,
                                      QStringLiteral("Internal Web Access"),
                                      error.isEmpty()
                                          ? QStringLiteral("Could not forward the redirected address.")
@@ -91,7 +91,7 @@ void MainWindow::openInternalWebPage(const QString& source)
     }
 
     if (!QDesktopServices::openUrl(QUrl(prepared))) {
-        QMessageBox::warning(this,
+        showSafeWarning(this,
                              QStringLiteral("Internal Web Access"),
                              QStringLiteral("Could not open the system default browser."));
         setStatus(QStringLiteral("Could not open the default browser"));

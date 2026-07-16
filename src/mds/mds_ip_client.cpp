@@ -319,9 +319,6 @@ QString MdsIpClient::serverHost(QString server)
     if (colon > 0) {
         server = server.left(colon);
     }
-    if (server.compare(QStringLiteral("mds.ipp.ac.cn"), Qt::CaseInsensitive) == 0) {
-        return QStringLiteral("202.127.204.12");
-    }
     return server;
 }
 

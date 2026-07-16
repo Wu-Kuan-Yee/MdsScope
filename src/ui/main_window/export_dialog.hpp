@@ -107,7 +107,14 @@ public:
 
         auto* exportButton = new QPushButton("Export", side);
         auto* cancel = new QPushButton("Cancel", side);
+        
+        auto* errorLabel = new QLabel(side);
+        errorLabel->setStyleSheet("color: red;");
+        errorLabel->setWordWrap(true);
+        errorLabel->hide();
+
         sideLayout->addStretch(1);
+        sideLayout->addWidget(errorLabel);
         sideLayout->addWidget(exportButton);
         sideLayout->addWidget(cancel);
         mainLayout->addWidget(side);
@@ -143,17 +150,21 @@ public:
         };
         connect(range_, &QComboBox::currentIndexChanged, this, updateCustomRangeEnabled);
         updateCustomRangeEnabled();
-        connect(exportButton, &QPushButton::clicked, this, [this] {
+        connect(exportButton, &QPushButton::clicked, this, [this, errorLabel] {
+            errorLabel->hide();
             if (signalMode_ ? selectedSignals().isEmpty() : selectedPanels().isEmpty()) {
-                QMessageBox::warning(this, "Export Data", signalMode_ ? "Select at least one signal." : "Select at least one panel.");
+                errorLabel->setText(signalMode_ ? "Select at least one signal." : "Select at least one panel.");
+                errorLabel->show();
                 return;
             }
             if (outputBaseDir().isEmpty()) {
-                QMessageBox::warning(this, "Export Data", "Choose an output directory.");
+                errorLabel->setText("Choose an output directory.");
+                errorLabel->show();
                 return;
             }
             if (exportRange() == ExportRange::CustomXRange && !customRangeValid()) {
-                QMessageBox::warning(this, "Export Data", "Enter a valid custom X range.");
+                errorLabel->setText("Enter a valid custom X range.");
+                errorLabel->show();
                 return;
             }
             accept();

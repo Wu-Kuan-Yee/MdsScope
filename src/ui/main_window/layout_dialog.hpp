@@ -47,6 +47,12 @@ public:
         buttons->addStretch(1);
         buttons->addWidget(ok);
         buttons->addWidget(cancel);
+
+        errorLabel_ = new QLabel(this);
+        errorLabel_->setStyleSheet("color: red;");
+        errorLabel_->setWordWrap(true);
+        errorLabel_->hide();
+        layout->addRow(errorLabel_);
         layout->addRow(buttons);
         connect(ok, &QPushButton::clicked, this, [this] {
             if (!validateRanges()) {
@@ -77,10 +83,12 @@ private:
         double value = qQNaN();
         for (QLineEdit* edit : {xmin_, xmax_, ymin_, ymax_}) {
             if (!optionalDoubleFromText(edit->text(), &value)) {
-                QMessageBox::warning(this, "Panel Setup", "Range values must be numeric or empty.");
+                errorLabel_->setText("Range values must be numeric or empty.");
+                errorLabel_->show();
                 return false;
             }
         }
+        errorLabel_->hide();
         return true;
     }
 
@@ -94,6 +102,7 @@ private:
     QLineEdit* xmax_ = nullptr;
     QLineEdit* ymin_ = nullptr;
     QLineEdit* ymax_ = nullptr;
+    QLabel* errorLabel_ = nullptr;
 };
 
 class LayoutCanvas final : public QWidget {

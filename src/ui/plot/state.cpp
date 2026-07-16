@@ -14,6 +14,7 @@ PlotWidget::PlotWidget(QWidget* parent)
     setAttribute(Qt::WA_AcceptTouchEvents);
     grabGesture(Qt::TapAndHoldGesture);
     grabGesture(Qt::PinchGesture);
+    grabGesture(Qt::PanGesture);
 }
 
 void PlotWidget::setSpec(PlotSpec spec)
