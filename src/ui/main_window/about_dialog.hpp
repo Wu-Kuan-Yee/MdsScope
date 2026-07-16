@@ -3,6 +3,7 @@
 
 #pragma once
 #include "base_dialog.hpp"
+#include "dialog_overlay.hpp"
 
 #include "shared.hpp"
 
@@ -277,8 +278,19 @@ inline QMessageBox* makeAboutMessageBox(QWidget* parent,
     message->setIcon(icon);
     message->setText(text);
     message->setInformativeText(informativeText);
+    message->setStandardButtons(QMessageBox::Ok);
     message->setStyleSheet(aboutMessageBoxStyleSheet());
     return message;
+}
+
+inline void showAboutMessageBox(QWidget* parent, QMessageBox* message)
+{
+#ifdef Q_OS_IOS
+    new DialogOverlayManager(qobject_cast<QMainWindow*>(parent->window()), message);
+#else
+    (void)parent;
+    message->open();
+#endif
 }
 
 class AboutDialog final : public BaseDialog {
@@ -484,7 +496,7 @@ private:
                                                 "Update",
                                                 "Could not check for updates.",
                                                 reply->errorString());
-            message->open();
+            showAboutMessageBox(this, message);
             return;
         }
 
@@ -497,7 +509,7 @@ private:
                                                 "Update",
                                                 "Could not check for updates.",
                                                 "GitHub returned an invalid release response.");
-            message->open();
+            showAboutMessageBox(this, message);
             return;
         }
 
@@ -513,7 +525,7 @@ private:
                                                 "Update",
                                                 "Could not compare release versions.",
                                                 QStringLiteral("Current: %1\nLatest: %2").arg(QStringLiteral(MDSSCOPE_VERSION), tagName));
-            message->open();
+            showAboutMessageBox(this, message);
             return;
         }
 
@@ -524,7 +536,7 @@ private:
                                                 "Update",
                                                 QStringLiteral("MdsScope %1 is up to date.").arg(QStringLiteral(MDSSCOPE_VERSION)),
                                                 {});
-            message->open();
+            showAboutMessageBox(this, message);
             return;
         }
 
@@ -534,6 +546,7 @@ private:
                                             "Update",
                                             QStringLiteral("MdsScope %1 is available.").arg(tagName),
                                             "Open the GitHub release page to download it?");
+        message->setStandardButtons(QMessageBox::NoButton);
         QPushButton* openRelease = message->addButton("Open Release", QMessageBox::AcceptRole);
         message->addButton(QMessageBox::Cancel);
         QObject::connect(message, &QMessageBox::finished, message, [message, openRelease, releaseUrl] {
@@ -541,7 +554,7 @@ private:
                 openExternalUrlQuietly(releaseUrl);
             }
         });
-        message->open();
+        showAboutMessageBox(this, message);
     }
 
     QNetworkAccessManager* networkManager_ = nullptr;

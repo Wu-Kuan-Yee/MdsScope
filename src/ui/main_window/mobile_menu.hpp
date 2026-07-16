@@ -20,7 +20,7 @@ public:
         mainLayout->setSpacing(0);
         
         auto* container = new QFrame(this);
-        container->setStyleSheet("QFrame { background: #ffffff; border: 1px solid #d1d5db; border-radius: 12px; }");
+        container->setStyleSheet("QFrame { background: palette(window); border: 1px solid palette(mid); border-radius: 12px; }");
         auto* layout = new QVBoxLayout(container);
         layout->setContentsMargins(8, 8, 8, 8);
         layout->setSpacing(4);
@@ -28,12 +28,12 @@ public:
         if (!title.isEmpty()) {
             auto* titleLabel = new QLabel(title, container);
             titleLabel->setAlignment(Qt::AlignCenter);
-            titleLabel->setStyleSheet("font-weight: bold; color: #6b7280; padding: 4px; border: none;");
+            titleLabel->setStyleSheet("font-weight: bold; color: palette(window-text); padding: 4px; border: none;");
             layout->addWidget(titleLabel);
             
             auto* line = new QFrame(container);
             line->setFrameShape(QFrame::HLine);
-            line->setStyleSheet("background: #e5e7eb; border: none; max-height: 1px;");
+            line->setStyleSheet("background: palette(mid); border: none; max-height: 1px;");
             layout->addWidget(line);
         }
         
@@ -57,8 +57,8 @@ public:
     void addAction(const QString& text, const std::function<void()>& slot) {
         auto* btn = new QPushButton(text, contentWidget_);
         btn->setStyleSheet(
-            "QPushButton { padding: 12px; font-size: 16px; border: none; background: transparent; color: #111827; text-align: center; }"
-            "QPushButton:pressed { background: #f3f4f6; border-radius: 6px; }"
+            "QPushButton { padding: 12px; font-size: 16px; border: none; background: transparent; color: palette(text); text-align: center; }"
+            "QPushButton:pressed { background: palette(highlight); border-radius: 6px; }"
         );
         connect(btn, &QPushButton::clicked, this, [this, slot]() {
             accept();
@@ -70,7 +70,7 @@ public:
     void addSeparator() {
         auto* line = new QFrame(contentWidget_);
         line->setFrameShape(QFrame::HLine);
-        line->setStyleSheet("background: #e5e7eb; border: none; max-height: 1px; margin: 4px 0px;");
+        line->setStyleSheet("background: palette(mid); border: none; max-height: 1px; margin: 4px 0px;");
         contentLayout_->addWidget(line);
     }
 

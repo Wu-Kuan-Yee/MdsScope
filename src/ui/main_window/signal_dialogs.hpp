@@ -3,8 +3,21 @@
 
 #pragma once
 #include "base_dialog.hpp"
-
 #include "shared.hpp"
+
+#include <QCheckBox>
+#include <QColorDialog>
+#include <QComboBox>
+#include <QCompleter>
+#include <QFormLayout>
+#include <QGridLayout>
+#include <QLabel>
+#include <QLineEdit>
+#include <QMenu>
+#include <QPushButton>
+#include <QScrollArea>
+#include <QStringListModel>
+#include <QVBoxLayout>
 
 class SignalDialog final : public BaseDialog {
 public:
@@ -102,7 +115,13 @@ public:
         rowsLayout_->addWidget(new QLabel("Hide", rowsHost_), 0, 5);
         rowsLayout_->addWidget(new QLabel("Data", rowsHost_), 0, 6);
         rowsLayout_->addWidget(new QLabel("", rowsHost_), 0, 7);
-        mainLayout->addWidget(rowsHost_);
+
+        auto* scrollArea = new QScrollArea(this);
+        scrollArea->setWidget(rowsHost_);
+        scrollArea->setWidgetResizable(true);
+        scrollArea->setFrameShape(QFrame::NoFrame);
+        scrollArea->setStyleSheet("QScrollArea { background: transparent; border: none; }");
+        mainLayout->addWidget(scrollArea);
 
         QString defaultTree;
         QString defaultServer;
