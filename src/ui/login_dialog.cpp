@@ -131,6 +131,14 @@ void LoginDialog::accept()
 {
     if (isClosing_) return;
     isClosing_ = true;
+    
+    apiEdit_->clearFocus();
+    userEdit_->clearFocus();
+    passwordEdit_->clearFocus();
+    if (auto* im = QGuiApplication::inputMethod()) {
+        im->hide();
+    }
+    
 #ifdef Q_OS_IOS
     QTimer::singleShot(600, this, [this]() { BaseDialog::accept(); });
 #else
@@ -142,6 +150,14 @@ void LoginDialog::reject()
 {
     if (isClosing_) return;
     isClosing_ = true;
+    
+    apiEdit_->clearFocus();
+    userEdit_->clearFocus();
+    passwordEdit_->clearFocus();
+    if (auto* im = QGuiApplication::inputMethod()) {
+        im->hide();
+    }
+
 #ifdef Q_OS_IOS
     QTimer::singleShot(600, this, [this]() { BaseDialog::reject(); });
 #else
@@ -154,6 +170,14 @@ void LoginDialog::tryLogin()
     if (loginInProgress_) {
         return;
     }
+    
+    apiEdit_->clearFocus();
+    userEdit_->clearFocus();
+    passwordEdit_->clearFocus();
+    if (auto* im = QGuiApplication::inputMethod()) {
+        im->hide();
+    }
+
     const QString api = apiEdit_->text().trimmed();
     const QString charset = properties_.value("Charset", "UTF-8");
 

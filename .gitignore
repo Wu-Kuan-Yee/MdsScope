@@ -6,3 +6,7 @@ resources/environment/*
 !resources/environment/init.webscp
 output/
 /release-note.md
+
+venv/
+aqt_venv/
+*.log

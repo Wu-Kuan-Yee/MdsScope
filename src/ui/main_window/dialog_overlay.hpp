@@ -4,18 +4,20 @@
 #include <QEvent>
 #include <QResizeEvent>
 #include <QObject>
-#include <QMainWindow>
+#include <QPointer>
+#include <QTimer>
 
 class DialogOverlayManager : public QObject {
 public:
-    QWidget* overlay;
-    QWidget* dialog;
+    QPointer<QWidget> overlay;
+    QPointer<QWidget> dialog;
 
     template <typename T>
     DialogOverlayManager(QMainWindow* mainWindow, T* d) 
         : QObject(mainWindow), dialog(d) 
     {
         overlay = new QWidget(mainWindow);
+        overlay->setAttribute(Qt::WA_StyledBackground, true);
         overlay->setStyleSheet("background-color: rgba(0, 0, 0, 150);");
         overlay->setGeometry(mainWindow->rect());
         overlay->raise();
@@ -23,18 +25,23 @@ public:
 
         dialog->setParent(overlay);
         dialog->setWindowFlags(Qt::Widget);
+        dialog->setAttribute(Qt::WA_StyledBackground, true);
         
         dialog->setObjectName("dialogOverlayTarget");
         QString shadow = "#dialogOverlayTarget { border: 1px solid #475569; border-radius: 8px; }";
         dialog->setStyleSheet(dialog->styleSheet() + shadow);
 
+        dialog->adjustSize();
         centerDialog();
         dialog->show();
 
         mainWindow->installEventFilter(this);
         connect(d, &T::finished, this, [this]() {
-            overlay->deleteLater();
-            this->deleteLater();
+            if (overlay) {
+                overlay->hide();
+                // QTimer::singleShot(2000, overlay, &QObject::deleteLater);
+            }
+            // QTimer::singleShot(2000, this, &QObject::deleteLater);
         });
     }
 
@@ -48,8 +55,10 @@ public:
     bool eventFilter(QObject* obj, QEvent* event) override {
         if (event->type() == QEvent::Resize) {
             if (auto* w = qobject_cast<QWidget*>(obj)) {
-                overlay->setGeometry(w->rect());
-                centerDialog();
+                if (overlay) {
+                    overlay->setGeometry(w->rect());
+                    centerDialog();
+                }
             }
         }
         return QObject::eventFilter(obj, event);
