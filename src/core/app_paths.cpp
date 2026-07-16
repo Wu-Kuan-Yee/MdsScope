@@ -69,7 +69,9 @@ static void copyFileIfMissing(const QString& source, const QString& target)
         return;
     }
     QDir().mkpath(QFileInfo(target).absolutePath());
-    QFile::copy(source, target);
+    if (QFile::copy(source, target)) {
+        QFile::setPermissions(target, QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ReadUser | QFileDevice::WriteUser);
+    }
 }
 
 static QString sourceIndexFileName(QString tree)
@@ -196,6 +198,14 @@ QString appEnvironmentDir(const QString& rootPath)
             copyFileIfMissing(file.absoluteFilePath(), userDir.filePath(file.fileName()));
         }
     }
+    
+    const auto allConfigs = userDir.entryInfoList({"*.toml", "*.webscp"}, QDir::Files, QDir::Name);
+    for (const QFileInfo& file : allConfigs) {
+        if (!file.isWritable()) {
+            QFile::setPermissions(file.absoluteFilePath(), file.permissions() | QFileDevice::WriteOwner | QFileDevice::WriteUser);
+        }
+    }
+
     return userEnvironment;
 }
 
