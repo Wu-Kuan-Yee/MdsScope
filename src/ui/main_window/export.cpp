@@ -13,11 +13,7 @@ void MainWindow::openExportDataDialog()
 {
     QSettings settings(uiSettingsPath(rootPath_), QSettings::IniFormat);
     const ExportFormat defaultFormat = exportFormatFromSetting(settings.value("export/format", "text").toString());
-#ifdef Q_OS_IOS
-    auto* dialog = new ExportDataDialog(config_, exportBasePath_, defaultFormat, nullptr);
-#else
     auto* dialog = new ExportDataDialog(config_, exportBasePath_, defaultFormat, this);
-#endif
     connect(dialog, &QDialog::accepted, this, [this, dialog] {
         QSettings settings(uiSettingsPath(rootPath_), QSettings::IniFormat);
         settings.setValue("export/format", exportFormatSettingValue(dialog->exportFormat()));
@@ -52,11 +48,7 @@ void MainWindow::exportCurrentPanelData()
     }
     dialogConfig = expandedShotLayout(dialogConfig);
     const PlotSpec& plot = dialogConfig.columns[0][0];
-#ifdef Q_OS_IOS
-    auto* dialog = new ExportDataDialog(config_, exportBasePath_, defaultFormat, nullptr, &plot);
-#else
     auto* dialog = new ExportDataDialog(config_, exportBasePath_, defaultFormat, this, &plot);
-#endif
     connect(dialog, &QDialog::accepted, this, [this, dialog] {
         QSettings settings(uiSettingsPath(rootPath_), QSettings::IniFormat);
         settings.setValue("export/format", exportFormatSettingValue(dialog->exportFormat()));

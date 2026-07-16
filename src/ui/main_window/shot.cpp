@@ -67,11 +67,7 @@ void MainWindow::openLoginDialog()
     if (!prepareSshUrl(readApiUrl(rootPath_), &apiUrl)) {
         return;
     }
-#ifdef Q_OS_IOS
-    auto* dialog = new LoginDialog(rootPath_, nullptr, apiUrl);
-#else
     auto* dialog = new LoginDialog(rootPath_, this, apiUrl);
-#endif
     if (dialog->exec() == QDialog::Accepted) {
         QTimer::singleShot(1000, this, [this]() {
             applyLoginSuccessStatus("Login token saved");
@@ -82,11 +78,7 @@ void MainWindow::openLoginDialog()
 
 void MainWindow::openAboutDialog()
 {
-#ifdef Q_OS_IOS
-    auto* dialog = new AboutDialog(nullptr);
-#else
     auto* dialog = new AboutDialog(this);
-#endif
     dialog->exec();
     QTimer::singleShot(2000, dialog, &QObject::deleteLater);
 }
