@@ -91,9 +91,15 @@ LoginDialog::LoginDialog(QString rootPath, QWidget* parent, QString apiOverride)
     buttons->addWidget(cancel);
     layout->addLayout(buttons);
 
-    connect(loginButton_, &QPushButton::clicked, this, &LoginDialog::tryLogin);
-    connect(passwordEdit_, &QLineEdit::returnPressed, this, &LoginDialog::tryLogin);
-    connect(userEdit_, &QLineEdit::returnPressed, passwordEdit_, qOverload<>(&QWidget::setFocus));
+    connect(loginButton_, &QPushButton::clicked, this, [this]() {
+        QTimer::singleShot(100, this, &LoginDialog::tryLogin);
+    });
+    connect(passwordEdit_, &QLineEdit::returnPressed, this, [this]() {
+        QTimer::singleShot(100, this, &LoginDialog::tryLogin);
+    });
+    connect(userEdit_, &QLineEdit::returnPressed, this, [this]() {
+        QTimer::singleShot(100, passwordEdit_, qOverload<>(&QWidget::setFocus));
+    });
     connect(cancel, &QPushButton::clicked, this, &QDialog::reject);
     loadProperties();
 }
