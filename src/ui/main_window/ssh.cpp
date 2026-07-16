@@ -12,7 +12,9 @@ void MainWindow::openSshDialog()
     auto* dialog = new SshDialog(sshTunnelManager_, this);
     dialog->setWindowIcon(appIcon());
     connect(dialog, &QDialog::finished, this, [this, dialog] {
-        updateSshActionIcon();
+        QTimer::singleShot(500, this, [this]() {
+            updateSshActionIcon();
+        });
         QTimer::singleShot(1000, dialog, &QObject::deleteLater);
     });
     dialog->open();

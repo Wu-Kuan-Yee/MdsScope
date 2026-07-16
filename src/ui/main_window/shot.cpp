@@ -69,7 +69,9 @@ void MainWindow::openLoginDialog()
     }
     auto* dialog = new LoginDialog(rootPath_, this, apiUrl);
     connect(dialog, &QDialog::accepted, this, [this]() {
-        applyLoginSuccessStatus("Login token saved");
+        QTimer::singleShot(500, this, [this]() {
+            applyLoginSuccessStatus("Login token saved");
+        });
     });
     connect(dialog, &QDialog::finished, dialog, [dialog]() {
         QTimer::singleShot(1000, dialog, &QObject::deleteLater);
