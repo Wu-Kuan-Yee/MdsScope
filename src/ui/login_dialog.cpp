@@ -18,8 +18,7 @@ LoginDialog::LoginDialog(QString rootPath, QWidget* parent, QString apiOverride)
 #endif
     manager_ = new QNetworkAccessManager(this);
 #ifdef Q_OS_IOS
-    // Send a dummy request to a domain to trigger the iOS China network permission prompt
-    manager_->get(QNetworkRequest(QUrl("http://captive.apple.com/hotspot-detect.html")));
+    // Removed captive portal request to avoid background crashes
 #endif
     QString styleSheet =
         "QDialog { background: palette(base); }"
@@ -50,10 +49,9 @@ LoginDialog::LoginDialog(QString rootPath, QWidget* parent, QString apiOverride)
     subtitle->setObjectName("subtitle");
     layout->addWidget(subtitle);
 
-    statusLabel_ = new QLabel(this);
+    statusLabel_ = new QLabel(" ", this);
     statusLabel_->setObjectName("status");
     statusLabel_->setWordWrap(true);
-    statusLabel_->hide();
     layout->addWidget(statusLabel_);
 
     layout->addSpacing(8);
@@ -97,9 +95,6 @@ LoginDialog::LoginDialog(QString rootPath, QWidget* parent, QString apiOverride)
     connect(passwordEdit_, &QLineEdit::returnPressed, this, [this]() {
         QTimer::singleShot(100, this, &LoginDialog::tryLogin);
     });
-    connect(userEdit_, &QLineEdit::returnPressed, this, [this]() {
-        QTimer::singleShot(100, passwordEdit_, qOverload<>(&QWidget::setFocus));
-    });
     connect(cancel, &QPushButton::clicked, this, &QDialog::reject);
     loadProperties();
 }
@@ -116,7 +111,6 @@ void LoginDialog::loadProperties()
 
     if (currentApi.isEmpty()) {
         statusLabel_->setText("Missing API configuration.");
-        statusLabel_->show();
         loginButton_->setEnabled(false);
     }
     CachedAuth auth;
@@ -124,8 +118,7 @@ void LoginDialog::loadProperties()
         userEdit_->setText(auth.userName);
         passwordEdit_->setText(auth.password);
     }
-    statusLabel_->clear();
-    statusLabel_->hide();
+    statusLabel_->setText(" ");
     if (userEdit_->text().trimmed().isEmpty()) {
         userEdit_->setFocus();
     } else {
@@ -165,7 +158,6 @@ void LoginDialog::tryLogin()
 
     if (api.isEmpty()) {
         statusLabel_->setText("Missing API URL.");
-        statusLabel_->show();
         return;
     }
 
@@ -175,7 +167,6 @@ void LoginDialog::tryLogin()
     loginButton_->setEnabled(false);
     loginButton_->setText(QStringLiteral("Signing in..."));
     statusLabel_->setText(QStringLiteral("Signing in..."));
-    statusLabel_->show();
 
     QString baseUrl = api.trimmed();
     if (baseUrl.endsWith('/')) {
@@ -231,6 +222,5 @@ void LoginDialog::tryLogin()
         } else {
             statusLabel_->setText(reply->errorString());
         }
-        statusLabel_->show();
     });
 }
