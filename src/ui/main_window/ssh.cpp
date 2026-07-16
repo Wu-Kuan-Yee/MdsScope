@@ -9,15 +9,10 @@
 
 void MainWindow::openSshDialog()
 {
-    auto* dialog = new SshDialog(sshTunnelManager_, this);
-    dialog->setWindowIcon(appIcon());
-    connect(dialog, &QDialog::finished, this, [this, dialog] {
-        QTimer::singleShot(500, this, [this]() {
-            updateSshActionIcon();
-        });
-        QTimer::singleShot(1000, dialog, &QObject::deleteLater);
-    });
-    dialog->open();
+    SshDialog dialog(sshTunnelManager_, this);
+    dialog.setWindowIcon(appIcon());
+    dialog.exec();
+    updateSshActionIcon();
 }
 
 bool MainWindow::prepareSshLayout(const LayoutConfig& source, LayoutConfig* prepared)
