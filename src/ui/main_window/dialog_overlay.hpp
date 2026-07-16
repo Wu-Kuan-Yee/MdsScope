@@ -9,9 +9,10 @@
 class DialogOverlayManager : public QObject {
 public:
     QWidget* overlay;
-    BaseDialog* dialog;
+    QWidget* dialog;
 
-    DialogOverlayManager(QMainWindow* mainWindow, BaseDialog* d) 
+    template <typename T>
+    DialogOverlayManager(QMainWindow* mainWindow, T* d) 
         : QObject(mainWindow), dialog(d) 
     {
         overlay = new QWidget(mainWindow);
@@ -23,14 +24,15 @@ public:
         dialog->setParent(overlay);
         dialog->setWindowFlags(Qt::Widget);
         
-        QString shadow = "BaseDialog { border: 1px solid #475569; border-radius: 8px; }";
+        dialog->setObjectName("dialogOverlayTarget");
+        QString shadow = "#dialogOverlayTarget { border: 1px solid #475569; border-radius: 8px; }";
         dialog->setStyleSheet(dialog->styleSheet() + shadow);
 
         centerDialog();
         dialog->show();
 
         mainWindow->installEventFilter(this);
-        connect(dialog, &BaseDialog::finished, this, [this]() {
+        connect(d, &T::finished, this, [this]() {
             overlay->deleteLater();
             this->deleteLater();
         });

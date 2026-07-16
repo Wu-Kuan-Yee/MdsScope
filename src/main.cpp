@@ -625,13 +625,14 @@ bool ensureApiLoginBeforeMain(const QString& rootPath)
             return saveCachedAuth(auth);
         }
     }
-
+#ifndef Q_OS_IOS
     LoginDialog dialog(rootPath, nullptr, api);
     dialog.setWindowIcon(appIcon());
-    
     const bool accepted = dialog.exec() == QDialog::Accepted;
-    
     return accepted;
+#else
+    return true;
+#endif
 }
 }
 
