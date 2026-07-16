@@ -2,13 +2,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #pragma once
+#include "base_dialog.hpp"
 
 #include "shared.hpp"
 
-class SignalDialog final : public QDialog {
+class SignalDialog final : public BaseDialog {
 public:
     explicit SignalDialog(const PlotSpec& base, QWidget* parent = nullptr)
-        : QDialog(parent)
+        : BaseDialog(parent)
     {
         setWindowTitle("Signal");
         auto* layout = new QFormLayout(this);
@@ -50,7 +51,7 @@ public:
             errorLabel_->hide();
             accept();
         });
-        connect(cancel, &QPushButton::clicked, this, &QDialog::reject);
+        connect(cancel, &QPushButton::clicked, this, &BaseDialog::reject);
     }
 
     QString shot() const { return shot_->text().trimmed(); }
@@ -74,13 +75,13 @@ private:
     QLabel* errorLabel_ = nullptr;
 };
 
-class DataSourceDialog final : public QDialog {
+class DataSourceDialog final : public BaseDialog {
 public:
     explicit DataSourceDialog(const PlotSpec& base,
                               const QString& currentShot,
                               const QString& sourceIndexDir,
                               QWidget* parent = nullptr)
-        : QDialog(parent)
+        : BaseDialog(parent)
         , defaultShot_(currentShot.trimmed().isEmpty() ? base.shot.trimmed() : currentShot.trimmed())
         , sourceIndexDir_(sourceIndexDir)
     {
@@ -163,7 +164,7 @@ public:
             errorLabel_->hide();
             accept();
         });
-        connect(cancel, &QPushButton::clicked, this, &QDialog::reject);
+        connect(cancel, &QPushButton::clicked, this, &BaseDialog::reject);
     }
 
     QVector<SignalSpec> signalSpecs() const

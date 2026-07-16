@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "mdsscope_internal.hpp"
+#include "base_dialog.hpp"
 #include "export_dialog.hpp"
 #include "dialog_overlay.hpp"
 #include "shared.hpp"
@@ -20,7 +21,7 @@ void MainWindow::openExportDataDialog()
 #else
     auto* dialog = new ExportDataDialog(config_, exportBasePath_, defaultFormat, this);
 #endif
-    connect(dialog, &QDialog::accepted, this, [this, dialog] {
+    connect(dialog, &BaseDialog::accepted, this, [this, dialog] {
         QSettings settings(uiSettingsPath(rootPath_), QSettings::IniFormat);
         settings.setValue("export/format", exportFormatSettingValue(dialog->exportFormat()));
         exportDataForPanels(dialog->selectedPanels(),
@@ -31,7 +32,7 @@ void MainWindow::openExportDataDialog()
                             dialog->customXMax());
     });
 #ifndef Q_OS_IOS
-    connect(dialog, &QDialog::finished, dialog, [dialog] { QTimer::singleShot(1000, dialog, &QObject::deleteLater); });
+    connect(dialog, &BaseDialog::finished, dialog, [dialog] { QTimer::singleShot(1000, dialog, &QObject::deleteLater); });
     dialog->open();
 #endif
 }
@@ -60,7 +61,7 @@ void MainWindow::exportCurrentPanelData()
 #else
     auto* dialog = new ExportDataDialog(config_, exportBasePath_, defaultFormat, this, &plot);
 #endif
-    connect(dialog, &QDialog::accepted, this, [this, dialog] {
+    connect(dialog, &BaseDialog::accepted, this, [this, dialog] {
         QSettings settings(uiSettingsPath(rootPath_), QSettings::IniFormat);
         settings.setValue("export/format", exportFormatSettingValue(dialog->exportFormat()));
         QSet<int> selectedSignalIndexes;
@@ -78,7 +79,7 @@ void MainWindow::exportCurrentPanelData()
                             signalFilter);
     });
 #ifndef Q_OS_IOS
-    connect(dialog, &QDialog::finished, dialog, [dialog] { QTimer::singleShot(1000, dialog, &QObject::deleteLater); });
+    connect(dialog, &BaseDialog::finished, dialog, [dialog] { QTimer::singleShot(1000, dialog, &QObject::deleteLater); });
     dialog->open();
 #endif
 }

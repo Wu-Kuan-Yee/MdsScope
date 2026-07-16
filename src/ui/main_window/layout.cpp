@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "mdsscope_internal.hpp"
+#include "base_dialog.hpp"
 #include "dialog_overlay.hpp"
 #include "layout_dialog.hpp"
 #include "shared.hpp"
@@ -168,7 +169,7 @@ void MainWindow::openLayoutSetupDialog()
     }
 
     auto* dialog = new LayoutSetupDialog(config_, this);
-    connect(dialog, &QDialog::accepted, this, [this, dialog] {
+    connect(dialog, &BaseDialog::accepted, this, [this, dialog] {
         auto layoutItems = dialog->layoutItems();
 
     auto makePanel = [this] {
@@ -319,7 +320,7 @@ void MainWindow::addPlotBelow()
     const int column = selectedColumn_ >= 0 ? selectedColumn_ : 0;
     const int row = selectedRow_ >= 0 ? selectedRow_ + 1 : config_.columns[column].size();
     auto* dialog = new SignalDialog(defaultPlotFromSelection(), this);
-    connect(dialog, &QDialog::accepted, this, [this, column, row, dialog] {
+    connect(dialog, &BaseDialog::accepted, this, [this, column, row, dialog] {
         QString shot = dialog->shot();
         SignalSpec sig = dialog->signal();
     PlotSpec plot = defaultPlotFromSelection();
@@ -360,7 +361,7 @@ void MainWindow::addSignalToCurrentPlot()
     }
     PlotSpec& plot = config_.columns[selectedColumn_][selectedRow_];
     auto* dialog = new SignalDialog(plot, this);
-    connect(dialog, &QDialog::accepted, this, [this, dialog] {
+    connect(dialog, &BaseDialog::accepted, this, [this, dialog] {
         if (selectedColumn_ < 0 || selectedRow_ < 0) return;
         PlotSpec& plot = config_.columns[selectedColumn_][selectedRow_];
         QString shot = dialog->shot();
@@ -398,7 +399,7 @@ void MainWindow::deleteSignalFromCurrentPlot()
     dialog->setComboBoxItems(items);
     dialog->setComboBoxEditable(false);
     
-    connect(dialog, &QDialog::accepted, this, [this, dialog, items] {
+    connect(dialog, &BaseDialog::accepted, this, [this, dialog, items] {
         if (selectedColumn_ < 0 || selectedRow_ < 0) return;
         PlotSpec& plot = config_.columns[selectedColumn_][selectedRow_];
         QString choice = dialog->textValue();
@@ -411,7 +412,7 @@ void MainWindow::deleteSignalFromCurrentPlot()
         }
     });
     #ifndef Q_OS_IOS
-    connect(dialog, &QDialog::finished, dialog, &QObject::deleteLater);
+    connect(dialog, &BaseDialog::finished, dialog, &QObject::deleteLater);
 #endif
     #ifdef Q_OS_IOS
     new DialogOverlayManager(this, dialog);
@@ -432,7 +433,7 @@ void MainWindow::panelSetupForCurrentPanel()
 
     PlotSpec& plot = config_.columns[selectedColumn_][selectedRow_];
     auto* dialog = new PanelSetupDialog(plot, this);
-    connect(dialog, &QDialog::accepted, this, [this, dialog] {
+    connect(dialog, &BaseDialog::accepted, this, [this, dialog] {
         if (selectedColumn_ < 0 || selectedRow_ < 0) return;
         PlotSpec& plot = config_.columns[selectedColumn_][selectedRow_];
         dialog->applyTo(&plot);
@@ -463,7 +464,7 @@ void MainWindow::dataSourceSetupForCurrentPanel()
     PlotSpec& plot = config_.columns[selectedColumn_][selectedRow_];
     const QString currentShot = shotEdit_ ? shotEdit_->text().trimmed() : plot.shot;
     auto* dialog = new DataSourceDialog(plot, currentShot, appSourceIndexDir(rootPath_), this);
-    connect(dialog, &QDialog::accepted, this, [this, dialog] {
+    connect(dialog, &BaseDialog::accepted, this, [this, dialog] {
         if (selectedColumn_ < 0 || selectedRow_ < 0) return;
         PlotSpec& plot = config_.columns[selectedColumn_][selectedRow_];
         QVector<SignalSpec> specs = dialog->signalSpecs();
@@ -505,7 +506,7 @@ void MainWindow::dataSourceSetupForCurrentPanel()
     }
     });
     #ifndef Q_OS_IOS
-    connect(dialog, &QDialog::finished, dialog, &QObject::deleteLater);
+    connect(dialog, &BaseDialog::finished, dialog, &QObject::deleteLater);
 #endif
     #ifdef Q_OS_IOS
     new DialogOverlayManager(this, dialog);

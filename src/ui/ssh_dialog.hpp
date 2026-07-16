@@ -5,7 +5,7 @@
 
 #include "mdsscope_internal.hpp"
 
-#include <QDialog>
+#include "base_dialog.hpp"
 
 class QComboBox;
 class QLabel;
@@ -14,7 +14,7 @@ class QPushButton;
 class QSpinBox;
 class SshTunnelManager;
 
-class SshDialog final : public QDialog {
+class SshDialog final : public BaseDialog {
     Q_OBJECT
 
 public:

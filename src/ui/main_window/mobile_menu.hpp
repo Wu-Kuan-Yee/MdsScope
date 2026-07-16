@@ -1,5 +1,5 @@
 #pragma once
-#include <QDialog>
+#include "base_dialog.hpp"
 #include <QVBoxLayout>
 #include <QPushButton>
 #include <QTimer>
@@ -7,12 +7,12 @@
 #include <QLabel>
 #include <QScrollArea>
 
-class MobileContextMenu : public QDialog {
+class MobileContextMenu : public BaseDialog {
 public:
-    explicit MobileContextMenu(const QString& title, QWidget* parent = nullptr) : QDialog(parent) {
+    explicit MobileContextMenu(const QString& title, QWidget* parent = nullptr) : BaseDialog(parent) {
         setWindowFlags(Qt::Popup | Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint);
         // Do not use WA_DeleteOnClose! It destroys the view before iOS animation finishes, causing a crash.
-        connect(this, &QDialog::finished, this, [this]() {
+        connect(this, &BaseDialog::finished, this, [this]() {
         });
         
         auto* mainLayout = new QVBoxLayout(this);

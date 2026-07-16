@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "mdsscope_internal.hpp"
+#include "base_dialog.hpp"
 
 #include <QDialogButtonBox>
 #include <QSignalBlocker>
@@ -82,7 +83,7 @@ QString defaultWebAlias(const QString& value)
 
 void editWebAddress(QWidget* parent, const QString& title, const InternalWebBookmark& initial, std::function<void(const InternalWebBookmark&)> onAccept)
 {
-    auto* _dialog = new QDialog(parent);
+    auto* _dialog = new BaseDialog(parent);
     QDialog& dialog = *_dialog;
     dialog.setWindowTitle(title);
     dialog.setWindowIcon(appIcon());
@@ -115,11 +116,11 @@ void editWebAddress(QWidget* parent, const QString& title, const InternalWebBook
         onAccept(res);
         dialog.accept();
     });
-    QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &BaseDialog::reject);
     layout->addWidget(buttons);
     updateSave();
     #ifndef Q_OS_IOS
-    QObject::connect(&dialog, &QDialog::finished, &dialog, &QObject::deleteLater);
+    QObject::connect(&dialog, &BaseDialog::finished, &dialog, &QObject::deleteLater);
 #endif
     dialog.open();
 }
@@ -130,7 +131,7 @@ void editSavedWebAddresses(QWidget* parent, const QVector<InternalWebBookmark>& 
         return;
     }
 
-    auto* _dialog = new QDialog(parent);
+    auto* _dialog = new BaseDialog(parent);
     QDialog& dialog = *_dialog;
     dialog.setWindowTitle(QStringLiteral("Edit"));
     dialog.setWindowIcon(appIcon());
@@ -230,13 +231,13 @@ void editSavedWebAddresses(QWidget* parent, const QVector<InternalWebBookmark>& 
         onAccept(res);
         dialog.accept();
     });
-    QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &BaseDialog::reject);
     mainLayout->addWidget(buttons);
     list->setCurrentRow(0);
     loadCurrent();
     updateSave();
     #ifndef Q_OS_IOS
-    QObject::connect(&dialog, &QDialog::finished, &dialog, &QObject::deleteLater);
+    QObject::connect(&dialog, &BaseDialog::finished, &dialog, &QObject::deleteLater);
 #endif
     dialog.open();
 }
@@ -247,7 +248,7 @@ void selectWebAddressToRemove(QWidget* parent, const QVector<InternalWebBookmark
         return;
     }
 
-    auto* _dialog = new QDialog(parent);
+    auto* _dialog = new BaseDialog(parent);
     QDialog& dialog = *_dialog;
     dialog.setWindowTitle(QStringLiteral("Remove"));
     dialog.setWindowIcon(appIcon());
@@ -305,10 +306,10 @@ void selectWebAddressToRemove(QWidget* parent, const QVector<InternalWebBookmark
         onAccept(res);
         dialog.accept();
     });
-    QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &BaseDialog::reject);
     layout->addWidget(buttons);
     #ifndef Q_OS_IOS
-    QObject::connect(&dialog, &QDialog::finished, &dialog, &QObject::deleteLater);
+    QObject::connect(&dialog, &BaseDialog::finished, &dialog, &QObject::deleteLater);
 #endif
     dialog.open();
 }

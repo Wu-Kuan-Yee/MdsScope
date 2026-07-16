@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "mdsscope_internal.hpp"
+#include "base_dialog.hpp"
 #include <QNetworkProxy>
 #include <QGuiApplication>
 #include <QInputMethod>
 
 LoginDialog::LoginDialog(QString rootPath, QWidget* parent, QString apiOverride)
-    : QDialog(parent), rootPath_(std::move(rootPath)), apiOverride_(std::move(apiOverride))
+    : BaseDialog(parent), rootPath_(std::move(rootPath)), apiOverride_(std::move(apiOverride))
 {
     setWindowTitle("Login");
     setModal(true);
@@ -95,7 +96,7 @@ LoginDialog::LoginDialog(QString rootPath, QWidget* parent, QString apiOverride)
     connect(passwordEdit_, &QLineEdit::returnPressed, this, [this]() {
         QTimer::singleShot(100, this, &LoginDialog::tryLogin);
     });
-    connect(cancel, &QPushButton::clicked, this, &QDialog::reject);
+    connect(cancel, &QPushButton::clicked, this, &BaseDialog::reject);
     loadProperties();
 }
 
@@ -131,9 +132,9 @@ void LoginDialog::accept()
     if (isClosing_) return;
     isClosing_ = true;
 #ifdef Q_OS_IOS
-    QTimer::singleShot(600, this, [this]() { QDialog::accept(); });
+    QTimer::singleShot(600, this, [this]() { BaseDialog::accept(); });
 #else
-    QDialog::accept();
+    BaseDialog::accept();
 #endif
 }
 
@@ -142,9 +143,9 @@ void LoginDialog::reject()
     if (isClosing_) return;
     isClosing_ = true;
 #ifdef Q_OS_IOS
-    QTimer::singleShot(600, this, [this]() { QDialog::reject(); });
+    QTimer::singleShot(600, this, [this]() { BaseDialog::reject(); });
 #else
-    QDialog::reject();
+    BaseDialog::reject();
 #endif
 }
 

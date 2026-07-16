@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "mdsscope_internal.hpp"
+#include "base_dialog.hpp"
 #include <QScrollArea>
 #include <QScroller>
 #include <QTimer>
@@ -462,7 +463,7 @@ void MainWindow::showPanelContextMenu(PlotWidget* plot, int column, int row, con
 void MainWindow::openCustomizeDialog()
 {
     FontSettings& fonts = fontSettings();
-    auto* dialog = new QDialog(this);
+    auto* dialog = new BaseDialog(this);
     dialog->setWindowTitle("Customize Fonts");
     if (QApplication::palette().color(QPalette::Window).lightness() >= 128) {
         dialog->setStyleSheet(
@@ -508,10 +509,10 @@ void MainWindow::openCustomizeDialog()
     buttons->addWidget(ok);
     buttons->addWidget(cancel);
     layout->addRow(buttons);
-    connect(ok, &QPushButton::clicked, dialog, &QDialog::accept);
-    connect(cancel, &QPushButton::clicked, dialog, &QDialog::reject);
+    connect(ok, &QPushButton::clicked, dialog, &BaseDialog::accept);
+    connect(cancel, &QPushButton::clicked, dialog, &BaseDialog::reject);
 
-    connect(dialog, &QDialog::accepted, this, [this, family, legendSize, axisSize, unitSize, uiSize]() {
+    connect(dialog, &BaseDialog::accepted, this, [this, family, legendSize, axisSize, unitSize, uiSize]() {
         FontSettings& fonts = fontSettings();
         fonts.family = family->currentFont().family();
         fonts.legendSize = legendSize->value();
@@ -523,7 +524,7 @@ void MainWindow::openCustomizeDialog()
         refreshPlotFonts();
     });
     #ifndef Q_OS_IOS
-    connect(dialog, &QDialog::finished, dialog, &QObject::deleteLater);
+    connect(dialog, &BaseDialog::finished, dialog, &QObject::deleteLater);
 #endif
 #ifdef Q_OS_IOS
     new DialogOverlayManager(this, dialog);

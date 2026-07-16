@@ -22,7 +22,7 @@
 #include <QVBoxLayout>
 
 SshDialog::SshDialog(SshTunnelManager* manager, QWidget* parent)
-    : QDialog(parent), manager_(manager)
+    : BaseDialog(parent), manager_(manager)
 {
     setWindowTitle(QStringLiteral("SSH Remote Access"));
     setModal(true);
@@ -109,7 +109,7 @@ SshDialog::SshDialog(SshTunnelManager* manager, QWidget* parent)
     layout->addWidget(buttons);
     connect(testButton_, &QPushButton::clicked, this, &SshDialog::testConnection);
     connect(buttons->button(QDialogButtonBox::Save), &QPushButton::clicked, this, &SshDialog::saveAndAccept);
-    connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
+    connect(buttons, &QDialogButtonBox::rejected, this, &BaseDialog::reject);
 }
 
 SshSettings SshDialog::currentSettings() const
@@ -173,9 +173,9 @@ void SshDialog::accept()
     if (isClosing_) return;
     isClosing_ = true;
 #ifdef Q_OS_IOS
-    QTimer::singleShot(600, this, [this]() { QDialog::accept(); });
+    QTimer::singleShot(600, this, [this]() { BaseDialog::accept(); });
 #else
-    QDialog::accept();
+    BaseDialog::accept();
 #endif
 }
 
@@ -184,9 +184,9 @@ void SshDialog::reject()
     if (isClosing_) return;
     isClosing_ = true;
 #ifdef Q_OS_IOS
-    QTimer::singleShot(600, this, [this]() { QDialog::reject(); });
+    QTimer::singleShot(600, this, [this]() { BaseDialog::reject(); });
 #else
-    QDialog::reject();
+    BaseDialog::reject();
 #endif
 }
 

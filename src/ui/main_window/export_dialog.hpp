@@ -2,20 +2,21 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #pragma once
+#include "base_dialog.hpp"
 
 #include "layout_dialog.hpp"
 #include <QGuiApplication>
 #include <QInputMethod>
 #include <QTimer>
 
-class ExportDataDialog final : public QDialog {
+class ExportDataDialog final : public BaseDialog {
 public:
     explicit ExportDataDialog(const LayoutConfig& config,
                               const QString& defaultDir,
                               ExportFormat defaultFormat,
                               QWidget* parent = nullptr,
                               const PlotSpec* signalPlot = nullptr)
-        : QDialog(parent)
+        : BaseDialog(parent)
     {
         setWindowTitle("Export Data");
 #if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
@@ -176,7 +177,7 @@ public:
             }
             accept();
         });
-        connect(cancel, &QPushButton::clicked, this, &QDialog::reject);
+        connect(cancel, &QPushButton::clicked, this, &BaseDialog::reject);
     }
 
     QVector<QPair<int, int>> selectedPanels() const
@@ -232,18 +233,18 @@ public slots:
         if (isClosing_) return;
         isClosing_ = true;
 #ifdef Q_OS_IOS
-        QTimer::singleShot(600, this, [this]() { QDialog::accept(); });
+        QTimer::singleShot(600, this, [this]() { BaseDialog::accept(); });
 #else
-        QDialog::accept();
+        BaseDialog::accept();
 #endif
     }
     void reject() override {
         if (isClosing_) return;
         isClosing_ = true;
 #ifdef Q_OS_IOS
-        QTimer::singleShot(600, this, [this]() { QDialog::reject(); });
+        QTimer::singleShot(600, this, [this]() { BaseDialog::reject(); });
 #else
-        QDialog::reject();
+        BaseDialog::reject();
 #endif
     }
 
