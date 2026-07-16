@@ -19,6 +19,9 @@ MainWindow::MainWindow(QString rootPath, QWidget* parent)
     exportBasePath_ = QSettings(uiSettingsPath(rootPath_), QSettings::IniFormat)
                           .value("export/base_dir", defaultExportBaseDir())
                           .toString();
+    if (!QDir(exportBasePath_).exists()) {
+        exportBasePath_ = defaultExportBaseDir();
+    }
     loadFontSettings(rootPath_);
     buildUi();
     applyUiFont();
