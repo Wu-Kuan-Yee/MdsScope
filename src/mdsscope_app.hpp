@@ -168,6 +168,7 @@ private:
     QLabel* statusLabel_ = nullptr;
     QPushButton* loginButton_ = nullptr;
     bool loginInProgress_ = false;
+    QNetworkAccessManager* manager_ = nullptr;
 };
 
 class PlotWidget final : public QWidget {

@@ -13,6 +13,7 @@ void MainWindow::openSshDialog()
     dialog->setWindowIcon(appIcon());
     connect(dialog, &QDialog::finished, this, [this, dialog] {
         updateSshActionIcon();
+        dialog->deleteLater();
     });
     dialog->open();
 }
