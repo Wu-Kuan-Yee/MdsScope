@@ -67,25 +67,16 @@ void MainWindow::openLoginDialog()
     if (!prepareSshUrl(readApiUrl(rootPath_), &apiUrl)) {
         return;
     }
-    auto* dialog = new LoginDialog(rootPath_, this, apiUrl);
-    connect(dialog, &QDialog::accepted, this, [this]() {
-        QTimer::singleShot(500, this, [this]() {
-            applyLoginSuccessStatus("Login token saved");
-        });
-    });
-    connect(dialog, &QDialog::finished, dialog, [dialog]() {
-        QTimer::singleShot(1000, dialog, &QObject::deleteLater);
-    });
-    dialog->open();
+    LoginDialog dialog(rootPath_, this, apiUrl);
+    if (dialog.exec() == QDialog::Accepted) {
+        applyLoginSuccessStatus("Login token saved");
+    }
 }
 
 void MainWindow::openAboutDialog()
 {
-    auto* dialog = new AboutDialog(this);
-    connect(dialog, &QDialog::finished, dialog, [dialog]() {
-        QTimer::singleShot(1000, dialog, &QObject::deleteLater);
-    });
-    dialog->open();
+    AboutDialog dialog(this);
+    dialog.exec();
 }
 
 void MainWindow::applyLoginSuccessStatus(const QString& statusText)
