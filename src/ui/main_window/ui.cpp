@@ -394,6 +394,13 @@ void MainWindow::buildUi()
     });
     connect(dataModeCombo_, &QComboBox::currentIndexChanged, this, [this] { refreshData(); });
     connect(aboutButton_, &QToolButton::clicked, this, &MainWindow::openAboutDialog);
+
+#ifdef Q_OS_IOS
+    CachedAuth auth;
+    if (!loadCachedAuth(&auth) || auth.token.trimmed().isEmpty() || tokenExpiresSoon(auth.token)) {
+        QTimer::singleShot(0, this, &MainWindow::openLoginDialog);
+    }
+#endif
 }
 
 void MainWindow::showPanelContextMenu(PlotWidget* plot, int column, int row, const QPoint& pos)
