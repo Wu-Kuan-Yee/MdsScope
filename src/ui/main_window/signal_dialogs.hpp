@@ -33,8 +33,23 @@ public:
         buttons->addStretch();
         buttons->addWidget(ok);
         buttons->addWidget(cancel);
+
+        errorLabel_ = new QLabel(this);
+        errorLabel_->setStyleSheet("color: red;");
+        errorLabel_->setWordWrap(true);
+        errorLabel_->hide();
+        layout->addRow(errorLabel_);
         layout->addRow(buttons);
-        connect(ok, &QPushButton::clicked, this, &QDialog::accept);
+
+        connect(ok, &QPushButton::clicked, this, [this] {
+            if (y_->text().trimmed().isEmpty()) {
+                errorLabel_->setText("Y expr is required.");
+                errorLabel_->show();
+                return;
+            }
+            errorLabel_->hide();
+            accept();
+        });
         connect(cancel, &QPushButton::clicked, this, &QDialog::reject);
     }
 
@@ -56,6 +71,7 @@ private:
     QLineEdit* x_ = nullptr;
     QLineEdit* experiment_ = nullptr;
     QLineEdit* server_ = nullptr;
+    QLabel* errorLabel_ = nullptr;
 };
 
 class DataSourceDialog final : public QDialog {
@@ -107,8 +123,15 @@ public:
         auto* addCurve = new QPushButton("Add Curve", this);
         auto* ok = new QPushButton("OK", this);
         auto* cancel = new QPushButton("Cancel", this);
+
+        errorLabel_ = new QLabel(this);
+        errorLabel_->setStyleSheet("color: red;");
+        errorLabel_->setWordWrap(true);
+        errorLabel_->hide();
+
         commandLayout->addWidget(addCurve);
         commandLayout->addStretch(1);
+        commandLayout->addWidget(errorLabel_);
         commandLayout->addWidget(ok);
         commandLayout->addWidget(cancel);
         mainLayout->addLayout(commandLayout);
@@ -131,7 +154,15 @@ public:
             sig.colorName = colorForIndex(activeCount);
             addRow(sig, activeCount);
         });
-        connect(ok, &QPushButton::clicked, this, &QDialog::accept);
+        connect(ok, &QPushButton::clicked, this, [this] {
+            if (signalSpecs().isEmpty()) {
+                errorLabel_->setText("At least one valid signal is required.");
+                errorLabel_->show();
+                return;
+            }
+            errorLabel_->hide();
+            accept();
+        });
         connect(cancel, &QPushButton::clicked, this, &QDialog::reject);
     }
 
@@ -625,6 +656,7 @@ private:
     QHash<QString, QStringList> signalCache_;
     QHash<QString, QSet<QString>> signalToTrees_;
     QVector<Row*> rows_;
+    QLabel* errorLabel_ = nullptr;
     bool globalSignalIndexLoaded_ = false;
-};
 
+};

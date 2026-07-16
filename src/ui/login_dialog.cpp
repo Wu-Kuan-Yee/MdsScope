@@ -134,7 +134,8 @@ void LoginDialog::tryLogin()
     const QString charset = properties_.value("Charset", "UTF-8");
 
     if (api.isEmpty()) {
-        QMessageBox::warning(this, "Login", "Missing API URL.");
+        statusLabel_->setText("Missing API URL.");
+        statusLabel_->show();
         return;
     }
 
@@ -147,7 +148,6 @@ void LoginDialog::tryLogin()
     statusLabel_->show();
 
     auto* manager = new QNetworkAccessManager(this);
-    manager->setProxy(QNetworkProxy::NoProxy);
     QString baseUrl = api.trimmed();
     if (baseUrl.endsWith('/')) {
         baseUrl.chop(1);
@@ -193,18 +193,15 @@ void LoginDialog::tryLogin()
                 QString msg = json.value("message").toString();
                 if (!msg.isEmpty()) {
                     statusLabel_->setText(msg);
-                    QMessageBox::warning(this, "Login Failed", msg);
                     return;
                 }
             }
             QString debugMsg = QString("Invalid response.\nError: %1\nRaw: %2")
                                    .arg(err.errorString())
                                    .arg(QString::fromUtf8(rawResponse).left(200));
-            statusLabel_->setText("Invalid response from server.");
-            QMessageBox::warning(this, "Login Failed", debugMsg);
+            statusLabel_->setText("Invalid response from server.\n" + debugMsg);
         } else {
             statusLabel_->setText(reply->errorString());
-            QMessageBox::warning(this, "Login Error", reply->errorString());
         }
         statusLabel_->show();
     });

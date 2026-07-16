@@ -187,3 +187,18 @@ QString escapedMdsExpr(QString expr);
 QString normalizedMdsSignal(QString expr);
 QString effectiveSignalShot(const PlotSpec& plot, const SignalSpec& sig);
 DataReadMode effectiveSignalReadMode(DataReadMode globalMode, const SignalSpec& sig);
+inline void showSafeWarning(QWidget* parent, const QString& title, const QString& text) {
+    auto* box = new QMessageBox(QMessageBox::Warning, title, text, QMessageBox::Ok, parent);
+#ifndef Q_OS_IOS
+    QObject::connect(box, &QDialog::finished, box, &QObject::deleteLater);
+#endif
+    box->open();
+}
+inline void showSafeInfo(QWidget* parent, const QString& title, const QString& text) {
+    auto* box = new QMessageBox(QMessageBox::Information, title, text, QMessageBox::Ok, parent);
+#ifndef Q_OS_IOS
+    QObject::connect(box, &QDialog::finished, box, &QObject::deleteLater);
+#endif
+    box->open();
+}
+// No safeExec

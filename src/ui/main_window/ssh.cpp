@@ -9,10 +9,12 @@
 
 void MainWindow::openSshDialog()
 {
-    SshDialog dialog(sshTunnelManager_, this);
-    dialog.setWindowIcon(appIcon());
-    dialog.exec();
-    updateSshActionIcon();
+    auto* dialog = new SshDialog(sshTunnelManager_, this);
+    dialog->setWindowIcon(appIcon());
+    connect(dialog, &QDialog::finished, this, [this, dialog] {
+        updateSshActionIcon();
+    });
+    dialog->open();
 }
 
 bool MainWindow::prepareSshLayout(const LayoutConfig& source, LayoutConfig* prepared)
@@ -27,7 +29,7 @@ bool MainWindow::prepareSshLayout(const LayoutConfig& source, LayoutConfig* prep
         return true;
     }
     updateSshActionIcon();
-    QMessageBox::warning(this,
+    showSafeWarning(this,
                          QStringLiteral("SSH Remote Access"),
                          error.isEmpty() ? QStringLiteral("Could not establish the SSH tunnel.") : error);
     setStatus(QStringLiteral("SSH connection failed"));

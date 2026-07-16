@@ -166,10 +166,9 @@ void MainWindow::openLayoutSetupDialog()
         config_.columns.resize(1);
     }
 
-    LayoutSetupDialog dialog(config_, this);
-    if (dialog.exec() != QDialog::Accepted) {
-        return;
-    }
+    auto* dialog = new LayoutSetupDialog(config_, this);
+    connect(dialog, &QDialog::accepted, this, [this, dialog] {
+        auto layoutItems = dialog->layoutItems();
 
     auto makePanel = [this] {
         PlotSpec plot = defaultPlotFromSelection();
@@ -187,7 +186,7 @@ void MainWindow::openLayoutSetupDialog()
         return plot;
     };
 
-    const QVector<QVector<LayoutCanvas::Item>> layout = dialog.layoutItems();
+    const QVector<QVector<LayoutCanvas::Item>> layout = layoutItems;
     if (layoutItemsMatchConfig(layout, config_)) {
         setStatus("Layout unchanged");
         return;
@@ -289,6 +288,8 @@ void MainWindow::openLayoutSetupDialog()
             plot->applyView(preserved.view);
         }
     }
+    });
+    dialog->open();
 }
 
 PlotSpec MainWindow::defaultPlotFromSelection() const
@@ -312,23 +313,20 @@ void MainWindow::addPlotBelow()
     }
     const int column = selectedColumn_ >= 0 ? selectedColumn_ : 0;
     const int row = selectedRow_ >= 0 ? selectedRow_ + 1 : config_.columns[column].size();
-    SignalDialog dialog(defaultPlotFromSelection(), this);
-    if (dialog.exec() != QDialog::Accepted) {
-        return;
-    }
+    auto* dialog = new SignalDialog(defaultPlotFromSelection(), this);
+    connect(dialog, &QDialog::accepted, this, [this, column, row, dialog] {
+        QString shot = dialog->shot();
+        SignalSpec sig = dialog->signal();
     PlotSpec plot = defaultPlotFromSelection();
-    plot.shot = dialog.shot();
-    SignalSpec sig = dialog.signal();
-    if (sig.yExpr.isEmpty()) {
-        QMessageBox::warning(this, "Add Plot", "Y expr is required.");
-        return;
-    }
+    plot.shot = shot;
     plot.title = sig.yExpr;
     plot.signalSpecs.push_back(sig);
     config_.columns[column].insert(row, plot);
-    rebuildGrid();
-    selectPlot(column, row);
-    refreshOne(column, row, 0);
+        rebuildGrid();
+        selectPlot(column, row);
+        refreshOne(column, row, 0);
+    });
+    dialog->open();
 }
 
 void MainWindow::deleteCurrentPlot()
@@ -352,21 +350,20 @@ void MainWindow::addSignalToCurrentPlot()
         return;
     }
     PlotSpec& plot = config_.columns[selectedColumn_][selectedRow_];
-    SignalDialog dialog(plot, this);
-    if (dialog.exec() != QDialog::Accepted) {
-        return;
-    }
-    SignalSpec sig = dialog.signal();
-    if (sig.yExpr.isEmpty()) {
-        QMessageBox::warning(this, "Add Signal", "Y expr is required.");
-        return;
-    }
+    auto* dialog = new SignalDialog(plot, this);
+    connect(dialog, &QDialog::accepted, this, [this, dialog] {
+        if (selectedColumn_ < 0 || selectedRow_ < 0) return;
+        PlotSpec& plot = config_.columns[selectedColumn_][selectedRow_];
+        QString shot = dialog->shot();
+        SignalSpec sig = dialog->signal();
     sig.colorName = colorForIndex(plot.signalSpecs.size());
-    plot.shot = dialog.shot();
+    plot.shot = shot;
     plot.signalSpecs.push_back(sig);
-    normalizePresetColors(plot.signalSpecs);
-    syncDisplayConfig();
-    refreshOne(selectedColumn_, selectedRow_, -1);
+        normalizePresetColors(plot.signalSpecs);
+        syncDisplayConfig();
+        refreshOne(selectedColumn_, selectedRow_, -1);
+    });
+    dialog->open();
 }
 
 void MainWindow::deleteSignalFromCurrentPlot()
@@ -382,18 +379,28 @@ void MainWindow::deleteSignalFromCurrentPlot()
     for (const auto& sig : plot.signalSpecs) {
         items.push_back(sig.yExpr);
     }
-    bool ok = false;
-    const QString choice = QInputDialog::getItem(this, "Delete Signal", "Signal", items, 0, false, &ok);
-    if (!ok) {
-        return;
-    }
-    const int idx = items.indexOf(choice);
-    if (idx >= 0) {
-        plot.signalSpecs.removeAt(idx);
-        normalizePresetColors(plot.signalSpecs);
-        syncDisplayConfig();
-        refreshOne(selectedColumn_, selectedRow_, -1);
-    }
+    auto* dialog = new QInputDialog(this);
+    dialog->setWindowTitle("Delete Signal");
+    dialog->setLabelText("Signal");
+    dialog->setComboBoxItems(items);
+    dialog->setComboBoxEditable(false);
+    
+    connect(dialog, &QDialog::accepted, this, [this, dialog, items] {
+        if (selectedColumn_ < 0 || selectedRow_ < 0) return;
+        PlotSpec& plot = config_.columns[selectedColumn_][selectedRow_];
+        QString choice = dialog->textValue();
+        const int idx = items.indexOf(choice);
+        if (idx >= 0) {
+            plot.signalSpecs.removeAt(idx);
+            normalizePresetColors(plot.signalSpecs);
+            syncDisplayConfig();
+            refreshOne(selectedColumn_, selectedRow_, -1);
+        }
+    });
+    #ifndef Q_OS_IOS
+    connect(dialog, &QDialog::finished, dialog, &QObject::deleteLater);
+#endif
+    dialog->open();
 }
 
 void MainWindow::panelSetupForCurrentPanel()
@@ -407,17 +414,19 @@ void MainWindow::panelSetupForCurrentPanel()
     }
 
     PlotSpec& plot = config_.columns[selectedColumn_][selectedRow_];
-    PanelSetupDialog dialog(plot, this);
-    if (dialog.exec() != QDialog::Accepted) {
-        return;
-    }
+    auto* dialog = new PanelSetupDialog(plot, this);
+    connect(dialog, &QDialog::accepted, this, [this, dialog] {
+        if (selectedColumn_ < 0 || selectedRow_ < 0) return;
+        PlotSpec& plot = config_.columns[selectedColumn_][selectedRow_];
+        dialog->applyTo(&plot);
 
-    dialog.applyTo(&plot);
     displayConfig_ = expandedShotLayout(config_);
     plotWidgets_[selectedColumn_][selectedRow_]->setSpec(displayConfig_.columns[selectedColumn_][selectedRow_]);
     plotWidgets_[selectedColumn_][selectedRow_]->resetScale();
-    updateTopInfoLabels();
-    setStatus(QString("Updated panel setup: col %1 row %2").arg(selectedColumn_ + 1).arg(selectedRow_ + 1));
+        updateTopInfoLabels();
+        setStatus(QString("Updated panel setup: col %1 row %2").arg(selectedColumn_ + 1).arg(selectedRow_ + 1));
+    });
+    dialog->open();
 }
 
 void MainWindow::dataSourceSetupForCurrentPanel()
@@ -432,14 +441,13 @@ void MainWindow::dataSourceSetupForCurrentPanel()
 
     PlotSpec& plot = config_.columns[selectedColumn_][selectedRow_];
     const QString currentShot = shotEdit_ ? shotEdit_->text().trimmed() : plot.shot;
-    DataSourceDialog dialog(plot, currentShot, appSourceIndexDir(rootPath_), this);
-    if (dialog.exec() != QDialog::Accepted) {
-        return;
-    }
+    auto* dialog = new DataSourceDialog(plot, currentShot, appSourceIndexDir(rootPath_), this);
+    connect(dialog, &QDialog::accepted, this, [this, dialog] {
+        if (selectedColumn_ < 0 || selectedRow_ < 0) return;
+        PlotSpec& plot = config_.columns[selectedColumn_][selectedRow_];
+        QVector<SignalSpec> specs = dialog->signalSpecs();
 
-    QVector<SignalSpec> specs = dialog.signalSpecs();
     if (specs.isEmpty()) {
-        QMessageBox::warning(this, "Data Source Setup", "At least one signal is required.");
         return;
     }
 
@@ -474,6 +482,11 @@ void MainWindow::dataSourceSetupForCurrentPanel()
     } else {
         setStatus(QString("Updated panel style: col %1 row %2").arg(selectedColumn_ + 1).arg(selectedRow_ + 1));
     }
+    });
+    #ifndef Q_OS_IOS
+    connect(dialog, &QDialog::finished, dialog, &QObject::deleteLater);
+#endif
+    dialog->open();
 }
 
 void MainWindow::maximizeCurrentPanel()

@@ -1,0 +1,62 @@
+version = 1
+
+[[panels]]
+column = 1
+row = 1
+title = "Ip"
+
+[[panels.signals]]
+tree = "pcs_east"
+server = "202.127.204.12"
+y = "\\pcrl01"
+
+[[panels]]
+column = 1
+row = 2
+title = "R"
+
+[[panels.signals]]
+tree = "pcs_east"
+server = "202.127.204.12"
+y = "\\lmsr"
+
+[[panels]]
+column = 1
+row = 3
+title = "Z"
+
+[[panels.signals]]
+tree = "pcs_east"
+server = "202.127.204.12"
+y = "\\lmsz"
+
+[[panels]]
+column = 2
+row = 1
+title = "Vloop"
+
+[[panels.signals]]
+tree = "pcs_east"
+server = "202.127.204.12"
+y = "\\pcvloop"
+
+[[panels]]
+column = 2
+row = 2
+title = "Ne"
+
+[[panels.signals]]
+tree = "pcs_east"
+server = "202.127.204.12"
+y = "\\dfsdev"
+
+[[panels]]
+column = 2
+row = 3
+title = "Pf1 current"
+
+[[panels.signals]]
+tree = "pcs_east"
+server = "202.127.204.12"
+y = "\\pcpf1"
+

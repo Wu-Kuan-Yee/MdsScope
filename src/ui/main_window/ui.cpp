@@ -2,9 +2,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "mdsscope_internal.hpp"
+#include <QScrollArea>
+#include <QScroller>
+#include <QTimer>
 #include "shared.hpp"
 #include "theme.hpp"
 #include "ssh_tunnel_manager.hpp"
+#include "mobile_menu.hpp"
 
 
 void MainWindow::changeEvent(QEvent* event)
@@ -159,17 +163,26 @@ void MainWindow::buildUi()
     gridLayout_ = new QGridLayout(gridHost_);
     gridLayout_->setContentsMargins(0, 0, 0, 0);
     gridLayout_->setSpacing(0);
+
 #if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
-    auto* scrollArea = new QScrollArea(this);
-    scrollArea->setWidgetResizable(true);
-    scrollArea->setWidget(gridHost_);
-    setCentralWidget(scrollArea);
+    scrollArea_ = new QScrollArea(this);
+    scrollArea_->setWidgetResizable(true);
+    scrollArea_->setWidget(gridHost_);
+    scrollArea_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    scrollArea_->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    // Ensure the scroll area has a transparent background
+    scrollArea_->setStyleSheet("QScrollArea { background: transparent; border: none; }");
+    
+    // Enable native kinetic scrolling with one finger
+    QScroller::grabGesture(scrollArea_->viewport(), QScroller::TouchGesture);
+    setCentralWidget(scrollArea_);
 #else
     setCentralWidget(gridHost_);
 #endif
 
     statusLabel_ = new QLabel(this);
     statusLabel_->setStyleSheet("color: palette(highlight);");
+    statusLabel_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
 
     toolbar->addSeparator();
 #if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
@@ -260,13 +273,11 @@ void MainWindow::buildUi()
     addToolBar(Qt::BottomToolBarArea, bottomToolBar);
     bottomToolBar->setMovable(false);
     bottomToolBar->setContextMenuPolicy(Qt::PreventContextMenu);
-#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS) || defined(Q_OS_WIN)
     bottomToolBar->setStyleSheet(
         "QPushButton { padding: 1px 8px; min-height: 18px; }"
         "QLineEdit, QComboBox { min-height: 18px; padding: 0px 2px; }"
         "QToolButton { margin: 0px; padding: 1px; min-width: 30px; min-height: 28px; }"
     );
-#endif
     zoomButton_ = new QToolButton(bottomToolBar);
     pointButton_ = new QToolButton(bottomToolBar);
     for (QToolButton* button : {zoomButton_, pointButton_}) {
@@ -280,35 +291,23 @@ void MainWindow::buildUi()
     pointButton_->setChecked(true);
     bottomToolBar->addWidget(zoomButton_);
     bottomToolBar->addWidget(pointButton_);
-#if defined(Q_OS_IOS) || defined(Q_OS_ANDROID)
-    shotEdit_ = new QLineEdit(bottomToolBar);
-    shotEdit_->setPlaceholderText("Shot");
-    shotEdit_->setMinimumWidth(120);
-    shotEdit_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-    
-    shotHistoryBtn_ = new QToolButton(bottomToolBar);
-    shotHistoryBtn_->setIcon(QIcon::fromTheme("history"));
-    shotHistoryBtn_->setPopupMode(QToolButton::InstantPopup);
-    shotHistoryBtn_->setMenu(new QMenu(shotHistoryBtn_));
-    
-    bottomToolBar->addWidget(new QLabel("Shot: ", bottomToolBar));
-    bottomToolBar->addWidget(shotEdit_);
-    bottomToolBar->addWidget(shotHistoryBtn_);
-#else
+    bottomToolBar->addWidget(new QLabel("Shot", bottomToolBar));
     shotCombo_ = new QComboBox(bottomToolBar);
     shotCombo_->setEditable(true);
     shotCombo_->setInsertPolicy(QComboBox::NoInsert);
     shotCombo_->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
     shotCombo_->setMaxVisibleItems(10);
     shotCombo_->view()->setTextElideMode(Qt::ElideMiddle);
-    
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+    shotCombo_->view()->setMinimumWidth(200);
+    shotCombo_->setMinimumWidth(80);
+    shotCombo_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    shotCombo_->setStyleSheet("QComboBox::drop-down { width: 44px; border-left: 1px solid #cbd5e1; }");
+#else
     shotCombo_->view()->setMinimumWidth(260);
     shotCombo_->view()->setMaximumWidth(520);
-    
-    shotEdit_ = shotCombo_->lineEdit();
-    bottomToolBar->addWidget(new QLabel("Shot: ", bottomToolBar));
-    bottomToolBar->addWidget(shotCombo_);
 #endif
+    shotEdit_ = shotCombo_->lineEdit();
     refreshShotHistory();
     auto resizeShotEdit = [this] {
         if (!shotEdit_ || !shotCombo_) {
@@ -323,6 +322,7 @@ void MainWindow::buildUi()
 #endif
     };
     resizeShotEdit();
+    bottomToolBar->addWidget(shotCombo_);
 
 #if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
     addToolBarBreak(Qt::BottomToolBarArea);
@@ -330,11 +330,9 @@ void MainWindow::buildUi()
     addToolBar(Qt::BottomToolBarArea, bottomToolBar2);
     bottomToolBar2->setMovable(false);
     bottomToolBar2->setContextMenuPolicy(Qt::PreventContextMenu);
-#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS) || defined(Q_OS_WIN)
     bottomToolBar2->setStyleSheet(
         "QPushButton { padding: 1px 8px; min-height: 18px; }"
     );
-#endif
 #else
     auto* bottomToolBar2 = bottomToolBar;
 #endif
@@ -378,9 +376,6 @@ void MainWindow::buildUi()
     connect(stop, &QPushButton::clicked, this, &MainWindow::onStopOrContinue);
     connect(shotEdit_, &QLineEdit::returnPressed, this, &MainWindow::applyShot);
     connect(shotEdit_, &QLineEdit::textChanged, this, [resizeShotEdit] { resizeShotEdit(); });
-#if defined(Q_OS_IOS) || defined(Q_OS_ANDROID)
-    connect(shotEdit_, &QLineEdit::returnPressed, this, &MainWindow::applyShot);
-#else
     connect(shotCombo_, &QComboBox::activated, this, [this](int index) {
         const QString shot = shotCombo_->itemData(index).toString();
         if (!shot.isEmpty()) {
@@ -388,7 +383,6 @@ void MainWindow::buildUi()
         }
         applyShot();
     });
-#endif
     connect(dataModeCombo_, &QComboBox::currentIndexChanged, this, [this] { refreshData(); });
     connect(aboutButton_, &QToolButton::clicked, this, &MainWindow::openAboutDialog);
 }
@@ -400,7 +394,36 @@ void MainWindow::showPanelContextMenu(PlotWidget* plot, int column, int row, con
     }
     selectPlot(column, row);
 
-    QMenu* menu = new QMenu(this);
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+    auto* menu = new MobileContextMenu("Panel Actions", this);
+    menu->addAction("Max", [this] { maximizeCurrentPanel(); });
+    if (singlePanelMaximized_) {
+        menu->addAction("Show All Panels", [this] { showAllPanels(); });
+    }
+    menu->addSeparator();
+    menu->addAction("Panel Setup", [this] { panelSetupForCurrentPanel(); });
+    menu->addAction("Data Source Setup", [this] { dataSourceSetupForCurrentPanel(); });
+    menu->addAction("Export Data", [this] { exportCurrentPanelData(); });
+    menu->addSeparator();
+    menu->addAction("Reset Current Scale", [this] { resetCurrentScale(); });
+    menu->addAction("Reset All Panels", [this] { resetScales(); });
+    menu->addAction("All Same X Scale", [this] { applyScaleToAll(); });
+    menu->addAction("All Same Y Scale", [this] { applyYScaleToAll(); });
+    
+    // Calculate a nice position: centered or slightly offset
+    menu->setMinimumWidth(240);
+    menu->adjustSize();
+    QPoint globalPos = plot->mapToGlobal(pos);
+    globalPos.rx() -= menu->width() / 2;
+    globalPos.ry() -= menu->height() / 2;
+    menu->move(globalPos);
+    menu->show();
+#else
+    auto* menu = new QMenu(this);
+    #ifndef Q_OS_IOS
+    connect(menu, &QMenu::aboutToHide, menu, &QObject::deleteLater);
+#endif
+    
     QAction* maxAction = menu->addAction("Max");
     QAction* showAllAction = menu->addAction("Show All Panels");
     showAllAction->setEnabled(singlePanelMaximized_);
@@ -414,41 +437,27 @@ void MainWindow::showPanelContextMenu(PlotWidget* plot, int column, int row, con
     QAction* sameXAction = menu->addAction("All Same X Scale");
     QAction* sameYAction = menu->addAction("All Same Y Scale");
 
-    connect(menu, &QMenu::triggered, this, [=](QAction* chosen) {
-        QTimer::singleShot(150, this, [=]() {
-            if (chosen == maxAction) {
-                maximizeCurrentPanel();
-            } else if (chosen == showAllAction) {
-                showAllPanels();
-            } else if (chosen == panelSetupAction) {
-                panelSetupForCurrentPanel();
-            } else if (chosen == dataSourceAction) {
-                dataSourceSetupForCurrentPanel();
-            } else if (chosen == exportDataAction) {
-                exportCurrentPanelData();
-            } else if (chosen == resetCurrentAction) {
-                resetCurrentScale();
-            } else if (chosen == resetAllAction) {
-                resetScales();
-            } else if (chosen == sameXAction) {
-                applyScaleToAll();
-            } else if (chosen == sameYAction) {
-                applyYScaleToAll();
-            }
-        });
-    });
+    connect(maxAction, &QAction::triggered, this, [this] { QTimer::singleShot(250, this, &MainWindow::maximizeCurrentPanel); });
+    connect(showAllAction, &QAction::triggered, this, [this] { QTimer::singleShot(250, this, &MainWindow::showAllPanels); });
+    connect(panelSetupAction, &QAction::triggered, this, [this] { QTimer::singleShot(250, this, &MainWindow::panelSetupForCurrentPanel); });
+    connect(dataSourceAction, &QAction::triggered, this, [this] { QTimer::singleShot(250, this, &MainWindow::dataSourceSetupForCurrentPanel); });
+    connect(exportDataAction, &QAction::triggered, this, [this] { QTimer::singleShot(250, this, &MainWindow::exportCurrentPanelData); });
+    connect(resetCurrentAction, &QAction::triggered, this, [this] { QTimer::singleShot(250, this, &MainWindow::resetCurrentScale); });
+    connect(resetAllAction, &QAction::triggered, this, [this] { QTimer::singleShot(250, this, &MainWindow::resetScales); });
+    connect(sameXAction, &QAction::triggered, this, [this] { QTimer::singleShot(250, this, &MainWindow::applyScaleToAll); });
+    connect(sameYAction, &QAction::triggered, this, [this] { QTimer::singleShot(250, this, &MainWindow::applyYScaleToAll); });
 
-    connect(menu, &QMenu::aboutToHide, menu, &QObject::deleteLater);
     menu->popup(plot->mapToGlobal(pos));
+#endif
 }
 
 void MainWindow::openCustomizeDialog()
 {
     FontSettings& fonts = fontSettings();
-    QDialog dialog(this);
-    dialog.setWindowTitle("Customize Fonts");
+    auto* dialog = new QDialog(this);
+    dialog->setWindowTitle("Customize Fonts");
     if (QApplication::palette().color(QPalette::Window).lightness() >= 128) {
-        dialog.setStyleSheet(
+        dialog->setStyleSheet(
             "QDialog { background: #f6f6f6; color: #111827; }"
             "QLabel { background: transparent; color: #111827; }"
             "QSpinBox, QFontComboBox {"
@@ -463,13 +472,13 @@ void MainWindow::openCustomizeDialog()
             "QSpinBox:focus, QFontComboBox:focus { border-color: #2563eb; }"
             "QSpinBox::up-button, QSpinBox::down-button { background: transparent; border: none; width: 16px; }");
     }
-    auto* layout = new QFormLayout(&dialog);
-    auto* family = new QFontComboBox(&dialog);
+    auto* layout = new QFormLayout(dialog);
+    auto* family = new QFontComboBox(dialog);
     family->setCurrentFont(QFont(fonts.family));
-    auto* legendSize = new QSpinBox(&dialog);
-    auto* axisSize = new QSpinBox(&dialog);
-    auto* unitSize = new QSpinBox(&dialog);
-    auto* uiSize = new QSpinBox(&dialog);
+    auto* legendSize = new QSpinBox(dialog);
+    auto* axisSize = new QSpinBox(dialog);
+    auto* unitSize = new QSpinBox(dialog);
+    auto* uiSize = new QSpinBox(dialog);
     for (QSpinBox* box : {legendSize, axisSize, unitSize, uiSize}) {
         box->setRange(6, 28);
         box->setSingleStep(1);
@@ -485,26 +494,30 @@ void MainWindow::openCustomizeDialog()
     layout->addRow("Unit size", unitSize);
     layout->addRow("UI size", uiSize);
     auto* buttons = new QHBoxLayout();
-    auto* ok = new QPushButton("OK", &dialog);
-    auto* cancel = new QPushButton("Cancel", &dialog);
+    auto* ok = new QPushButton("OK", dialog);
+    auto* cancel = new QPushButton("Cancel", dialog);
     buttons->addStretch(1);
     buttons->addWidget(ok);
     buttons->addWidget(cancel);
     layout->addRow(buttons);
-    connect(ok, &QPushButton::clicked, &dialog, &QDialog::accept);
-    connect(cancel, &QPushButton::clicked, &dialog, &QDialog::reject);
+    connect(ok, &QPushButton::clicked, dialog, &QDialog::accept);
+    connect(cancel, &QPushButton::clicked, dialog, &QDialog::reject);
 
-    if (dialog.exec() != QDialog::Accepted) {
-        return;
-    }
-    fonts.family = family->currentFont().family();
-    fonts.legendSize = legendSize->value();
-    fonts.axisSize = axisSize->value();
-    fonts.unitSize = unitSize->value();
-    fonts.uiSize = uiSize->value();
-    saveFontSettings(rootPath_);
-    applyUiFont();
-    refreshPlotFonts();
+    connect(dialog, &QDialog::accepted, this, [this, family, legendSize, axisSize, unitSize, uiSize]() {
+        FontSettings& fonts = fontSettings();
+        fonts.family = family->currentFont().family();
+        fonts.legendSize = legendSize->value();
+        fonts.axisSize = axisSize->value();
+        fonts.unitSize = unitSize->value();
+        fonts.uiSize = uiSize->value();
+        saveFontSettings(rootPath_);
+        applyUiFont();
+        refreshPlotFonts();
+    });
+    #ifndef Q_OS_IOS
+    connect(dialog, &QDialog::finished, dialog, &QObject::deleteLater);
+#endif
+    dialog->open();
 }
 
 void MainWindow::applyUiFont()

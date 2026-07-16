@@ -481,8 +481,7 @@ private:
                                                 "Update",
                                                 "Could not check for updates.",
                                                 reply->errorString());
-            message->exec();
-            message->deleteLater();
+            message->open();
             return;
         }
 
@@ -495,8 +494,7 @@ private:
                                                 "Update",
                                                 "Could not check for updates.",
                                                 "GitHub returned an invalid release response.");
-            message->exec();
-            message->deleteLater();
+            message->open();
             return;
         }
 
@@ -512,8 +510,7 @@ private:
                                                 "Update",
                                                 "Could not compare release versions.",
                                                 QStringLiteral("Current: %1\nLatest: %2").arg(QStringLiteral(MDSSCOPE_VERSION), tagName));
-            message->exec();
-            message->deleteLater();
+            message->open();
             return;
         }
 
@@ -524,8 +521,7 @@ private:
                                                 "Update",
                                                 QStringLiteral("MdsScope %1 is up to date.").arg(QStringLiteral(MDSSCOPE_VERSION)),
                                                 {});
-            message->exec();
-            message->deleteLater();
+            message->open();
             return;
         }
 
@@ -537,11 +533,12 @@ private:
                                             "Open the GitHub release page to download it?");
         QPushButton* openRelease = message->addButton("Open Release", QMessageBox::AcceptRole);
         message->addButton(QMessageBox::Cancel);
-        message->exec();
-        if (message->clickedButton() == openRelease) {
-            openExternalUrlQuietly(releaseUrl);
-        }
-        message->deleteLater();
+        QObject::connect(message, &QMessageBox::finished, message, [message, openRelease, releaseUrl] {
+            if (message->clickedButton() == openRelease) {
+                openExternalUrlQuietly(releaseUrl);
+            }
+        });
+        message->open();
     }
 
     QNetworkAccessManager* networkManager_ = nullptr;

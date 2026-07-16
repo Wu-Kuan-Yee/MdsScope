@@ -11,18 +11,21 @@ void MainWindow::openExportDataDialog()
 {
     QSettings settings(uiSettingsPath(rootPath_), QSettings::IniFormat);
     const ExportFormat defaultFormat = exportFormatFromSetting(settings.value("export/format", "text").toString());
-    ExportDataDialog dialog(config_, exportBasePath_, defaultFormat, this);
-    if (dialog.exec() != QDialog::Accepted) {
-        return;
-    }
-
-    settings.setValue("export/format", exportFormatSettingValue(dialog.exportFormat()));
-    exportDataForPanels(dialog.selectedPanels(),
-                        dialog.outputBaseDir(),
-                        static_cast<int>(dialog.exportFormat()),
-                        static_cast<int>(dialog.exportRange()),
-                        dialog.customXMin(),
-                        dialog.customXMax());
+    auto* dialog = new ExportDataDialog(config_, exportBasePath_, defaultFormat, this);
+    connect(dialog, &QDialog::accepted, this, [this, dialog] {
+        QSettings settings(uiSettingsPath(rootPath_), QSettings::IniFormat);
+        settings.setValue("export/format", exportFormatSettingValue(dialog->exportFormat()));
+        exportDataForPanels(dialog->selectedPanels(),
+                            dialog->outputBaseDir(),
+                            static_cast<int>(dialog->exportFormat()),
+                            static_cast<int>(dialog->exportRange()),
+                            dialog->customXMin(),
+                            dialog->customXMax());
+    });
+    #ifndef Q_OS_IOS
+    connect(dialog, &QDialog::finished, dialog, &QObject::deleteLater);
+#endif
+    dialog->open();
 }
 
 void MainWindow::exportCurrentPanelData()
@@ -43,25 +46,28 @@ void MainWindow::exportCurrentPanelData()
     }
     dialogConfig = expandedShotLayout(dialogConfig);
     const PlotSpec& plot = dialogConfig.columns[0][0];
-    ExportDataDialog dialog(config_, exportBasePath_, defaultFormat, this, &plot);
-    if (dialog.exec() != QDialog::Accepted) {
-        return;
-    }
-
-    settings.setValue("export/format", exportFormatSettingValue(dialog.exportFormat()));
-    QSet<int> selectedSignalIndexes;
-    for (int signal : dialog.selectedSignals()) {
-        selectedSignalIndexes.insert(signal);
-    }
-    QHash<QString, QSet<int>> signalFilter;
-    signalFilter.insert(QStringLiteral("%1:%2").arg(selectedColumn_).arg(selectedRow_), selectedSignalIndexes);
-    exportDataForPanels({{selectedColumn_, selectedRow_}},
-                        dialog.outputBaseDir(),
-                        static_cast<int>(dialog.exportFormat()),
-                        static_cast<int>(dialog.exportRange()),
-                        dialog.customXMin(),
-                        dialog.customXMax(),
-                        signalFilter);
+    auto* dialog = new ExportDataDialog(config_, exportBasePath_, defaultFormat, this, &plot);
+    connect(dialog, &QDialog::accepted, this, [this, dialog] {
+        QSettings settings(uiSettingsPath(rootPath_), QSettings::IniFormat);
+        settings.setValue("export/format", exportFormatSettingValue(dialog->exportFormat()));
+        QSet<int> selectedSignalIndexes;
+        for (int signal : dialog->selectedSignals()) {
+            selectedSignalIndexes.insert(signal);
+        }
+        QHash<QString, QSet<int>> signalFilter;
+        signalFilter.insert(QStringLiteral("%1:%2").arg(selectedColumn_).arg(selectedRow_), selectedSignalIndexes);
+        exportDataForPanels({{selectedColumn_, selectedRow_}},
+                            dialog->outputBaseDir(),
+                            static_cast<int>(dialog->exportFormat()),
+                            static_cast<int>(dialog->exportRange()),
+                            dialog->customXMin(),
+                            dialog->customXMax(),
+                            signalFilter);
+    });
+    #ifndef Q_OS_IOS
+    connect(dialog, &QDialog::finished, dialog, &QObject::deleteLater);
+#endif
+    dialog->open();
 }
 
 void MainWindow::exportDataForPanels(const QVector<QPair<int, int>>& panels,
@@ -73,11 +79,11 @@ void MainWindow::exportDataForPanels(const QVector<QPair<int, int>>& panels,
                                      const QHash<QString, QSet<int>>& signalFilter)
 {
     if (panels.isEmpty()) {
-        QMessageBox::warning(this, "Export Data", "Select at least one panel.");
+        setStatus("Export Data: Select at least one panel.");
         return;
     }
     if (baseDirPath.trimmed().isEmpty()) {
-        QMessageBox::warning(this, "Export Data", "Choose an output directory.");
+        setStatus("Export Data: Choose an output directory.");
         return;
     }
     exportBasePath_ = QDir(baseDirPath.trimmed()).absolutePath();
@@ -225,9 +231,10 @@ void MainWindow::exportDataForPanels(const QVector<QPair<int, int>>& panels,
                 return;
             }
             if (!errors.isEmpty()) {
-                QMessageBox::warning(self, "Export Data", errors.join("\n"));
+                self->setStatus(QString("Export errors: %1").arg(errors.first()));
+            } else {
+                self->setStatus(QString("Exported %1 files to %2").arg(written).arg(outputPath));
             }
-            self->setStatus(QString("Exported %1 files to %2").arg(written).arg(outputPath));
         }, Qt::QueuedConnection);
     });
 }

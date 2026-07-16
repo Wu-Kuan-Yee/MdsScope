@@ -6,6 +6,7 @@
 #include "helpers.hpp"
 #include <QGestureEvent>
 #include <QPinchGesture>
+#include <QPanGesture>
 
 bool PlotWidget::event(QEvent* event)
 {
@@ -44,12 +45,28 @@ bool PlotWidget::event(QEvent* event)
                 handled = true;
             }
             
+            if (QGesture* pan = ge->gesture(Qt::PanGesture)) {
+                auto* panGesture = static_cast<QPanGesture*>(pan);
+                if (panGesture->state() == Qt::GestureUpdated) {
+                    const QRectF pr = plotRect();
+                    if (pr.isValid()) {
+                        QRectF view = effectiveView();
+                        const QPointF delta = panGesture->delta();
+                        const double dx = -delta.x() / pr.width() * view.width();
+                        const double dy = delta.y() / pr.height() * view.height();
+                        view.translate(dx, dy);
+                        view_ = view;
+                        hasView_ = true;
+                        invalidatePlotCache();
+                        update();
+                    }
+                }
+                handled = true;
+            }
+            
             if (QGesture* tap = ge->gesture(Qt::TapAndHoldGesture)) {
                 if (tap->state() == Qt::GestureFinished) {
-                    QPoint pos = mapFromGlobal(tap->hotSpot().toPoint());
-                    QTimer::singleShot(0, this, [this, pos]() {
-                        emit customContextMenuRequested(pos);
-                    });
+                    emit customContextMenuRequested(mapFromGlobal(tap->hotSpot().toPoint()));
                 }
                 handled = true;
             }
@@ -253,9 +270,11 @@ void PlotWidget::wheelEvent(QWheelEvent* event)
 
     // For trackpads, two-finger scroll pans by default, and pinch zooms.
     // We allow zooming with trackpad scroll only if Ctrl/Cmd is pressed.
+#if !defined(Q_OS_IOS) && !defined(Q_OS_ANDROID)
     if (isTrackpad && !event->modifiers().testFlag(Qt::ControlModifier)) {
         shouldZoom = false;
     }
+#endif
 
     if (shouldZoom) {
         const QPointF center = pixelToData(event->position(), view, pr);

@@ -114,7 +114,7 @@ void MainWindow::openEnvironmentFile()
 void MainWindow::openRecentEnvironmentFile(const QString& path)
 {
     if (!QFileInfo::exists(path)) {
-        QMessageBox::warning(this, "Open MdsScope Config", "Recent file no longer exists:\n" + path);
+        showSafeWarning(this, "Open MdsScope Config", "Recent file no longer exists:\n" + path);
         refreshRecentEnvironmentMenu();
         return;
     }
@@ -357,20 +357,23 @@ bool MainWindow::saveEnvironmentFile(const QString& path) const
     const QDir dir(info.absolutePath());
     const QString tomlPath = suffix == "toml" ? primaryPath : dir.filePath(baseName + ".toml");
     const QString webscpPath = suffix == "webscp" ? primaryPath : dir.filePath(baseName + ".webscp");
+    if (!dir.exists()) {
+        dir.mkpath(".");
+    }
 
     QString tomlError;
     const bool tomlOk = writeEnvironmentToml(config_, tomlPath, &tomlError);
     const bool webscpOk = saveWebscpEnvironmentFile(webscpPath);
 
     if (!tomlOk && !webscpOk) {
-        QMessageBox::warning(nullptr, "Save", "Cannot write TOML: " + tomlError + "\nCannot write webscp: " + webscpPath);
+        showSafeWarning(nullptr, "Save", "Cannot write TOML: " + tomlError + "\nCannot write webscp: " + webscpPath);
         return false;
     }
     if (!tomlOk) {
-        QMessageBox::warning(nullptr, "Save", "Saved webscp, but TOML export failed: " + tomlError);
+        showSafeWarning(nullptr, "Save", "Saved webscp, but TOML export failed: " + tomlError);
     }
     if (!webscpOk) {
-        QMessageBox::warning(nullptr, "Save", "Saved TOML, but webscp export failed: " + webscpPath);
+        showSafeWarning(nullptr, "Save", "Saved TOML, but webscp export failed: " + webscpPath);
     }
     return tomlOk && webscpOk;
 }
@@ -379,7 +382,7 @@ bool MainWindow::saveWebscpEnvironmentFile(const QString& path) const
 {
     QFile file(path);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
-        QMessageBox::warning(nullptr, "Save", "Cannot write " + path);
+        showSafeWarning(nullptr, "Save", "Cannot write " + path);
         return false;
     }
     QTextStream out(&file);
