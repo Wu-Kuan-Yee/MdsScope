@@ -193,7 +193,7 @@ void LoginDialog::tryLogin()
                     auth.token = token;
                     saveCachedAuth(auth);
                     QSettings().setValue("ApiUrlOverride", api);
-                    QTimer::singleShot(0, this, [this] { accept(); });
+                    QTimer::singleShot(500, this, [this] { accept(); });
                     return;
                 }
                 

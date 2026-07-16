@@ -208,6 +208,6 @@ void SshDialog::saveAndAccept()
 #endif
     const SshSettings settings = currentSettings();
     if (validateSettings(settings) && saveSettings(settings)) {
-        accept();
+        QTimer::singleShot(500, this, [this] { accept(); });
     }
 }
