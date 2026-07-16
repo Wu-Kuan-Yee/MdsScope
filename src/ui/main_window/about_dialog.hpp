@@ -289,7 +289,9 @@ public:
         setWindowTitle("About MdsScope");
         setWindowIcon(appIcon());
         setModal(true);
+#ifndef Q_OS_IOS
         setSizeGripEnabled(false);
+#endif
         networkManager_ = new QNetworkAccessManager(this);
 
         const FontSettings& fonts = fontSettings();

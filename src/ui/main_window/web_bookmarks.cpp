@@ -3,6 +3,7 @@
 
 #include "mdsscope_internal.hpp"
 #include "base_dialog.hpp"
+#include "dialog_overlay.hpp"
 
 #include <QDialogButtonBox>
 #include <QSignalBlocker>
@@ -84,7 +85,7 @@ QString defaultWebAlias(const QString& value)
 void editWebAddress(QWidget* parent, const QString& title, const InternalWebBookmark& initial, std::function<void(const InternalWebBookmark&)> onAccept)
 {
     auto* _dialog = new BaseDialog(parent);
-    QDialog& dialog = *_dialog;
+    BaseDialog& dialog = *_dialog;
     dialog.setWindowTitle(title);
     dialog.setWindowIcon(appIcon());
 #if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
@@ -122,7 +123,11 @@ void editWebAddress(QWidget* parent, const QString& title, const InternalWebBook
     #ifndef Q_OS_IOS
     QObject::connect(&dialog, &BaseDialog::finished, &dialog, &QObject::deleteLater);
 #endif
+    #ifdef Q_OS_IOS
+    new DialogOverlayManager(qobject_cast<QMainWindow*>(parent), _dialog);
+    #else
     dialog.open();
+    #endif
 }
 
 void editSavedWebAddresses(QWidget* parent, const QVector<InternalWebBookmark>& bookmarks, std::function<void(const QVector<InternalWebBookmark>&)> onAccept)
@@ -132,7 +137,7 @@ void editSavedWebAddresses(QWidget* parent, const QVector<InternalWebBookmark>& 
     }
 
     auto* _dialog = new BaseDialog(parent);
-    QDialog& dialog = *_dialog;
+    BaseDialog& dialog = *_dialog;
     dialog.setWindowTitle(QStringLiteral("Edit"));
     dialog.setWindowIcon(appIcon());
 #if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
@@ -239,7 +244,11 @@ void editSavedWebAddresses(QWidget* parent, const QVector<InternalWebBookmark>& 
     #ifndef Q_OS_IOS
     QObject::connect(&dialog, &BaseDialog::finished, &dialog, &QObject::deleteLater);
 #endif
+    #ifdef Q_OS_IOS
+    new DialogOverlayManager(qobject_cast<QMainWindow*>(parent), _dialog);
+    #else
     dialog.open();
+    #endif
 }
 
 void selectWebAddressToRemove(QWidget* parent, const QVector<InternalWebBookmark>& bookmarks, std::function<void(const QVector<int>&)> onAccept)
@@ -249,7 +258,7 @@ void selectWebAddressToRemove(QWidget* parent, const QVector<InternalWebBookmark
     }
 
     auto* _dialog = new BaseDialog(parent);
-    QDialog& dialog = *_dialog;
+    BaseDialog& dialog = *_dialog;
     dialog.setWindowTitle(QStringLiteral("Remove"));
     dialog.setWindowIcon(appIcon());
     dialog.setMinimumSize(560, 280);
@@ -311,7 +320,11 @@ void selectWebAddressToRemove(QWidget* parent, const QVector<InternalWebBookmark
     #ifndef Q_OS_IOS
     QObject::connect(&dialog, &BaseDialog::finished, &dialog, &QObject::deleteLater);
 #endif
+    #ifdef Q_OS_IOS
+    new DialogOverlayManager(qobject_cast<QMainWindow*>(parent), _dialog);
+    #else
     dialog.open();
+    #endif
 }
 
 }

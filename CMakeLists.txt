@@ -102,6 +102,7 @@ qt_add_executable(MdsScope
     src/mds/mds_ip_series.cpp
     src/ssh/ssh_tunnel_manager.cpp
     src/ssh/ssh_diagnostic.cpp
+    src/ui/base_dialog.hpp
     src/ui/login_dialog.cpp
     src/ui/ssh_dialog.cpp
     src/ui/plot/events.cpp

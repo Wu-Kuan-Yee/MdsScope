@@ -399,7 +399,7 @@ void MainWindow::deleteSignalFromCurrentPlot()
     dialog->setComboBoxItems(items);
     dialog->setComboBoxEditable(false);
     
-    connect(dialog, &BaseDialog::accepted, this, [this, dialog, items] {
+    connect(dialog, &QInputDialog::accepted, this, [this, dialog, items] {
         if (selectedColumn_ < 0 || selectedRow_ < 0) return;
         PlotSpec& plot = config_.columns[selectedColumn_][selectedRow_];
         QString choice = dialog->textValue();
@@ -412,7 +412,7 @@ void MainWindow::deleteSignalFromCurrentPlot()
         }
     });
     #ifndef Q_OS_IOS
-    connect(dialog, &BaseDialog::finished, dialog, &QObject::deleteLater);
+    connect(dialog, &QInputDialog::finished, dialog, &QObject::deleteLater);
 #endif
     #ifdef Q_OS_IOS
     new DialogOverlayManager(this, dialog);
