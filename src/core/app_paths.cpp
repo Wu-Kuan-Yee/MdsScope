@@ -260,11 +260,16 @@ bool addSourceIndexSignal(const QString& tree, const QString& signal)
 
 QString defaultExportBaseDir()
 {
-    QString downloads = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
-    if (downloads.isEmpty()) {
-        downloads = QDir::home().filePath("Downloads");
+    QString base;
+#if defined(Q_OS_IOS) || defined(Q_OS_ANDROID)
+    base = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+#else
+    base = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
+#endif
+    if (base.isEmpty()) {
+        base = QDir::home().filePath("Downloads");
     }
-    const QString path = QDir(downloads).filePath("mdsscope");
+    const QString path = QDir(base).filePath("mdsscope_export");
     QDir().mkpath(path);
     return path;
 }
