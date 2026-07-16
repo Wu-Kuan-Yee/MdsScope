@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "mdsscope_internal.hpp"
+#include "dialog_overlay.hpp"
 #include "layout_dialog.hpp"
 #include "shared.hpp"
 #include "signal_dialogs.hpp"
@@ -289,7 +290,11 @@ void MainWindow::openLayoutSetupDialog()
         }
     }
     });
+    #ifdef Q_OS_IOS
+    new DialogOverlayManager(this, dialog);
+    #else
     dialog->open();
+    #endif
 }
 
 PlotSpec MainWindow::defaultPlotFromSelection() const
@@ -326,7 +331,11 @@ void MainWindow::addPlotBelow()
         selectPlot(column, row);
         refreshOne(column, row, 0);
     });
+    #ifdef Q_OS_IOS
+    new DialogOverlayManager(this, dialog);
+    #else
     dialog->open();
+    #endif
 }
 
 void MainWindow::deleteCurrentPlot()
@@ -363,7 +372,11 @@ void MainWindow::addSignalToCurrentPlot()
         syncDisplayConfig();
         refreshOne(selectedColumn_, selectedRow_, -1);
     });
+    #ifdef Q_OS_IOS
+    new DialogOverlayManager(this, dialog);
+    #else
     dialog->open();
+    #endif
 }
 
 void MainWindow::deleteSignalFromCurrentPlot()
@@ -400,7 +413,11 @@ void MainWindow::deleteSignalFromCurrentPlot()
     #ifndef Q_OS_IOS
     connect(dialog, &QDialog::finished, dialog, &QObject::deleteLater);
 #endif
+    #ifdef Q_OS_IOS
+    new DialogOverlayManager(this, dialog);
+    #else
     dialog->open();
+    #endif
 }
 
 void MainWindow::panelSetupForCurrentPanel()
@@ -426,7 +443,11 @@ void MainWindow::panelSetupForCurrentPanel()
         updateTopInfoLabels();
         setStatus(QString("Updated panel setup: col %1 row %2").arg(selectedColumn_ + 1).arg(selectedRow_ + 1));
     });
+    #ifdef Q_OS_IOS
+    new DialogOverlayManager(this, dialog);
+    #else
     dialog->open();
+    #endif
 }
 
 void MainWindow::dataSourceSetupForCurrentPanel()
@@ -486,7 +507,11 @@ void MainWindow::dataSourceSetupForCurrentPanel()
     #ifndef Q_OS_IOS
     connect(dialog, &QDialog::finished, dialog, &QObject::deleteLater);
 #endif
+    #ifdef Q_OS_IOS
+    new DialogOverlayManager(this, dialog);
+    #else
     dialog->open();
+    #endif
 }
 
 void MainWindow::maximizeCurrentPanel()

@@ -4,6 +4,7 @@
 #include "mdsscope_internal.hpp"
 #include "about_dialog.hpp"
 #include "shared.hpp"
+#include "dialog_overlay.hpp"
 
 
 void MainWindow::applyShot()
@@ -67,6 +68,16 @@ void MainWindow::openLoginDialog()
     if (!prepareSshUrl(readApiUrl(rootPath_), &apiUrl)) {
         return;
     }
+#ifdef Q_OS_IOS
+    auto* dialog = new LoginDialog(rootPath_, nullptr, apiUrl);
+    new DialogOverlayManager(this, dialog);
+    // Since it's async now, we handle accept via signal
+    connect(dialog, &QDialog::accepted, this, [this]() {
+        QTimer::singleShot(1000, this, [this]() {
+            applyLoginSuccessStatus("Login token saved");
+        });
+    });
+#else
     auto* dialog = new LoginDialog(rootPath_, this, apiUrl);
     if (dialog->exec() == QDialog::Accepted) {
         QTimer::singleShot(1000, this, [this]() {
@@ -74,13 +85,19 @@ void MainWindow::openLoginDialog()
         });
     }
     QTimer::singleShot(2000, dialog, &QObject::deleteLater);
+#endif
 }
 
 void MainWindow::openAboutDialog()
 {
+#ifdef Q_OS_IOS
+    auto* dialog = new AboutDialog(nullptr);
+    new DialogOverlayManager(this, dialog);
+#else
     auto* dialog = new AboutDialog(this);
     dialog->exec();
     QTimer::singleShot(2000, dialog, &QObject::deleteLater);
+#endif
 }
 
 void MainWindow::applyLoginSuccessStatus(const QString& statusText)
