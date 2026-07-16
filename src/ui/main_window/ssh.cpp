@@ -2,13 +2,24 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "mdsscope_internal.hpp"
-#include "ssh_dialog.hpp"
+#include "../ssh_dialog.hpp"
+#include "dialog_overlay.hpp"
 #include "ssh_tunnel_manager.hpp"
 
 #include <QMessageBox>
 
 void MainWindow::openSshDialog()
 {
+#ifdef Q_OS_IOS
+    auto* dialog = new SshDialog(sshTunnelManager_, nullptr);
+    new DialogOverlayManager(this, dialog);
+    // Since it's async now, we wait for finished signal to refresh UI
+    connect(dialog, &QDialog::finished, this, [this]() {
+        QTimer::singleShot(1000, this, [this]() {
+            updateSshActionIcon();
+        });
+    });
+#else
     auto* dialog = new SshDialog(sshTunnelManager_, this);
     dialog->setWindowIcon(appIcon());
     dialog->exec();
@@ -16,6 +27,7 @@ void MainWindow::openSshDialog()
         updateSshActionIcon();
     });
     QTimer::singleShot(2000, dialog, &QObject::deleteLater);
+#endif
 }
 
 bool MainWindow::prepareSshLayout(const LayoutConfig& source, LayoutConfig* prepared)

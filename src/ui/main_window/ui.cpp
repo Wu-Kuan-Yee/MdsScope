@@ -9,6 +9,7 @@
 #include "theme.hpp"
 #include "ssh_tunnel_manager.hpp"
 #include "mobile_menu.hpp"
+#include "dialog_overlay.hpp"
 
 
 void MainWindow::changeEvent(QEvent* event)
@@ -524,7 +525,15 @@ void MainWindow::openCustomizeDialog()
     #ifndef Q_OS_IOS
     connect(dialog, &QDialog::finished, dialog, &QObject::deleteLater);
 #endif
+#ifdef Q_OS_IOS
+    new DialogOverlayManager(this, dialog);
+#else
+    #ifdef Q_OS_IOS
+    new DialogOverlayManager(this, dialog);
+    #else
     dialog->open();
+    #endif
+#endif
 }
 
 void MainWindow::applyUiFont()

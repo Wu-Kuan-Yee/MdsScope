@@ -3,6 +3,7 @@
 
 #include "mdsscope_internal.hpp"
 #include "export_dialog.hpp"
+#include "dialog_overlay.hpp"
 #include "shared.hpp"
 #include "mds_client.hpp"
 #include <QDesktopServices>
@@ -13,7 +14,12 @@ void MainWindow::openExportDataDialog()
 {
     QSettings settings(uiSettingsPath(rootPath_), QSettings::IniFormat);
     const ExportFormat defaultFormat = exportFormatFromSetting(settings.value("export/format", "text").toString());
+#ifdef Q_OS_IOS
+    auto* dialog = new ExportDataDialog(config_, exportBasePath_, defaultFormat, nullptr);
+    new DialogOverlayManager(this, dialog);
+#else
     auto* dialog = new ExportDataDialog(config_, exportBasePath_, defaultFormat, this);
+#endif
     connect(dialog, &QDialog::accepted, this, [this, dialog] {
         QSettings settings(uiSettingsPath(rootPath_), QSettings::IniFormat);
         settings.setValue("export/format", exportFormatSettingValue(dialog->exportFormat()));
@@ -24,10 +30,10 @@ void MainWindow::openExportDataDialog()
                             dialog->customXMin(),
                             dialog->customXMax());
     });
-    #ifndef Q_OS_IOS
+#ifndef Q_OS_IOS
     connect(dialog, &QDialog::finished, dialog, [dialog] { QTimer::singleShot(1000, dialog, &QObject::deleteLater); });
-#endif
     dialog->open();
+#endif
 }
 
 void MainWindow::exportCurrentPanelData()
@@ -48,7 +54,12 @@ void MainWindow::exportCurrentPanelData()
     }
     dialogConfig = expandedShotLayout(dialogConfig);
     const PlotSpec& plot = dialogConfig.columns[0][0];
+#ifdef Q_OS_IOS
+    auto* dialog = new ExportDataDialog(config_, exportBasePath_, defaultFormat, nullptr, &plot);
+    new DialogOverlayManager(this, dialog);
+#else
     auto* dialog = new ExportDataDialog(config_, exportBasePath_, defaultFormat, this, &plot);
+#endif
     connect(dialog, &QDialog::accepted, this, [this, dialog] {
         QSettings settings(uiSettingsPath(rootPath_), QSettings::IniFormat);
         settings.setValue("export/format", exportFormatSettingValue(dialog->exportFormat()));
@@ -66,10 +77,10 @@ void MainWindow::exportCurrentPanelData()
                             dialog->customXMax(),
                             signalFilter);
     });
-    #ifndef Q_OS_IOS
+#ifndef Q_OS_IOS
     connect(dialog, &QDialog::finished, dialog, [dialog] { QTimer::singleShot(1000, dialog, &QObject::deleteLater); });
-#endif
     dialog->open();
+#endif
 }
 
 void MainWindow::exportDataForPanels(const QVector<QPair<int, int>>& panels,
