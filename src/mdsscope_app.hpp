@@ -155,12 +155,17 @@ class LoginDialog final : public QDialog {
 public:
     explicit LoginDialog(QString rootPath, QWidget* parent = nullptr, QString apiOverride = {});
 
+public slots:
+    void accept() override;
+    void reject() override;
+
 private:
     void loadProperties();
     void tryLogin();
 
     QString rootPath_;
     QString apiOverride_;
+    bool isClosing_ = false;
     QHash<QString, QString> properties_;
     QLineEdit* apiEdit_ = nullptr;
     QLineEdit* userEdit_ = nullptr;

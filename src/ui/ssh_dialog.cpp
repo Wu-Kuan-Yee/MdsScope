@@ -12,6 +12,9 @@
 #include <QFormLayout>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QGuiApplication>
+#include <QInputMethod>
+#include <QTimer>
 #include <QLineEdit>
 #include <QMessageBox>
 #include <QPushButton>
@@ -165,6 +168,40 @@ bool SshDialog::saveSettings(const SshSettings& settings)
     return true;
 }
 
+void SshDialog::accept()
+{
+    if (isClosing_) return;
+    isClosing_ = true;
+#ifdef Q_OS_IOS
+    QMetaObject::invokeMethod(this, [this]() {
+        if (QWidget* fw = focusWidget()) fw->clearFocus();
+        if (QGuiApplication::inputMethod()->isVisible()) {
+            QGuiApplication::inputMethod()->hide();
+        }
+    }, Qt::QueuedConnection);
+    QTimer::singleShot(500, this, [this]() { QDialog::accept(); });
+#else
+    QDialog::accept();
+#endif
+}
+
+void SshDialog::reject()
+{
+    if (isClosing_) return;
+    isClosing_ = true;
+#ifdef Q_OS_IOS
+    QMetaObject::invokeMethod(this, [this]() {
+        if (QWidget* fw = focusWidget()) fw->clearFocus();
+        if (QGuiApplication::inputMethod()->isVisible()) {
+            QGuiApplication::inputMethod()->hide();
+        }
+    }, Qt::QueuedConnection);
+    QTimer::singleShot(500, this, [this]() { QDialog::reject(); });
+#else
+    QDialog::reject();
+#endif
+}
+
 void SshDialog::testConnection()
 {
     const SshSettings settings = currentSettings();
@@ -190,6 +227,6 @@ void SshDialog::saveAndAccept()
 {
     const SshSettings settings = currentSettings();
     if (validateSettings(settings) && saveSettings(settings)) {
-        QTimer::singleShot(500, this, [this] { accept(); });
+        accept();
     }
 }

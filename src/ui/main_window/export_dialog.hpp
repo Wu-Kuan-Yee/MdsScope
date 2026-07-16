@@ -4,6 +4,9 @@
 #pragma once
 
 #include "layout_dialog.hpp"
+#include <QGuiApplication>
+#include <QInputMethod>
+#include <QTimer>
 
 class ExportDataDialog final : public QDialog {
 public:
@@ -224,6 +227,38 @@ public:
         return xmax_->text().trimmed().toDouble();
     }
 
+public slots:
+    void accept() override {
+        if (isClosing_) return;
+        isClosing_ = true;
+#ifdef Q_OS_IOS
+        QMetaObject::invokeMethod(this, [this]() {
+            if (QWidget* fw = focusWidget()) fw->clearFocus();
+            if (QGuiApplication::inputMethod()->isVisible()) {
+                QGuiApplication::inputMethod()->hide();
+            }
+        }, Qt::QueuedConnection);
+        QTimer::singleShot(500, this, [this]() { QDialog::accept(); });
+#else
+        QDialog::accept();
+#endif
+    }
+    void reject() override {
+        if (isClosing_) return;
+        isClosing_ = true;
+#ifdef Q_OS_IOS
+        QMetaObject::invokeMethod(this, [this]() {
+            if (QWidget* fw = focusWidget()) fw->clearFocus();
+            if (QGuiApplication::inputMethod()->isVisible()) {
+                QGuiApplication::inputMethod()->hide();
+            }
+        }, Qt::QueuedConnection);
+        QTimer::singleShot(500, this, [this]() { QDialog::reject(); });
+#else
+        QDialog::reject();
+#endif
+    }
+
 private:
     bool customRangeValid() const
     {
@@ -233,6 +268,8 @@ private:
         const double xmax = xmax_->text().trimmed().toDouble(&maxOk);
         return minOk && maxOk && std::isfinite(xmin) && std::isfinite(xmax) && xmin != xmax;
     }
+
+    bool isClosing_ = false;
 
     bool signalMode_ = false;
     LayoutCanvas* canvas_ = nullptr;
