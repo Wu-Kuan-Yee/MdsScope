@@ -3,6 +3,8 @@
 
 #include "mdsscope_internal.hpp"
 #include <QNetworkProxy>
+#include <QGuiApplication>
+#include <QInputMethod>
 
 LoginDialog::LoginDialog(QString rootPath, QWidget* parent, QString apiOverride)
     : QDialog(parent), rootPath_(std::move(rootPath)), apiOverride_(std::move(apiOverride))
@@ -125,6 +127,40 @@ void LoginDialog::loadProperties()
     }
 }
 
+void LoginDialog::accept()
+{
+    if (isClosing_) return;
+    isClosing_ = true;
+#ifdef Q_OS_IOS
+    QMetaObject::invokeMethod(this, [this]() {
+        if (QWidget* fw = focusWidget()) fw->clearFocus();
+        if (QGuiApplication::inputMethod()->isVisible()) {
+            QGuiApplication::inputMethod()->hide();
+        }
+    }, Qt::QueuedConnection);
+    QTimer::singleShot(500, this, [this]() { QDialog::accept(); });
+#else
+    QDialog::accept();
+#endif
+}
+
+void LoginDialog::reject()
+{
+    if (isClosing_) return;
+    isClosing_ = true;
+#ifdef Q_OS_IOS
+    QMetaObject::invokeMethod(this, [this]() {
+        if (QWidget* fw = focusWidget()) fw->clearFocus();
+        if (QGuiApplication::inputMethod()->isVisible()) {
+            QGuiApplication::inputMethod()->hide();
+        }
+    }, Qt::QueuedConnection);
+    QTimer::singleShot(500, this, [this]() { QDialog::reject(); });
+#else
+    QDialog::reject();
+#endif
+}
+
 void LoginDialog::tryLogin()
 {
     if (loginInProgress_) {
@@ -183,7 +219,7 @@ void LoginDialog::tryLogin()
                     auth.token = token;
                     saveCachedAuth(auth);
                     QSettings().setValue("ApiUrlOverride", api);
-                    QTimer::singleShot(500, this, [this] { accept(); });
+                    accept();
                     return;
                 }
                 

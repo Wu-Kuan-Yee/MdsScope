@@ -20,12 +20,18 @@ class SshDialog final : public QDialog {
 public:
     explicit SshDialog(SshTunnelManager* manager, QWidget* parent = nullptr);
 
+public slots:
+    void accept() override;
+    void reject() override;
+
 private:
     SshSettings currentSettings() const;
     bool validateSettings(const SshSettings& settings);
     bool saveSettings(const SshSettings& settings);
     void testConnection();
     void saveAndAccept();
+
+    bool isClosing_ = false;
 
     SshTunnelManager* manager_ = nullptr;
     QComboBox* modeCombo_ = nullptr;
