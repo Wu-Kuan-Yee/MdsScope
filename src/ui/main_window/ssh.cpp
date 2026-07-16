@@ -9,7 +9,11 @@
 
 void MainWindow::openSshDialog()
 {
+#ifdef Q_OS_IOS
+    auto* dialog = new SshDialog(sshTunnelManager_, nullptr);
+#else
     auto* dialog = new SshDialog(sshTunnelManager_, this);
+#endif
     dialog->setWindowIcon(appIcon());
     dialog->exec();
     QTimer::singleShot(1000, this, [this]() {
