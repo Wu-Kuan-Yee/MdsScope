@@ -14,10 +14,10 @@ LoginDialog::LoginDialog(QString rootPath, QWidget* parent, QString apiOverride)
 #else
     setFixedWidth(420);
 #endif
+    manager_ = new QNetworkAccessManager(this);
 #ifdef Q_OS_IOS
     // Send a dummy request to a domain to trigger the iOS China network permission prompt
-    auto* dummyManager = new QNetworkAccessManager(this);
-    dummyManager->get(QNetworkRequest(QUrl("http://captive.apple.com/hotspot-detect.html")));
+    manager_->get(QNetworkRequest(QUrl("http://captive.apple.com/hotspot-detect.html")));
 #endif
     QString styleSheet =
         "QDialog { background: palette(base); }"
@@ -147,7 +147,6 @@ void LoginDialog::tryLogin()
     statusLabel_->setText(QStringLiteral("Signing in..."));
     statusLabel_->show();
 
-    auto* manager = new QNetworkAccessManager(this);
     QString baseUrl = api.trimmed();
     if (baseUrl.endsWith('/')) {
         baseUrl.chop(1);
@@ -160,11 +159,10 @@ void LoginDialog::tryLogin()
     payload.insert("userName", userName.trimmed());
     payload.insert("password", password);
 
-    QNetworkReply* reply = manager->post(request, QJsonDocument(payload).toJson(QJsonDocument::Compact));
+    QNetworkReply* reply = manager_->post(request, QJsonDocument(payload).toJson(QJsonDocument::Compact));
 
     connect(reply, &QNetworkReply::finished, this, [this, reply, userName, password, api]() {
         reply->deleteLater();
-        reply->manager()->deleteLater();
         loginInProgress_ = false;
         loginButton_->setEnabled(true);
         loginButton_->setText(QStringLiteral("Login"));
