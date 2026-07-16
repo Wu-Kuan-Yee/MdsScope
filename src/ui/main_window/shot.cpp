@@ -72,7 +72,7 @@ void MainWindow::openLoginDialog()
         applyLoginSuccessStatus("Login token saved");
     });
     connect(dialog, &QDialog::finished, dialog, [dialog]() {
-        dialog->deleteLater();
+        QTimer::singleShot(1000, dialog, &QObject::deleteLater);
     });
     dialog->open();
 }
@@ -81,7 +81,7 @@ void MainWindow::openAboutDialog()
 {
     auto* dialog = new AboutDialog(this);
     connect(dialog, &QDialog::finished, dialog, [dialog]() {
-        dialog->deleteLater();
+        QTimer::singleShot(1000, dialog, &QObject::deleteLater);
     });
     dialog->open();
 }

@@ -13,7 +13,7 @@ void MainWindow::openSshDialog()
     dialog->setWindowIcon(appIcon());
     connect(dialog, &QDialog::finished, this, [this, dialog] {
         updateSshActionIcon();
-        dialog->deleteLater();
+        QTimer::singleShot(1000, dialog, &QObject::deleteLater);
     });
     dialog->open();
 }

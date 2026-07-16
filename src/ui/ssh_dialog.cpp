@@ -12,6 +12,8 @@
 #include <QFormLayout>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QGuiApplication>
+#include <QInputMethod>
 #include <QLineEdit>
 #include <QMessageBox>
 #include <QPushButton>
@@ -167,6 +169,14 @@ bool SshDialog::saveSettings(const SshSettings& settings)
 
 void SshDialog::testConnection()
 {
+    if (QWidget* fw = focusWidget()) {
+        fw->clearFocus();
+    }
+#ifdef Q_OS_IOS
+    if (QGuiApplication::inputMethod()->isVisible()) {
+        QGuiApplication::inputMethod()->hide();
+    }
+#endif
     const SshSettings settings = currentSettings();
     if (!validateSettings(settings) || !saveSettings(settings)) {
         return;
@@ -188,6 +198,14 @@ void SshDialog::testConnection()
 
 void SshDialog::saveAndAccept()
 {
+    if (QWidget* fw = focusWidget()) {
+        fw->clearFocus();
+    }
+#ifdef Q_OS_IOS
+    if (QGuiApplication::inputMethod()->isVisible()) {
+        QGuiApplication::inputMethod()->hide();
+    }
+#endif
     const SshSettings settings = currentSettings();
     if (validateSettings(settings) && saveSettings(settings)) {
         accept();

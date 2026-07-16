@@ -3,6 +3,8 @@
 
 #include "mdsscope_internal.hpp"
 #include <QNetworkProxy>
+#include <QGuiApplication>
+#include <QInputMethod>
 
 LoginDialog::LoginDialog(QString rootPath, QWidget* parent, QString apiOverride)
     : QDialog(parent), rootPath_(std::move(rootPath)), apiOverride_(std::move(apiOverride))
@@ -130,6 +132,14 @@ void LoginDialog::tryLogin()
     if (loginInProgress_) {
         return;
     }
+    if (QWidget* fw = focusWidget()) {
+        fw->clearFocus();
+    }
+#ifdef Q_OS_IOS
+    if (QGuiApplication::inputMethod()->isVisible()) {
+        QGuiApplication::inputMethod()->hide();
+    }
+#endif
     const QString api = apiEdit_->text().trimmed();
     const QString charset = properties_.value("Charset", "UTF-8");
 
@@ -183,7 +193,7 @@ void LoginDialog::tryLogin()
                     auth.token = token;
                     saveCachedAuth(auth);
                     QSettings().setValue("ApiUrlOverride", api);
-                    accept();
+                    QTimer::singleShot(0, this, [this] { accept(); });
                     return;
                 }
                 

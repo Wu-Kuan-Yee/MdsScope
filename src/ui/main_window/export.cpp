@@ -25,7 +25,7 @@ void MainWindow::openExportDataDialog()
                             dialog->customXMax());
     });
     #ifndef Q_OS_IOS
-    connect(dialog, &QDialog::finished, dialog, &QObject::deleteLater);
+    connect(dialog, &QDialog::finished, dialog, [dialog] { QTimer::singleShot(1000, dialog, &QObject::deleteLater); });
 #endif
     dialog->open();
 }
@@ -67,7 +67,7 @@ void MainWindow::exportCurrentPanelData()
                             signalFilter);
     });
     #ifndef Q_OS_IOS
-    connect(dialog, &QDialog::finished, dialog, &QObject::deleteLater);
+    connect(dialog, &QDialog::finished, dialog, [dialog] { QTimer::singleShot(1000, dialog, &QObject::deleteLater); });
 #endif
     dialog->open();
 }
