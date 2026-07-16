@@ -2,13 +2,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #pragma once
+#include "base_dialog.hpp"
 
 #include "shared.hpp"
 
-class PanelSetupDialog final : public QDialog {
+class PanelSetupDialog final : public BaseDialog {
 public:
     explicit PanelSetupDialog(const PlotSpec& plot, QWidget* parent = nullptr)
-        : QDialog(parent)
+        : BaseDialog(parent)
     {
         setWindowTitle("Panel Setup");
         auto* layout = new QFormLayout(this);
@@ -60,7 +61,7 @@ public:
             }
             accept();
         });
-        connect(cancel, &QPushButton::clicked, this, &QDialog::reject);
+        connect(cancel, &QPushButton::clicked, this, &BaseDialog::reject);
     }
 
     void applyTo(PlotSpec* plot) const
@@ -460,10 +461,10 @@ private:
     QPair<int, int> lastDragTarget_ = {-1, -1};
 };
 
-class LayoutSetupDialog final : public QDialog {
+class LayoutSetupDialog final : public BaseDialog {
 public:
     explicit LayoutSetupDialog(const LayoutConfig& config, QWidget* parent = nullptr)
-        : QDialog(parent)
+        : BaseDialog(parent)
     {
         setWindowTitle("Layout Setup");
 #if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
@@ -518,8 +519,8 @@ public:
         connect(addPanelButton, &QPushButton::clicked, canvas_, &LayoutCanvas::createPendingPanelAtRight);
         connect(deleteButton, &QPushButton::clicked, canvas_, &LayoutCanvas::deleteSelected);
         connect(resetButton, &QPushButton::clicked, canvas_, &LayoutCanvas::reset);
-        connect(applyButton, &QPushButton::clicked, this, &QDialog::accept);
-        connect(cancelButton, &QPushButton::clicked, this, &QDialog::reject);
+        connect(applyButton, &QPushButton::clicked, this, &BaseDialog::accept);
+        connect(cancelButton, &QPushButton::clicked, this, &BaseDialog::reject);
     }
 
     QVector<QVector<LayoutCanvas::Item>> layoutItems() const { return canvas_->layoutItems(); }

@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include <QDialog>
+#include "base_dialog.hpp"
 #include <QFutureWatcher>
 #include <QColor>
 #include <QHash>
@@ -149,7 +149,7 @@ struct PointReadout {
     QColor color = QColor("#333333");
 };
 
-class LoginDialog final : public QDialog {
+class LoginDialog final : public BaseDialog {
     Q_OBJECT
 
 public:

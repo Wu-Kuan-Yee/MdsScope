@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "mdsscope_internal.hpp"
+#include "base_dialog.hpp"
 #include "about_dialog.hpp"
 #include "shared.hpp"
 #include "dialog_overlay.hpp"
@@ -72,14 +73,14 @@ void MainWindow::openLoginDialog()
     auto* dialog = new LoginDialog(rootPath_, nullptr, apiUrl);
     new DialogOverlayManager(this, dialog);
     // Since it's async now, we handle accept via signal
-    connect(dialog, &QDialog::accepted, this, [this]() {
+    connect(dialog, &BaseDialog::accepted, this, [this]() {
         QTimer::singleShot(1000, this, [this]() {
             applyLoginSuccessStatus("Login token saved");
         });
     });
 #else
     auto* dialog = new LoginDialog(rootPath_, this, apiUrl);
-    if (dialog->exec() == QDialog::Accepted) {
+    if (dialog->exec() == BaseDialog::Accepted) {
         QTimer::singleShot(1000, this, [this]() {
             applyLoginSuccessStatus("Login token saved");
         });

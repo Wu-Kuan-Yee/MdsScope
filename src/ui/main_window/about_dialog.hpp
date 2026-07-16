@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #pragma once
+#include "base_dialog.hpp"
 
 #include "shared.hpp"
 
@@ -280,10 +281,10 @@ inline QMessageBox* makeAboutMessageBox(QWidget* parent,
     return message;
 }
 
-class AboutDialog final : public QDialog {
+class AboutDialog final : public BaseDialog {
 public:
     explicit AboutDialog(QWidget* parent = nullptr)
-        : QDialog(parent)
+        : BaseDialog(parent)
     {
         setWindowTitle("About MdsScope");
         setWindowIcon(appIcon());
@@ -439,7 +440,7 @@ public:
         connect(updateButton_, &QPushButton::clicked, this, [this] {
             checkForUpdate();
         });
-        connect(close, &QPushButton::clicked, this, &QDialog::accept);
+        connect(close, &QPushButton::clicked, this, &BaseDialog::accept);
     }
 
 private:
