@@ -168,6 +168,7 @@ set_target_properties(MdsScope PROPERTIES WIN32_EXECUTABLE TRUE)
             resources/environment/init.toml
             resources/environment/init.webscp
             resources/source_index/trees.txt
+            images/down_arrow.png
             ${MDS_SCOPE_SOURCE_INDEX_SIGNALS}
     )
 

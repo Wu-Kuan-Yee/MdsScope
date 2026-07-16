@@ -17,8 +17,9 @@ public:
         : QObject(mainWindow), dialog(d) 
     {
         overlay = new QWidget(mainWindow);
+        overlay->setObjectName("dialogOverlayBackground");
         overlay->setAttribute(Qt::WA_StyledBackground, true);
-        overlay->setStyleSheet("background-color: rgba(0, 0, 0, 150);");
+        overlay->setStyleSheet("#dialogOverlayBackground { background-color: rgba(0, 0, 0, 150); }");
         overlay->setGeometry(mainWindow->rect());
         overlay->raise();
         overlay->show();
@@ -28,7 +29,7 @@ public:
         dialog->setAttribute(Qt::WA_StyledBackground, true);
         
         dialog->setObjectName("dialogOverlayTarget");
-        QString shadow = "#dialogOverlayTarget { border: 1px solid #475569; border-radius: 8px; }";
+        QString shadow = "#dialogOverlayTarget { border: 1px solid palette(mid); border-radius: 8px; }";
         dialog->setStyleSheet(dialog->styleSheet() + shadow);
 
         dialog->adjustSize();
@@ -47,6 +48,10 @@ public:
 
     void centerDialog() {
         if (overlay && dialog) {
+            int maxWidth = std::max(100, overlay->width() - 32);
+            int maxHeight = std::max(100, overlay->height() - 64);
+            dialog->setMaximumSize(maxWidth, maxHeight);
+            dialog->adjustSize(); // Re-adjust based on new constraints
             dialog->move((overlay->width() - dialog->width()) / 2, 
                          (overlay->height() - dialog->height()) / 2);
         }

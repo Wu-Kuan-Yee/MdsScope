@@ -76,9 +76,9 @@ QPalette darkPalette()
     palette.setColor(QPalette::Highlight, QColor("#60a5fa"));
     palette.setColor(QPalette::HighlightedText, QColor("#0f172a"));
     palette.setColor(QPalette::Link, QColor("#93c5fd"));
-    palette.setColor(QPalette::Mid, QColor("#475569"));
-    palette.setColor(QPalette::Midlight, QColor("#334155"));
-    palette.setColor(QPalette::Dark, QColor("#020617"));
+    palette.setColor(QPalette::Mid, QColor("#94a3b8"));
+    palette.setColor(QPalette::Midlight, QColor("#475569"));
+    palette.setColor(QPalette::Dark, QColor("#0f172a"));
     palette.setColor(QPalette::Disabled, QPalette::Text, QColor("#94a3b8"));
     palette.setColor(QPalette::Disabled, QPalette::WindowText, QColor("#94a3b8"));
     palette.setColor(QPalette::Disabled, QPalette::ButtonText, QColor("#94a3b8"));
@@ -161,6 +161,17 @@ QString applicationStyleSheet(const QPalette& palette)
                "QLineEdit:disabled, QComboBox:disabled {"
                "  background: %6;"
                "  color: %12;"
+               "}"
+               "QComboBox QLineEdit {"
+               "  background: transparent;"
+               "  border: none;"
+               "}"
+               "QComboBox::drop-down {"
+               "  border-left: 1px solid %5;"
+               "  width: 20px;"
+               "}"
+               "QComboBox::down-arrow {"
+               "  image: url(\":/images/down_arrow.png\");"
                "}"
                "QComboBox QAbstractItemView {"
                "  background: %9;"

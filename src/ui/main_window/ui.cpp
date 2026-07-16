@@ -201,7 +201,6 @@ void MainWindow::buildUi()
     topControls->setContextMenuPolicy(Qt::PreventContextMenu);
     topControls->setStyleSheet(
         "QPushButton { padding: 1px 8px; min-height: 18px; }"
-        "QLineEdit, QComboBox { min-height: 18px; padding: 0px 2px; }"
         "QLabel { margin-left: 2px; margin-right: 2px; }"
     );
 #else
@@ -212,7 +211,6 @@ void MainWindow::buildUi()
     topLayout->setSpacing(3);
     topControls->setStyleSheet(
         "QPushButton { padding: 1px 8px; min-height: 18px; }"
-        "QLineEdit, QComboBox { min-height: 18px; padding: 0px 2px; }"
         "QLabel { margin-left: 2px; margin-right: 2px; }"
     );
 #endif
@@ -284,7 +282,6 @@ void MainWindow::buildUi()
     bottomToolBar->setContextMenuPolicy(Qt::PreventContextMenu);
     bottomToolBar->setStyleSheet(
         "QPushButton { padding: 1px 8px; min-height: 18px; }"
-        "QLineEdit, QComboBox { min-height: 18px; padding: 0px 2px; }"
         "QToolButton { margin: 0px; padding: 1px; min-width: 30px; min-height: 28px; }"
     );
     zoomButton_ = new QToolButton(bottomToolBar);
@@ -311,7 +308,7 @@ void MainWindow::buildUi()
     shotCombo_->view()->setMinimumWidth(200);
     shotCombo_->setMinimumWidth(80);
     shotCombo_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-    shotCombo_->setStyleSheet("QComboBox::drop-down { width: 44px; border-left: 1px solid #cbd5e1; }");
+    shotCombo_->setStyleSheet("QComboBox::drop-down { width: 44px; border-left: 1px solid palette(mid); } QComboBox::down-arrow { image: url(\":/images/down_arrow.png\"); }");
 #else
     shotCombo_->view()->setMinimumWidth(260);
     shotCombo_->view()->setMaximumWidth(520);
