@@ -72,6 +72,10 @@ public:
         auto* row = new QVBoxLayout;
         outputDir_ = new QLineEdit(defaultDir, this);
         auto* browse = new QPushButton("Browse", side);
+#if defined(Q_OS_IOS) || defined(Q_OS_ANDROID)
+        outputDir_->setReadOnly(true);
+        browse->hide();
+#endif
         row->addWidget(new QLabel("Base dir", side));
         row->addWidget(outputDir_);
         row->addWidget(browse);
