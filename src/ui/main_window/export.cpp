@@ -5,6 +5,8 @@
 #include "export_dialog.hpp"
 #include "shared.hpp"
 #include "mds_client.hpp"
+#include <QDesktopServices>
+#include <QUrl>
 
 
 void MainWindow::openExportDataDialog()
@@ -233,7 +235,15 @@ void MainWindow::exportDataForPanels(const QVector<QPair<int, int>>& panels,
             if (!errors.isEmpty()) {
                 self->setStatus(QString("Export errors: %1").arg(errors.first()));
             } else {
-                self->setStatus(QString("Exported %1 files to %2").arg(written).arg(outputPath));
+                QString displayPath = outputPath;
+                QString docs = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+                if (displayPath.startsWith(docs)) {
+                    displayPath.replace(docs, "Documents");
+                }
+                self->setStatus(QString("Exported %1 files to %2").arg(written).arg(displayPath));
+                
+                // Open the destination folder in the system file manager
+                QDesktopServices::openUrl(QUrl::fromLocalFile(outputPath));
             }
         }, Qt::QueuedConnection);
     });
