@@ -40,8 +40,8 @@ QString appConfigDir()
     const QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     return path.isEmpty() ? QDir::home().filePath("Library/Application Support/MdsScope") : path;
 #elif defined(Q_OS_IOS) || defined(Q_OS_ANDROID)
-    const QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    return path.isEmpty() ? QDir::home().filePath(".config/mdsscope") : path;
+    const QString path = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+    return path.isEmpty() ? QDir::home().filePath(".config/mdsscope") : QDir(path).filePath("mdsscope_config");
 #else
     return QDir::home().filePath(".config/mdsscope");
 #endif
