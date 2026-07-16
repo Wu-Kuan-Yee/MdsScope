@@ -84,7 +84,8 @@ void MainWindow::buildUi()
     toolbar->setStyleSheet(
         "QToolBar { spacing: 5px; padding: 2px 4px; border: 0px; }"
         "QToolButton { margin: 0px; padding: 3px; min-width: 30px; min-height: 30px; }");
-    QAction* openAction = toolbar->addAction(style()->standardIcon(QStyle::SP_DirOpenIcon), "Open configure file", this, &MainWindow::openEnvironmentFile);
+    QAction* openAction = toolbar->addAction(style()->standardIcon(QStyle::SP_DirOpenIcon), "Open configure file");
+    connect(openAction, &QAction::triggered, this, &MainWindow::openEnvironmentFile, Qt::QueuedConnection);
     openButton_ = qobject_cast<QToolButton*>(toolbar->widgetForAction(openAction));
     if (openButton_) {
         openButton_->setToolButtonStyle(Qt::ToolButtonIconOnly);
@@ -128,15 +129,19 @@ void MainWindow::buildUi()
     recentEnvironmentMenu_ = new QMenu(recentMenuParent);
     connect(recentEnvironmentMenu_, &QMenu::aboutToShow, this, &MainWindow::refreshRecentEnvironmentMenu);
     refreshRecentEnvironmentMenu();
-    QAction* saveAction = toolbar->addAction(saveIcon(), "Save", this, &MainWindow::saveCurrentEnvironment);
+    QAction* saveAction = toolbar->addAction(saveIcon(), "Save");
+    connect(saveAction, &QAction::triggered, this, &MainWindow::saveCurrentEnvironment, Qt::QueuedConnection);
     saveAction->setShortcut(QKeySequence::Save);
     saveAction->setShortcutContext(Qt::ApplicationShortcut);
     addAction(saveAction);
-    toolbar->addAction(style()->standardIcon(QStyle::SP_DialogSaveButton), "Export data", this, &MainWindow::openExportDataDialog);
+    QAction* exportAction = toolbar->addAction(style()->standardIcon(QStyle::SP_DialogSaveButton), "Export data");
+    connect(exportAction, &QAction::triggered, this, &MainWindow::openExportDataDialog, Qt::QueuedConnection);
     toolbar->addAction(style()->standardIcon(QStyle::SP_BrowserReload), "Refresh", this, &MainWindow::refreshData);
-    loginAction_ = toolbar->addAction(loginIcon(false), "Login", this, &MainWindow::openLoginDialog);
+    loginAction_ = toolbar->addAction(loginIcon(false), "Login");
+    connect(loginAction_, &QAction::triggered, this, &MainWindow::openLoginDialog, Qt::QueuedConnection);
     updateLoginActionIcon();
-    sshAction_ = toolbar->addAction(sshIcon(0), "SSH remote access", this, &MainWindow::openSshDialog);
+    sshAction_ = toolbar->addAction(sshIcon(0), "SSH remote access");
+    connect(sshAction_, &QAction::triggered, this, &MainWindow::openSshDialog, Qt::QueuedConnection);
     connect(sshTunnelManager_, &SshTunnelManager::stateChanged, this, [this] {
         cachedApiSourceUrl_.clear();
         cachedPreparedApiUrl_.clear();
@@ -154,8 +159,10 @@ void MainWindow::buildUi()
         internalWebButton->setPopupMode(QToolButton::InstantPopup);
         refreshInternalWebMenu();
     }
-    toolbar->addAction(gearIcon(), "Layout setup", this, &MainWindow::openLayoutSetupDialog);
-    toolbar->addAction(fontIcon(), "Customize fonts", this, &MainWindow::openCustomizeDialog);
+    QAction* layoutSetupAction = toolbar->addAction(gearIcon(), "Layout setup");
+    connect(layoutSetupAction, &QAction::triggered, this, &MainWindow::openLayoutSetupDialog, Qt::QueuedConnection);
+    QAction* customizeFontsAction = toolbar->addAction(fontIcon(), "Customize fonts");
+    connect(customizeFontsAction, &QAction::triggered, this, &MainWindow::openCustomizeDialog, Qt::QueuedConnection);
 
     gridHost_ = new QWidget(this);
     gridHost_->setFocusPolicy(Qt::StrongFocus);

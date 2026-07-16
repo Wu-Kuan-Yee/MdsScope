@@ -62,7 +62,7 @@ public:
         );
         connect(btn, &QPushButton::clicked, this, [this, slot]() {
             accept();
-            QTimer::singleShot(50, this->parent(), slot);
+            QTimer::singleShot(500, this->parent(), slot);
         });
         contentLayout_->addWidget(btn);
     }
