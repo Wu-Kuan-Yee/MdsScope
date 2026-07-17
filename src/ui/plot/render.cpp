@@ -112,27 +112,27 @@ QRect PlotWidget::zoomRubberBandDirtyRect(const QRectF& band) const
 void PlotWidget::paintEvent(QPaintEvent* event)
 {
     QPainter painter(this);
-    painter.setClipRegion(event->region());
     const qreal dpr = devicePixelRatioF();
     const QSize pixmapSize(qCeil(width() * dpr), qCeil(height() * dpr));
     // Reallocate the backing pixmap only when the device size actually changes
     // (widget resize or dpr change). During pan/zoom the size is stable and
     // only baseCacheDirty_ is set, so the buffer is reused and cleared in place
     // (refcount is 1 between frames — the prior drawPixmap released its ref),
-    // avoiding a full-window alloc/free every frame.
-    if (baseCache_.isNull() || baseCache_.size() != pixmapSize) {
-        baseCache_ = QPixmap(pixmapSize);
+    if (baseCache_.isNull() || baseCache_.size() != pixmapSize || !qFuzzyCompare(baseCache_.devicePixelRatio(), dpr)) {
+        baseCache_ = QImage(pixmapSize, QImage::Format_RGB32);
         baseCache_.setDevicePixelRatio(dpr);
         baseCacheDirty_ = true;
     }
-    if (baseCacheDirty_ || baseCacheSize_ != size()) {
-        baseCache_.fill(Qt::transparent);
+    if (baseCacheDirty_) {
+        QColor bgColor = palette().color(QPalette::Base);
+        bgColor.setAlpha(255);
+        baseCache_.fill(bgColor);
         QPainter cachePainter(&baseCache_);
         renderBasePlot(cachePainter);
         baseCacheSize_ = size();
         baseCacheDirty_ = false;
     }
-    painter.drawPixmap(0, 0, baseCache_);
+    painter.drawImage(0, 0, baseCache_);
     drawSelectionBorder(painter);
     drawSyncedPoint(painter);
     drawZoomRubberBand(painter);
@@ -142,7 +142,8 @@ void PlotWidget::renderBasePlot(QPainter& painter) const
 {
     painter.setRenderHint(QPainter::Antialiasing, false);
     const QPalette pal = palette();
-    const QColor background = pal.color(QPalette::Base);
+    QColor background = pal.color(QPalette::Base);
+    background.setAlpha(255);
     const QColor frame = pal.color(QPalette::Mid);
     const QColor plotFrame = pal.color(QPalette::Midlight);
     const QColor textColor = pal.color(QPalette::Text);

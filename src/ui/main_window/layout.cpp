@@ -523,6 +523,19 @@ void MainWindow::maximizeCurrentPanel()
     singlePanelMaximized_ = true;
     maximizedColumn_ = selectedColumn_;
     maximizedRow_ = selectedRow_;
+    
+    // CRITICAL ANDROID WORKAROUND: Hide all plots FIRST.
+    // If we just change the layout while the widget is visible, Qt's Android backing store
+    // uses bitBlt to move the widget's old pixels to the new y=0 position.
+    // Since the scroll area is also changing size, the dirty rect calculation fails and 
+    // the top half of the screen retains a static ghost of the old frame.
+    // Hiding them first forces a full clean repaint when shown again.
+    for (int c = 0; c < plotWidgets_.size(); ++c) {
+        for (int r = 0; r < plotWidgets_[c].size(); ++r) {
+            plotWidgets_[c][r]->setVisible(false);
+        }
+    }
+
     for (int c = 0; c < plotWidgets_.size(); ++c) {
         QWidget* columnHost = plotWidgets_[c].isEmpty() ? nullptr : plotWidgets_[c].first()->parentWidget();
         if (columnHost) {
@@ -538,14 +551,22 @@ void MainWindow::maximizeCurrentPanel()
         gridLayout_->setColumnStretch(c, c == maximizedColumn_ ? 1 : 0);
         for (int r = 0; r < plotWidgets_[c].size(); ++r) {
             const bool visible = c == maximizedColumn_ && r == maximizedRow_;
-            plotWidgets_[c][r]->setVisible(visible);
-            plotWidgets_[c][r]->setLargeDisplayMode(visible);
+            if (visible) {
+                plotWidgets_[c][r]->setLargeDisplayMode(true);
+                plotWidgets_[c][r]->setVisible(true);
+            } else {
+                plotWidgets_[c][r]->setLargeDisplayMode(false);
+            }
         }
     }
     if (scrollArea_ && scrollArea_->viewport()) {
         gridHost_->setMinimumSize(scrollArea_->viewport()->size());
+        // Max mode has no gaps, so disable viewport background fill to save massive memory bandwidth
+        // and prevent tearing on mobile devices during panning!
+        scrollArea_->viewport()->setAutoFillBackground(false);
     }
     gridHost_->updateGeometry();
+    if (window()) window()->update();
     setStatus(QString("Max panel col %1 row %2").arg(maximizedColumn_ + 1).arg(maximizedRow_ + 1));
 }
 
@@ -574,7 +595,16 @@ void MainWindow::showAllPanels()
             }
         }
     }
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+    const int minHeight = std::max(1, static_cast<int>(plotWidgets_.isEmpty() ? 0 : plotWidgets_[0].size()) * 260);
+    gridHost_->setMinimumHeight(minHeight);
+#else
     gridHost_->setMinimumSize(QSize(0, 0));
+#endif
+    if (scrollArea_ && scrollArea_->viewport()) {
+        scrollArea_->viewport()->setAutoFillBackground(true);
+    }
     gridHost_->updateGeometry();
+    if (window()) window()->update();
     setStatus("Show all panels");
 }

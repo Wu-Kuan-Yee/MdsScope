@@ -269,7 +269,7 @@ private:
     QPointF hoverData_;
     QString hoverText_;
     PointReadout syncedPoint_;
-    mutable QPixmap baseCache_;
+    mutable QImage baseCache_;
     mutable QSize baseCacheSize_;
     mutable bool baseCacheDirty_ = true;
     int hoverSeriesIndex_ = -1;

@@ -10,7 +10,7 @@ void PlotWidget::resetScale(bool repaint)
     view_ = {};
     invalidatePlotCache();
     if (repaint) {
-        update();
+        if (window()) window()->update(); else update();
     }
 }
 
@@ -22,7 +22,7 @@ void PlotWidget::applyView(const QRectF& view)
     view_ = view;
     hasView_ = true;
     invalidatePlotCache();
-    update();
+    if (window()) window()->update(); else update();
 }
 
 void PlotWidget::applyXRangeAutoY(double xmin, double xmax)
@@ -110,7 +110,7 @@ void PlotWidget::applyXRangeAutoY(double xmin, double xmax)
     view_ = next;
     hasView_ = true;
     invalidatePlotCache();
-    update();
+    if (window()) window()->update(); else update();
 }
 
 void PlotWidget::applyYRangeKeepX(double ymin, double ymax)
@@ -135,7 +135,7 @@ void PlotWidget::applyYRangeKeepX(double ymin, double ymax)
     view_ = next;
     hasView_ = true;
     invalidatePlotCache();
-    update();
+    if (window()) window()->update(); else update();
 }
 
 QRectF PlotWidget::plotRect() const
