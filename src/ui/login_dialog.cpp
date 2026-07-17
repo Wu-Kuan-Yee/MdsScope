@@ -6,6 +6,8 @@
 #include <QNetworkProxy>
 #include <QGuiApplication>
 #include <QInputMethod>
+#include <QMessageBox>
+#include <QDesktopServices>
 
 LoginDialog::LoginDialog(QString rootPath, QWidget* parent, QString apiOverride)
     : BaseDialog(parent), rootPath_(std::move(rootPath)), apiOverride_(std::move(apiOverride))
@@ -245,7 +247,22 @@ void LoginDialog::tryLogin()
                                    .arg(QString::fromUtf8(rawResponse).left(200));
             statusLabel_->setText("Invalid response from server.\n" + debugMsg);
         } else {
-            statusLabel_->setText(reply->errorString());
+            const QString errStr = reply->errorString();
+            statusLabel_->setText(errStr);
+#ifdef Q_OS_IOS
+            if (reply->error() == QNetworkReply::HostNotFoundError || errStr.contains(QStringLiteral("Host unreachable"))) {
+                QMessageBox msgBox(this);
+                msgBox.setWindowTitle(QStringLiteral("网络连接失败"));
+                msgBox.setText(QStringLiteral("无法连接到服务器 (Host unreachable)。这通常是因为 iOS 系统未授予本应用的“WLAN 与蜂窝网络”权限，或者当前所处网络为纯 IPv6 环境。"));
+                msgBox.setInformativeText(QStringLiteral("请前往系统设置，在 MdsScope 的设置中开启“无线数据”，或者尝试切换至 Wi-Fi 网络。"));
+                QPushButton* settingsBtn = msgBox.addButton(QStringLiteral("去设置授权"), QMessageBox::ActionRole);
+                QPushButton* cancelBtn = msgBox.addButton(QStringLiteral("取消"), QMessageBox::RejectRole);
+                msgBox.exec();
+                if (msgBox.clickedButton() == settingsBtn) {
+                    QDesktopServices::openUrl(QUrl(QStringLiteral("app-settings:")));
+                }
+            }
+#endif
         }
     });
 }

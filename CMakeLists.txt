@@ -242,6 +242,7 @@ if(IOS)
         XCODE_ATTRIBUTE_CODE_SIGN_STYLE "Automatic"
         XCODE_ATTRIBUTE_ENABLE_BITCODE "NO"
     )
+    target_sources(MdsScope PRIVATE src/core/ios_network_trigger.mm)
 endif()
 
 target_compile_definitions(MdsScope PRIVATE

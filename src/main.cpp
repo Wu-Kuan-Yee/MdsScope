@@ -5,6 +5,7 @@
 #include "mdsscope_internal.hpp"
 #include "ssh_diagnostic.hpp"
 #include "ssh_tunnel_manager.hpp"
+#include "ios_network_trigger.hpp"
 
 #include <QApplication>
 #include <QColor>
@@ -708,6 +709,10 @@ int main(int argc, char* argv[])
     SystemThemeWatcher themeWatcher(app);
     QThreadPool::globalInstance()->setMaxThreadCount(16);
     QThreadPool::globalInstance()->setExpiryTimeout(300000);
+
+#ifdef Q_OS_IOS
+    triggerIOSNetworkPrompt();
+#endif
 
     QDir workDir = runtimeRootDir();
 
