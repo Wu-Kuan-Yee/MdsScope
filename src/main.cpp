@@ -278,6 +278,15 @@ public:
             setSystemScheme(readCurrentColorScheme());
 #endif
         });
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+        if (auto* hints = QGuiApplication::styleHints()) {
+            connect(hints, &QStyleHints::colorSchemeChanged, this, [this](Qt::ColorScheme colorScheme) {
+                if (currentMode_ == ThemeMode::Auto) {
+                    setSystemScheme(colorScheme == Qt::ColorScheme::Dark ? 1 : 2);
+                }
+            });
+        }
+#endif
         if (currentMode_ == ThemeMode::Auto) {
             pollTimer_.start(10000);
         }
@@ -518,6 +527,11 @@ private:
 #elif defined(Q_OS_WIN)
         return readWindowsColorScheme();
 #else
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+        if (auto* hints = QGuiApplication::styleHints()) {
+            return hints->colorScheme() == Qt::ColorScheme::Dark ? 1 : 2;
+        }
+#endif
         return 2;
 #endif
     }
