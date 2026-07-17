@@ -371,7 +371,7 @@ void MainWindow::buildUi()
     shotCombo_->view()->setTextElideMode(Qt::ElideMiddle);
 #if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
     if (auto* comp = shotCombo_->completer()) {
-        comp->setCompletionMode(QCompleter::PopupCompletion);
+        shotCombo_->setCompleter(nullptr);
     }
     shotCombo_->view()->setMinimumWidth(200);
     shotCombo_->setMinimumWidth(80);
