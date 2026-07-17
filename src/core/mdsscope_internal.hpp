@@ -98,11 +98,7 @@
 #include <vector>
 
 constexpr int kMdsPort = 8000;
-#if (defined(Q_OS_MACOS) || defined(Q_OS_MAC)) && !defined(Q_OS_IOS)
-constexpr int kNetworkTimeoutMs = 8000;
-#else
-constexpr int kNetworkTimeoutMs = 2500;
-#endif
+constexpr int kNetworkTimeoutMs = 30000;
 
 #ifndef MDSSCOPE_VERSION
 #define MDSSCOPE_VERSION "unknown"
