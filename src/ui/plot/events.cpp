@@ -318,6 +318,14 @@ void PlotWidget::resizeEvent(QResizeEvent* event)
 {
     QWidget::resizeEvent(event);
     invalidatePlotCache();
+    
+    // Clear crosshairs and hover state when widget resizes (e.g. entering Max Mode)
+    // to prevent drawing ghost crosshairs with stale plotRects.
+    clearSyncedPoint();
+    if (!hoverText_.isEmpty()) {
+        hoverText_.clear();
+        emit pointXChanged(qQNaN());
+    }
 }
 
 void PlotWidget::leaveEvent(QEvent*)
