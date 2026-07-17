@@ -14,6 +14,7 @@
 
 #include <QScreen>
 #include <QGuiApplication>
+#include <QInputMethod>
 
 class PopupPositionFilter : public QObject {
 public:
@@ -33,6 +34,15 @@ public:
                     int bottomSpace = screenRect.bottom() - (globalPos.y() + combo_->height());
                     if (popup->height() > bottomSpace) {
                         popup->move(globalPos.x(), globalPos.y() - popup->height());
+                    }
+                }
+                
+                if (combo_->isEditable()) {
+                    if (QLineEdit* le = combo_->lineEdit()) {
+                        le->clearFocus();
+                    }
+                    if (QInputMethod* im = QGuiApplication::inputMethod()) {
+                        im->hide();
                     }
                 }
             }
