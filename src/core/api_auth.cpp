@@ -326,3 +326,4 @@ QString firstShotFromJsonValue(const QJsonValue& value)
     }
     return {};
 }
+// Force rebuild for Info.plist change
