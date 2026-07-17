@@ -398,12 +398,6 @@ private:
     bool saveWebscpEnvironmentFile(const QString& path) const;
     PlotSpec defaultPlotFromSelection() const;
     void updateTopInfoLabels();
-    bool loadShotSummaryFromApi(const QString& shot,
-                                QString* ip,
-                                QString* pulse,
-                                QString* it,
-                                QString* time,
-                                const QString& apiOverride = {}) const;
     void setStatus(const QString& text);
     PlotWidget* currentPlotWidget() const;
     void schedulePointSync(PlotWidget* source, double x);

@@ -737,28 +737,83 @@ void MainWindow::scheduleTopInfoUpdate(const QString& shot)
         pendingTopSummaryShot_.clear();
         return;
     }
-    QThreadPool::globalInstance()->start([this, trimmedShot, generation, apiUrl] {
-        QString ip;
-        QString pulse;
-        QString it;
-        QString shotTime;
-        const bool ok = loadShotSummaryFromApi(trimmedShot, &ip, &pulse, &it, &shotTime, apiUrl);
-        QMetaObject::invokeMethod(this, [this, trimmedShot, generation, ok, ip, pulse, it, shotTime] {
-            if (generation != topSummaryGeneration_ || pendingTopSummaryShot_ != trimmedShot) {
-                return;
+
+    const auto properties = readApiSettings(rootPath_);
+    const QString api = apiUrl.trimmed().isEmpty() ? properties.value("ApiUrl") : apiUrl.trimmed();
+    const QString token = properties.value("Token");
+    const QString prefix = properties.value("Authorization_Prefix", properties.value("Init_Prefix", "Bearer"));
+    const QString charset = properties.value("Charset", "UTF-8");
+    if (api.isEmpty() || token.isEmpty() || trimmedShot.isEmpty()) {
+        pendingTopSummaryShot_.clear();
+        return;
+    }
+
+    bool shotOk = false;
+    const int shotNumber = trimmedShot.toInt(&shotOk);
+    if (!shotOk) {
+        pendingTopSummaryShot_.clear();
+        return;
+    }
+
+    auto* manager = new QNetworkAccessManager(this);
+    QNetworkRequest request(QUrl(api + "/pcsEastTree"));
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json; charset=" + charset);
+    request.setRawHeader("Authorization", (prefix + " " + token).toUtf8());
+    request.setRawHeader("User-Agent", "MdsScope/0.1");
+    request.setTransferTimeout(2500);
+
+    QJsonObject payload;
+    payload.insert("treeshot", shotNumber);
+
+    QNetworkReply* reply = manager->post(request, QJsonDocument(payload).toJson(QJsonDocument::Compact));
+    
+    connect(reply, &QNetworkReply::finished, this, [this, reply, manager, trimmedShot, generation]() {
+        reply->deleteLater();
+        manager->deleteLater();
+
+        if (generation != topSummaryGeneration_ || pendingTopSummaryShot_ != trimmedShot) {
+            return;
+        }
+
+        const QByteArray body = reply->readAll();
+        const auto error = reply->error();
+        bool ok = false;
+        QString ip, pulse, it, shotTime;
+
+        if (error == QNetworkReply::NoError && !body.isEmpty()) {
+            const QJsonObject root = QJsonDocument::fromJson(body).object();
+            const QString code = root.value("code").isString()
+                ? root.value("code").toString()
+                : QString::number(root.value("code").toInt());
+            if (code == "20000") {
+                const QJsonObject data = root.value("data").toObject();
+                if (!data.isEmpty()) {
+                    auto scalarText = [](const QJsonValue& value) {
+                        if (value.isString()) return value.toString().trimmed();
+                        if (value.isDouble()) return QString::number(value.toDouble(), 'g', 8);
+                        if (value.isBool()) return value.toBool() ? QStringLiteral("true") : QStringLiteral("false");
+                        return QString();
+                    };
+                    ip = scalarText(data.value("pcrl01"));
+                    pulse = scalarText(data.value("shot_len"));
+                    it = scalarText(data.value("iv"));
+                    shotTime = scalarText(data.value("curr_time"));
+                    ok = true;
+                }
             }
-            pendingTopSummaryShot_.clear();
-            topSummaryShot_ = trimmedShot;
-            topSummaryIp_ = ok ? ip : QString();
-            topSummaryPulse_ = ok ? pulse : QString();
-            topSummaryIt_ = ok ? it : QString();
-            topSummaryTime_ = ok ? shotTime : QString();
-            if (!ok) {
-                cachedApiSourceUrl_.clear();
-                cachedPreparedApiUrl_.clear();
-            }
-            updateTopInfoLabels();
-        }, Qt::QueuedConnection);
+        }
+
+        pendingTopSummaryShot_.clear();
+        topSummaryShot_ = trimmedShot;
+        topSummaryIp_ = ok ? ip : QString();
+        topSummaryPulse_ = ok ? pulse : QString();
+        topSummaryIt_ = ok ? it : QString();
+        topSummaryTime_ = ok ? shotTime : QString();
+        if (!ok) {
+            cachedApiSourceUrl_.clear();
+            cachedPreparedApiUrl_.clear();
+        }
+        updateTopInfoLabels();
     });
 }
 
