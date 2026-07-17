@@ -48,6 +48,9 @@ QVector<SignalFetchResult> MdsIpClient::fetchGroupResults(const QVector<NativeRe
             if (!canReuseSocket) {
                 resetConnection(cached);
                 cached->socket = std::make_unique<QTcpSocket>();
+#if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
+                cached->socket->setProxy(QNetworkProxy::NoProxy);
+#endif
                 stageTimer.restart();
                 cached->socket->connectToHost(serverHost(firstSig.serverIp), serverPort(firstSig.serverIp));
                 QElapsedTimer connectTimer;
