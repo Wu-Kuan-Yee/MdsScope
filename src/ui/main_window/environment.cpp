@@ -3,6 +3,7 @@
 
 #include "mdsscope_internal.hpp"
 #include "shared.hpp"
+#include <QStandardItemModel>
 
 
 void MainWindow::loadDefaultEnvironment(bool useLatestWhenNoCurrentShot)
@@ -203,33 +204,29 @@ void MainWindow::refreshShotHistory()
     }
     const QString current = shotEdit_->text();
     const QStringList history = recentShotExpressions();
-#if defined(Q_OS_IOS) || defined(Q_OS_ANDROID)
-    shotEdit_->setText(current);
-    if (shotHistoryBtn_) {
-        QMenu* menu = shotHistoryBtn_->menu();
-        if (menu) {
-            menu->clear();
-            for (const QString& shot : history) {
-                menu->addAction(shot, this, [this, shot]() {
-                    shotEdit_->setText(shot);
-                    applyShot();
-                });
-            }
-        }
-    }
-#else
     if (!shotCombo_) {
         return;
     }
     QSignalBlocker comboBlocker(shotCombo_);
-    shotCombo_->clear();
+    QStandardItemModel* model = qobject_cast<QStandardItemModel*>(shotCombo_->model());
+    if (!model) {
+        model = new QStandardItemModel(shotCombo_);
+        shotCombo_->setModel(model);
+    }
     const QFontMetrics fm(shotCombo_->font());
-    for (const QString& shot : history) {
-        shotCombo_->addItem(fm.elidedText(shot, Qt::ElideMiddle, 300), shot);
-        shotCombo_->setItemData(shotCombo_->count() - 1, shot, Qt::ToolTipRole);
+    model->setRowCount(history.size());
+    for (int i = 0; i < history.size(); ++i) {
+        const QString& shot = history.at(i);
+        QStandardItem* item = model->item(i);
+        if (!item) {
+            item = new QStandardItem();
+            model->setItem(i, item);
+        }
+        item->setText(fm.elidedText(shot, Qt::ElideMiddle, 300));
+        item->setData(shot, Qt::UserRole);
+        item->setData(shot, Qt::ToolTipRole);
     }
     shotCombo_->setEditText(current);
-#endif
 }
 
 bool MainWindow::loadEnvironmentFile(const QString& path,
