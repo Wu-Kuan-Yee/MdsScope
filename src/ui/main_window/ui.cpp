@@ -12,6 +12,36 @@
 #include "mobile_menu.hpp"
 #include "dialog_overlay.hpp"
 
+#include <QScreen>
+#include <QGuiApplication>
+
+class PopupPositionFilter : public QObject {
+public:
+    PopupPositionFilter(QComboBox* combo) : QObject(combo), combo_(combo) {}
+    bool eventFilter(QObject* obj, QEvent* event) override {
+        if (event->type() == QEvent::Show) {
+            if (QWidget* popup = qobject_cast<QWidget*>(obj)) {
+                QPoint globalPos = combo_->mapToGlobal(QPoint(0, 0));
+                QRect screenRect;
+                if (auto* screen = QGuiApplication::screenAt(globalPos)) {
+                    screenRect = screen->availableGeometry();
+                } else if (!QGuiApplication::screens().isEmpty()) {
+                    screenRect = QGuiApplication::screens().first()->availableGeometry();
+                }
+                
+                if (!screenRect.isEmpty()) {
+                    int bottomSpace = screenRect.bottom() - (globalPos.y() + combo_->height());
+                    if (popup->height() > bottomSpace) {
+                        popup->move(globalPos.x(), globalPos.y() - popup->height());
+                    }
+                }
+            }
+        }
+        return QObject::eventFilter(obj, event);
+    }
+private:
+    QComboBox* combo_;
+};
 
 void MainWindow::changeEvent(QEvent* event)
 {
@@ -224,6 +254,9 @@ void MainWindow::buildUi()
     dataModeCombo_->addItem("Medium", static_cast<int>(DataReadMode::Medium));
     dataModeCombo_->addItem("Full", static_cast<int>(DataReadMode::Full));
     dataModeCombo_->setCurrentIndex(0);
+    if (auto* popup = dataModeCombo_->view()->window()) {
+        popup->installEventFilter(new PopupPositionFilter(dataModeCombo_));
+    }
 #if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
     dataModeCombo_->setFixedWidth(90);
     topLayout->addWidget(dataModeCombo_);
@@ -313,6 +346,9 @@ void MainWindow::buildUi()
     shotCombo_->view()->setMinimumWidth(260);
     shotCombo_->view()->setMaximumWidth(520);
 #endif
+    if (auto* popup = shotCombo_->view()->window()) {
+        popup->installEventFilter(new PopupPositionFilter(shotCombo_));
+    }
     shotEdit_ = shotCombo_->lineEdit();
     refreshShotHistory();
     auto resizeShotEdit = [this] {
@@ -381,13 +417,15 @@ void MainWindow::buildUi()
     connect(latest, &QPushButton::clicked, this, &MainWindow::latestShot);
     connect(stop, &QPushButton::clicked, this, &MainWindow::onStopOrContinue);
     connect(shotEdit_, &QLineEdit::returnPressed, this, &MainWindow::applyShot);
-    connect(shotEdit_, &QLineEdit::textChanged, this, [resizeShotEdit] { resizeShotEdit(); });
+    connect(shotEdit_, &QLineEdit::textChanged, this, [resizeShotEdit] { QTimer::singleShot(0, [resizeShotEdit] { resizeShotEdit(); }); });
     connect(shotCombo_, &QComboBox::activated, this, [this](int index) {
         const QString shot = shotCombo_->itemData(index).toString();
-        if (!shot.isEmpty()) {
-            shotCombo_->setEditText(shot);
-        }
-        applyShot();
+        QTimer::singleShot(250, this, [this, shot] {
+            if (!shot.isEmpty()) {
+                shotCombo_->setEditText(shot);
+            }
+            applyShot();
+        });
     });
     connect(dataModeCombo_, &QComboBox::currentIndexChanged, this, [this] { refreshData(); });
     connect(aboutButton_, &QToolButton::clicked, this, &MainWindow::openAboutDialog);
