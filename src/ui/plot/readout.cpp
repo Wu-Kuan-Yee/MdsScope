@@ -323,9 +323,11 @@ void PlotWidget::setSyncedPointX(double x, int seriesIndex)
     QRect dirty = syncedPointDirtyRect(syncedPoint_).united(syncedPointDirtyRect(next));
     syncedPoint_ = std::move(next);
     if (dirty.isValid() && !dirty.isEmpty()) {
-        update(dirty);
+        update();
+        if (window()) window()->update();
     } else {
         update();
+        if (window()) window()->update();
     }
 }
 
@@ -337,9 +339,11 @@ void PlotWidget::clearSyncedPoint()
     const QRect dirty = syncedPointDirtyRect(syncedPoint_);
     syncedPoint_ = {};
     if (dirty.isValid() && !dirty.isEmpty()) {
-        update(dirty);
+        update();
+        if (window()) window()->update();
     } else {
         update();
+        if (window()) window()->update();
     }
 }
 

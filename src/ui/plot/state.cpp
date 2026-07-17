@@ -35,6 +35,7 @@ void PlotWidget::setSpec(PlotSpec spec)
     hasView_ = false;
     view_ = {};
     update();
+    if (window()) window()->update();
 }
 
 QVector<SignalSeries> PlotWidget::seriesSnapshot() const
@@ -138,7 +139,8 @@ void PlotWidget::setSelected(bool selected)
     selected_ = selected;
     const QRect dirty = selectionBorderDirtyRect();
     if (dirty.isValid() && !dirty.isEmpty()) {
-        update(dirty);
+        update();
+        if (window()) window()->update();
     }
 }
 
@@ -150,12 +152,14 @@ void PlotWidget::setLargeDisplayMode(bool enabled)
     largeDisplayMode_ = enabled;
     invalidatePlotCache();
     update();
+    if (window()) window()->update();
 }
 
 void PlotWidget::refreshStyle()
 {
     invalidatePlotCache();
     update();
+    if (window()) window()->update();
 }
 
 void PlotWidget::setInteractionMode(InteractionMode mode)
@@ -178,7 +182,7 @@ void PlotWidget::setInteractionMode(InteractionMode mode)
         clearSyncedPoint();
     }
     if (oldZoomDirty.isValid() && !oldZoomDirty.isEmpty()) {
-        update(oldZoomDirty);
+        if (window()) window()->update(); else update(oldZoomDirty);
     }
 }
 

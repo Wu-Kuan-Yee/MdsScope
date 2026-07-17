@@ -540,6 +540,9 @@ void MainWindow::maximizeCurrentPanel()
         QWidget* columnHost = plotWidgets_[c].isEmpty() ? nullptr : plotWidgets_[c].first()->parentWidget();
         if (columnHost) {
             columnHost->setVisible(c == maximizedColumn_);
+            if (c == maximizedColumn_) {
+                columnHost->raise();
+            }
             columnHost->setSizePolicy(c == maximizedColumn_ ? QSizePolicy::Expanding : QSizePolicy::Ignored,
                                       QSizePolicy::Expanding);
             if (auto* columnLayout = qobject_cast<QBoxLayout*>(columnHost->layout())) {
@@ -554,8 +557,10 @@ void MainWindow::maximizeCurrentPanel()
             if (visible) {
                 plotWidgets_[c][r]->setLargeDisplayMode(true);
                 plotWidgets_[c][r]->setVisible(true);
+                plotWidgets_[c][r]->raise();
             } else {
                 plotWidgets_[c][r]->setLargeDisplayMode(false);
+                plotWidgets_[c][r]->setVisible(false);
             }
         }
     }

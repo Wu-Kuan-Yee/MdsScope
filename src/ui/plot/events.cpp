@@ -39,7 +39,7 @@ bool PlotWidget::event(QEvent* event)
                         view_ = view;
                         hasView_ = true;
                         invalidatePlotCache();
-                        if (window()) window()->update(); else update();
+                        update(); if (window()) window()->update();
                     }
                 }
                 handled = true;
@@ -58,7 +58,7 @@ bool PlotWidget::event(QEvent* event)
                         view_ = view;
                         hasView_ = true;
                         invalidatePlotCache();
-                        if (window()) window()->update(); else update();
+                        update(); if (window()) window()->update();
                     }
                 }
                 handled = true;
@@ -157,7 +157,7 @@ void PlotWidget::changeEvent(QEvent* event)
     QWidget::changeEvent(event);
     if (event->type() == QEvent::PaletteChange || event->type() == QEvent::ApplicationPaletteChange) {
         invalidatePlotCache();
-        if (window()) window()->update(); else update();
+        update(); if (window()) window()->update();
     }
 }
 
@@ -174,7 +174,8 @@ void PlotWidget::mouseMoveEvent(QMouseEvent* event)
             zooming_ = false;
             zoomRubberBand_ = {};
             if (oldDirty.isValid() && !oldDirty.isEmpty()) {
-                update(oldDirty);
+                update();
+                if (window()) window()->update();
             }
         }
         if (dragging_) {
@@ -198,7 +199,8 @@ void PlotWidget::mouseMoveEvent(QMouseEvent* event)
         const QRect newDirty = zoomRubberBandDirtyRect(zoomRubberBand_);
         const QRect dirty = oldDirty.united(newDirty);
         if (dirty.isValid() && !dirty.isEmpty()) {
-            update(dirty);
+            update();
+            if (window()) window()->update();
         }
     }
     bool needsUpdate = (interactionMode_ == InteractionMode::Pan || interactionMode_ == InteractionMode::Zoom) && dragging_;
@@ -241,9 +243,10 @@ void PlotWidget::mouseReleaseEvent(QMouseEvent* event)
         zoomRubberBand_ = {};
         zooming_ = false;
         if (viewChanged) {
-            if (window()) window()->update(); else update();
+            update(); if (window()) window()->update();
         } else if (oldDirty.isValid() && !oldDirty.isEmpty()) {
-            update(oldDirty);
+            update();
+            if (window()) window()->update();
         }
         dragging_ = false;
         unsetCursor();
@@ -253,7 +256,7 @@ void PlotWidget::mouseReleaseEvent(QMouseEvent* event)
     dragging_ = false;
     unsetCursor();
     if (interactionMode_ == InteractionMode::Pan || interactionMode_ == InteractionMode::Zoom) {
-        if (window()) window()->update(); else update();
+        update(); if (window()) window()->update();
     }
 }
 
@@ -306,7 +309,8 @@ void PlotWidget::wheelEvent(QWheelEvent* event)
     } else {
         updateHover(event->position());
     }
-    if (window()) window()->update(); else update();
+    update();
+    if (window()) window()->update();
     event->accept();
 }
 
