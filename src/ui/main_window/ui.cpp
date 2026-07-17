@@ -5,6 +5,7 @@
 #include "base_dialog.hpp"
 #include <QScrollArea>
 #include <QScroller>
+#include <QScrollerProperties>
 #include <QTimer>
 #include "shared.hpp"
 #include "theme.hpp"
@@ -13,6 +14,7 @@
 #include "dialog_overlay.hpp"
 
 #include <QScreen>
+#include <QScrollBar>
 #include <QGuiApplication>
 #include <QInputMethod>
 
@@ -222,7 +224,26 @@ void MainWindow::buildUi()
     // Ensure the scroll area has a transparent background
     scrollArea_->setStyleSheet("QScrollArea { background: transparent; border: none; }");
     
+    // CRITICAL ANDROID FIX FOR TEARING:
+    // When the scroll area is transparent, Qt disables bitBlt for scrolling.
+    // This fixes the 'static ghost cover' bug in Max Mode on Android!
+    // HOWEVER, it causes QScrollArea's move() to generate multiple dirty rects for each PlotWidget.
+    // Android's SurfaceFlinger composite swaps buffers between these rects, causing severe tearing.
+    // We MUST force a single FULL-WINDOW update whenever the scroll area moves!
+    connect(scrollArea_->verticalScrollBar(), &QScrollBar::valueChanged, this, [this] {
+        if (window()) window()->update();
+    });
+    
     // Enable native kinetic scrolling with one finger
+    QScroller* scroller = QScroller::scroller(scrollArea_->viewport());
+    QScrollerProperties props = scroller->scrollerProperties();
+    // CRITICAL: Disable overscroll (bounce effect) on Android! 
+    // Overscrolling exposes the viewport background outside the widget bounds.
+    // Due to Android Qt QPA bitBlt bugs, these exposed regions fail to paint correctly
+    // and leave severe ghost artifacts of the widget's previous pixels.
+    props.setScrollMetric(QScrollerProperties::VerticalOvershootPolicy, QScrollerProperties::OvershootAlwaysOff);
+    props.setScrollMetric(QScrollerProperties::HorizontalOvershootPolicy, QScrollerProperties::OvershootAlwaysOff);
+    scroller->setScrollerProperties(props);
     QScroller::grabGesture(scrollArea_->viewport(), QScroller::TouchGesture);
     setCentralWidget(scrollArea_);
 #else
@@ -240,6 +261,7 @@ void MainWindow::buildUi()
     topControls->setMovable(false);
     topControls->setContextMenuPolicy(Qt::PreventContextMenu);
     topControls->setStyleSheet(
+        "QToolBar { background: palette(window); border: none; }"
         "QPushButton { padding: 1px 8px; min-height: 18px; }"
         "QLabel { margin-left: 2px; margin-right: 2px; }"
     );

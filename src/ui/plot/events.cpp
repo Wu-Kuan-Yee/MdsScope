@@ -39,7 +39,7 @@ bool PlotWidget::event(QEvent* event)
                         view_ = view;
                         hasView_ = true;
                         invalidatePlotCache();
-                        update();
+                        if (window()) window()->update(); else update();
                     }
                 }
                 handled = true;
@@ -58,7 +58,7 @@ bool PlotWidget::event(QEvent* event)
                         view_ = view;
                         hasView_ = true;
                         invalidatePlotCache();
-                        update();
+                        if (window()) window()->update(); else update();
                     }
                 }
                 handled = true;
@@ -157,7 +157,7 @@ void PlotWidget::changeEvent(QEvent* event)
     QWidget::changeEvent(event);
     if (event->type() == QEvent::PaletteChange || event->type() == QEvent::ApplicationPaletteChange) {
         invalidatePlotCache();
-        update();
+        if (window()) window()->update(); else update();
     }
 }
 
@@ -241,7 +241,7 @@ void PlotWidget::mouseReleaseEvent(QMouseEvent* event)
         zoomRubberBand_ = {};
         zooming_ = false;
         if (viewChanged) {
-            update();
+            if (window()) window()->update(); else update();
         } else if (oldDirty.isValid() && !oldDirty.isEmpty()) {
             update(oldDirty);
         }
@@ -253,7 +253,7 @@ void PlotWidget::mouseReleaseEvent(QMouseEvent* event)
     dragging_ = false;
     unsetCursor();
     if (interactionMode_ == InteractionMode::Pan || interactionMode_ == InteractionMode::Zoom) {
-        update();
+        if (window()) window()->update(); else update();
     }
 }
 
@@ -306,7 +306,7 @@ void PlotWidget::wheelEvent(QWheelEvent* event)
     } else {
         updateHover(event->position());
     }
-    update();
+    if (window()) window()->update(); else update();
     event->accept();
 }
 

@@ -92,7 +92,8 @@ void PlotWidget::scheduleUpdate()
     updateQueued_ = true;
     QTimer::singleShot(16, this, [this] {
         updateQueued_ = false;
-        update();
+        if (window()) window()->update();
+        else update();
     });
 }
 

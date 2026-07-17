@@ -120,7 +120,6 @@ public:
         scrollArea->setWidget(rowsHost_);
         scrollArea->setWidgetResizable(true);
         scrollArea->setFrameShape(QFrame::NoFrame);
-        scrollArea->setStyleSheet("QScrollArea { background: transparent; border: none; }");
         mainLayout->addWidget(scrollArea);
 
         QString defaultTree;
