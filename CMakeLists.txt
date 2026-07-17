@@ -73,6 +73,21 @@ if(UNIX AND NOT APPLE AND NOT ANDROID)
     find_package(Qt6 6.4 REQUIRED COMPONENTS DBus)
 endif()
 
+# Workaround for Xcode 16 / macOS 15 SDK which removed AGL.framework
+# Qt's FindWrapOpenGL.cmake unconditionally adds "-framework AGL" if not found.
+if(APPLE AND TARGET WrapOpenGL::WrapOpenGL)
+    get_target_property(_gl_libs WrapOpenGL::WrapOpenGL INTERFACE_LINK_LIBRARIES)
+    if(_gl_libs)
+        set(_new_gl_libs)
+        foreach(_lib IN LISTS _gl_libs)
+            if(NOT "${_lib}" MATCHES "AGL")
+                list(APPEND _new_gl_libs "${_lib}")
+            endif()
+        endforeach()
+        set_target_properties(WrapOpenGL::WrapOpenGL PROPERTIES INTERFACE_LINK_LIBRARIES "${_new_gl_libs}")
+    endif()
+endif()
+
 configure_file(
     "${PROJECT_SOURCE_DIR}/cmake/cmake_uninstall.cmake.in"
     "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
