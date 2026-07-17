@@ -298,8 +298,9 @@ void PlotWidget::setSyncedPointX(double x, int seriesIndex)
     QPointF point;
     QPointF pixel;
     if (nearestPointForSeries(seriesIndex, x, nullptr, &point, &pixel, nullptr)) {
+        QPointF exactPixel = dataToPixel(QPointF(x, 0), effectiveView(), plotRect());
         next.plotRect = plotRect();
-        next.pixel = pixel;
+        next.pixel = QPointF(exactPixel.x(), pixel.y());
         next.data = point;
         next.visible = next.plotRect.contains(next.pixel);
         next.showText = true;
