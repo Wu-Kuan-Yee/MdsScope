@@ -485,6 +485,11 @@ private:
 #if (defined(Q_OS_MACOS) || defined(Q_OS_MAC)) && !defined(Q_OS_IOS)
     static uint readMacColorScheme()
     {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+        if (auto* hints = QGuiApplication::styleHints()) {
+            return hints->colorScheme() == Qt::ColorScheme::Dark ? 1 : 2;
+        }
+#endif
         const QString output = processOutput(QStringLiteral("defaults"),
                                              {QStringLiteral("read"),
                                               QStringLiteral("-g"),

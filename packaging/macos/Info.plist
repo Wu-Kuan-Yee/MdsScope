@@ -16,6 +16,8 @@
     <string>????</string>
     <key>LSMinimumSystemVersion</key>
     <string>10.14</string>
+    <key>NSRequiresAquaSystemAppearance</key>
+    <false/>
     <key>NSAppTransportSecurity</key>
     <dict>
         <key>NSAllowsArbitraryLoads</key>
