@@ -1,5 +1,7 @@
 build/
 build*/
+packaging/.openssl-src-*/
+packaging/ios_openssl/
 resources/environment/*
 !resources/environment/
 !resources/environment/init.toml
