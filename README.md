@@ -35,6 +35,9 @@ The mode can be set globally via the top toolbar dropdown, or overridden per sig
 - A C++23 compiler
 - Qt 6.4 or newer with Core, Widgets, Network, and Concurrent (Qt 6.8+ recommended for iOS/Android)
 - Qt 6 DBus on Linux
+- OpenSSL (macOS: `brew install openssl`; Linux: system package; Windows: WinCNG built-in)
+  - iOS additionally requires `packaging/build_ios_openssl.sh` run once before the first build.
+  - Android uses the bundled `android_openssl` submodule.
 
 ### Dependency Installation
 
@@ -86,6 +89,19 @@ cmake --build build --config Release
 
 iOS (requires Xcode and Qt for iOS):
 
+The SSH feature on iOS needs OpenSSL, which is not included in the iOS SDK.
+Build it once before the first iOS build:
+
+```bash
+cd packaging && ./build_ios_openssl.sh
+```
+
+The script downloads and compiles OpenSSL 3.4 for arm64. It is cached and
+does not need to be re-run for incremental builds. Without it SSH is
+disabled on iOS; the app still builds and runs, but the SSH button has no effect.
+
+Then build the app:
+
 ```bash
 /path/to/Qt/6.x.x/ios/bin/qt-cmake -S . -B build-ios -G Xcode -DCMAKE_SYSTEM_NAME=iOS
 cmake --build build-ios --config Release
@@ -93,13 +109,14 @@ cmake --build build-ios --config Release
 
 Android (requires Android SDK/NDK and Qt for Android):
 
-To enable native HTTPS (TLS) support for the Update feature on Android, you must initialize the `android_openssl` submodule before building:
+The Android build needs two git submodules for TLS and SSH support. Initialize them before building:
 
 ```bash
 git submodule update --init
 ```
 
-Then build as usual:
+This fetches `packaging/android_openssl` (OpenSSL for HTTPS and SSH) and
+`packaging/libssh2` (native SSH client). Once initialized, build as usual:
 
 ```bash
 export ANDROID_NDK_ROOT=/path/to/android/sdk/ndk/xx.y.zzzz
@@ -206,14 +223,19 @@ EAST MDSIP.
 ### SSH Remote Access
 
 Use the SSH button next to Login to tunnel MDSIP data and EAST metadata when
-they are only reachable from an internal network. Linux, macOS, and Windows are
-supported when a system OpenSSH client is available. The SSH server may run on
-any platform, but it must allow TCP forwarding and reach the required internal
-services.
+they are only reachable from an internal network. All platforms are supported:
 
-Authentication supports a password, a selected identity file, or the default
-OpenSSH configuration and `ssh-agent` when both are left empty. Saved SSH
-settings are stored in the machine-bound encrypted user cache.
+- **macOS, Linux, Windows**: uses the bundled libssh2 with system OpenSSL / WinCNG.
+- **Android**: uses libssh2 with the bundled `android_openssl` submodule.
+- **iOS**: uses libssh2 with OpenSSL built by `packaging/build_ios_openssl.sh`.
+
+No external SSH client is required. The SSH server may run on any platform, but
+it must allow TCP forwarding and reach the required internal services.
+
+Authentication supports a password, a selected identity file, SSH agent, or
+default keys (`~/.ssh/id_rsa`, `~/.ssh/id_ecdsa`, `~/.ssh/id_ed25519`) when
+both are left empty. Saved SSH settings are stored in the machine-bound
+encrypted user cache.
 
 SSH access is slower than a direct internal-network connection because of
 unavoidable network, encryption, and compression overhead. Users are responsible
