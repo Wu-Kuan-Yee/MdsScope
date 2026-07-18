@@ -163,7 +163,7 @@ jobs:
       - name: Install Qt
         uses: jurplel/install-qt-action@v4.3.1
         with:
-          version: "6.8.3"
+          version: "6.8.2"
           host: mac
           target: desktop
           arch: clang_64
@@ -239,7 +239,7 @@ jobs:
       - name: Install Qt
         uses: jurplel/install-qt-action@v4.3.1
         with:
-          version: "6.8.3"
+          version: "6.8.2"
           host: windows
           target: desktop
           arch: win64_msvc2022_64
@@ -312,7 +312,7 @@ jobs:
       - name: Install Qt
         uses: jurplel/install-qt-action@v4.3.1
         with:
-          version: "6.8.3"
+          version: "6.8.2"
           host: linux
           target: android
           arch: android_arm64_v8a
