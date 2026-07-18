@@ -7,76 +7,55 @@ on:
   workflow_dispatch:
     inputs:
       target:
-        description: "Package target"
+        description: "Platform"
         required: true
         default: "all"
         type: choice
         options:
           - all
-          - ubuntu24.04
-          - ubuntu26.04
+          - linux
+          - macos
           - windows
+          - android
 
 permissions:
   contents: write
 
 jobs:
-  package-plan:
-    name: Select packages
-    runs-on: ubuntu-26.04
-    outputs:
-      deb_matrix: ${{ steps.plan.outputs.deb_matrix }}
-      windows: ${{ steps.plan.outputs.windows }}
+  # ── Linux: DEB ──────────────────────────────────────────────────────────
 
-    steps:
-      - name: Build package plan
-        id: plan
-        shell: bash
-        env:
-          TARGET: ${{ inputs.target || 'all' }}
-        run: |
-          case "$TARGET" in
-            all)
-              deb_matrix='{"include":[{"arch":"amd64","runner":"ubuntu-26.04","package":"ubuntu26.04"},{"arch":"arm64","runner":"ubuntu-26.04-arm","package":"ubuntu26.04"},{"arch":"amd64","runner":"ubuntu-24.04","package":"ubuntu24.04"},{"arch":"arm64","runner":"ubuntu-24.04-arm","package":"ubuntu24.04"}]}'
-              windows=true
-              ;;
-            ubuntu24.04)
-              deb_matrix='{"include":[{"arch":"amd64","runner":"ubuntu-24.04","package":"ubuntu24.04"},{"arch":"arm64","runner":"ubuntu-24.04-arm","package":"ubuntu24.04"}]}'
-              windows=false
-              ;;
-            ubuntu26.04)
-              deb_matrix='{"include":[{"arch":"amd64","runner":"ubuntu-26.04","package":"ubuntu26.04"},{"arch":"arm64","runner":"ubuntu-26.04-arm","package":"ubuntu26.04"}]}'
-              windows=false
-              ;;
-            windows)
-              deb_matrix='{"include":[]}'
-              windows=true
-              ;;
-            *)
-              echo "Unknown package target: $TARGET" >&2
-              exit 1
-              ;;
-          esac
-          echo "deb_matrix=$deb_matrix" >> "$GITHUB_OUTPUT"
-          echo "windows=$windows" >> "$GITHUB_OUTPUT"
-
-  deb:
-    name: Build DEB (${{ matrix.package }} ${{ matrix.arch }})
-    needs: package-plan
-    if: ${{ needs.package-plan.outputs.deb_matrix != '{"include":[]}' }}
+  linux-deb:
+    name: Linux DEB (${{ matrix.package }} ${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
+    if: ${{ inputs.target == 'all' || inputs.target == 'linux' || startsWith(github.ref, 'refs/tags/') }}
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(needs.package-plan.outputs.deb_matrix) }}
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-26.04
+            package: ubuntu26.04
+          - arch: arm64
+            runner: ubuntu-26.04-arm
+            package: ubuntu26.04
+          - arch: amd64
+            runner: ubuntu-24.04
+            package: ubuntu24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            package: ubuntu24.04
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          submodules: recursive
 
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install -y build-essential cmake ninja-build dpkg-dev qt6-base-dev qt6-base-dev-tools
+          sudo apt install -y build-essential cmake ninja-build \
+            qt6-base-dev qt6-base-dev-tools libssl-dev rpm
 
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -88,23 +67,174 @@ jobs:
         run: |
           cpack --config build/CPackConfig.cmake -G DEB
           arch="$(dpkg --print-architecture)"
-          mv build/*.deb "build/mdsscope-${{ matrix.package }}.${arch}.deb"
+          mv build/*.deb "build/mdsscope-${{ matrix.package }}-${arch}.deb"
 
-      - name: Upload artifact
+      - name: Package RPM
+        run: |
+          deb="$(ls build/*.deb | head -1)"
+          pkgver="$(echo "$deb" | grep -oP 'mdsscope-\K[0-9.]+(?=-[^-]+\.deb)')"
+          fakeroot alien --to-rpm --scripts "$deb" || true
+          rpmfile="$(ls *.rpm 2>/dev/null | head -1)"
+          if [ -n "$rpmfile" ]; then mv "$rpmfile" "build/mdsscope-${{ matrix.package }}.rpm"; fi
+
+      - name: Upload DEB artifact
         uses: actions/upload-artifact@v7
         with:
           name: mdsscope-deb-${{ matrix.package }}-${{ matrix.arch }}
           path: build/*.deb
 
-  windows:
-    name: Build Windows portable zip
-    needs: package-plan
-    if: ${{ needs.package-plan.outputs.windows == 'true' }}
-    runs-on: windows-2022
+      - name: Upload RPM artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: mdsscope-rpm-${{ matrix.package }}-${{ matrix.arch }}
+          path: build/*.rpm
+
+  # ── Linux: AppImage & tar.gz ─────────────────────────────────────────────
+
+  linux-appimage:
+    name: Linux AppImage (amd64)
+    runs-on: ubuntu-26.04
+    if: ${{ inputs.target == 'all' || inputs.target == 'linux' || startsWith(github.ref, 'refs/tags/') }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y build-essential cmake ninja-build \
+            qt6-base-dev qt6-base-dev-tools libssl-dev libfuse2
+
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Install to staging
+        run: DESTDIR=build/staging cmake --install build
+
+      - name: Package AppImage
+        run: |
+          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+          chmod +x linuxdeploy*.AppImage
+          export QTDIR="$(dpkg -L qt6-base-dev | grep '/bin/qmake6$' | head -1 | xargs dirname)/.."
+          ./linuxdeploy-x86_64.AppImage --appdir build/staging \
+            --plugin qt --output appimage
+          mv MdsScope-*.AppImage build/mdsscope-linux-x86_64.AppImage
+
+      - name: Package tar.gz
+        run: |
+          strip build/MdsScope build/transfer 2>/dev/null || true
+          tar czf build/mdsscope-linux-x86_64.tar.gz \
+            -C build staging/usr/bin/MdsScope \
+            -C build staging/usr/bin/transfer \
+            -C build staging/usr/share
+
+      - name: Upload AppImage
+        uses: actions/upload-artifact@v7
+        with:
+          name: mdsscope-linux-appimage
+          path: build/mdsscope-linux-x86_64.AppImage
+
+      - name: Upload tar.gz
+        uses: actions/upload-artifact@v7
+        with:
+          name: mdsscope-linux-targz
+          path: build/mdsscope-linux-x86_64.tar.gz
+
+  # ── macOS ────────────────────────────────────────────────────────────────
+
+  macos:
+    name: macOS (universal)
+    runs-on: macos-latest
+    if: ${{ inputs.target == 'all' || inputs.target == 'macos' || startsWith(github.ref, 'refs/tags/') }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4.3.1
+        with:
+          version: "6.8.3"
+          host: mac
+          target: desktop
+          arch: clang_64
+
+      - name: Install OpenSSL
+        run: brew install openssl
+
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="${{ env.QT_ROOT_DIR }}"
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Package .app bundle
+        run: |
+          mkdir -p build/macos-package
+          cp -R build/MdsScope.app build/macos-package/
+          macdeployqt build/macos-package/MdsScope.app -no-strip
+          cp build/transfer build/macos-package/MdsScope.app/Contents/MacOS/ 2>/dev/null || true \
+          cp -R resources build/macos-package/MdsScope.app/Contents/Resources/ 2>/dev/null || true
+
+      - name: Package DMG
+        run: |
+          mkdir -p build/dmg-root
+          cp -R build/macos-package/MdsScope.app build/dmg-root/
+          ln -s /Applications build/dmg-root/Applications
+          hdiutil create -volname MdsScope -srcfolder build/dmg-root \
+            -ov -format UDZO build/mdsscope-macos.dmg
+
+      - name: Package PKG
+        run: |
+          pkgbuild --root build/macos-package \
+            --install-location /Applications \
+            --identifier com.mdsscope.app \
+            --version "$(echo '${{ github.ref_name }}' | sed 's/^v//')" \
+            build/mdsscope-macos.pkg
+
+      - name: Package ZIP
+        run: |
+          (cd build/macos-package && zip -qr ../mdsscope-macos.zip MdsScope.app)
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v7
+        with:
+          name: mdsscope-macos-dmg
+          path: build/mdsscope-macos.dmg
+
+      - name: Upload PKG
+        uses: actions/upload-artifact@v7
+        with:
+          name: mdsscope-macos-pkg
+          path: build/mdsscope-macos.pkg
+
+      - name: Upload ZIP
+        uses: actions/upload-artifact@v7
+        with:
+          name: mdsscope-macos-zip
+          path: build/mdsscope-macos.zip
+
+  # ── Windows ──────────────────────────────────────────────────────────────
+
+  windows:
+    name: Windows (x64)
+    runs-on: windows-2022
+    if: ${{ inputs.target == 'all' || inputs.target == 'windows' || startsWith(github.ref, 'refs/tags/') }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
 
       - name: Install Qt
         uses: jurplel/install-qt-action@v4.3.1
@@ -120,57 +250,124 @@ jobs:
       - name: Build
         run: cmake --build build --config Release
 
-      - name: Package portable zip
+      - name: Package portable ZIP
         shell: pwsh
         run: |
-          $stage = Join-Path $env:GITHUB_WORKSPACE "build\windows-package\MdsScope"
+          $stage = "$env:GITHUB_WORKSPACE\build\windows-package\MdsScope"
           New-Item -ItemType Directory -Force $stage | Out-Null
+          Copy-Item build\Release\MdsScope.exe $stage
+          Copy-Item build\Release\transfer.exe $stage 2>$null
+          windeployqt --release --compiler-runtime --no-translations --dir $stage "$stage\MdsScope.exe"
+          Copy-Item resources "$stage\resources" -Recurse -ErrorAction SilentlyContinue
+          Copy-Item COPYING $stage -ErrorAction SilentlyContinue
+          Compress-Archive -Path $stage -DestinationPath build\mdsscope-windows-x64.zip -Force
 
-          Copy-Item "build\Release\MdsScope.exe" $stage
-          Copy-Item "build\Release\transfer.exe" $stage
+      - name: Package MSI
+        shell: pwsh
+        run: |
+          choco install wixtoolset -y --version=3.11.2
+          $wixBin = "${env:ProgramFiles(x86)}\WiX Toolset v3.11\bin"
+          $stage = "$env:GITHUB_WORKSPACE\build\windows-package\MdsScope"
+          & "$wixBin\heat.exe" dir "$stage" -dr INSTALLFOLDER -cg ApplicationGroup \
+            -gg -g1 -sfrag -srd -scom -svb -var var.SourceDir \
+            -out build\wix-files.wxs
+          & "$wixBin\candle.exe" build\wix-files.wxs `
+            -dSourceDir="$stage" -arch x64 `
+            -out build\wix-files.wixobj
+          & "$wixBin\light.exe" build\wix-files.wixobj `
+            -ext WixUIExtension -cultures:en-us `
+            -out build\mdsscope-windows-x64.msi
 
-          windeployqt --release --compiler-runtime --no-translations --dir $stage (Join-Path $stage "MdsScope.exe")
-
-          Copy-Item "resources" (Join-Path $stage "resources") -Recurse
-          Copy-Item "COPYING" $stage
-          Copy-Item "README.md" $stage
-          Copy-Item "packaging\linux\mdsscope.svg" $stage
-
-          Compress-Archive -Path $stage -DestinationPath "build\mdsscope-windows-x64.zip" -Force
-
-      - name: Upload release zip artifact
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Upload ZIP
         uses: actions/upload-artifact@v7
         with:
-          name: mdsscope-windows-x64
+          name: mdsscope-windows-zip
           path: build/mdsscope-windows-x64.zip
 
-      - name: Upload portable app artifact
-        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+      - name: Upload MSI
         uses: actions/upload-artifact@v7
         with:
-          name: mdsscope-windows-x64
-          path: build/windows-package
+          name: mdsscope-windows-msi
+          path: build/mdsscope-windows-x64.msi
+
+  # ── Android ──────────────────────────────────────────────────────────────
+
+  android:
+    name: Android (arm64)
+    runs-on: ubuntu-26.04
+    if: ${{ inputs.target == 'all' || inputs.target == 'android' || startsWith(github.ref, 'refs/tags/') }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          java-version: "17"
+          distribution: temurin
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4.3.1
+        with:
+          version: "6.8.3"
+          host: linux
+          target: android
+          arch: android_arm64_v8a
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_SYSTEM_NAME=Android \
+            -DQT_ANDROID_ABIS=arm64-v8a \
+            -DANDROID_ABI=arm64-v8a \
+            -DCMAKE_PREFIX_PATH="${{ env.QT_ROOT_DIR }}"
+
+      - name: Build
+        run: cmake --build build --target apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: mdsscope-android-apk
+          path: build/android-build/build/outputs/apk/release/*.apk
+
+      - name: Build AAB
+        run: cmake --build build --target aab 2>/dev/null || echo "AAB target not available"
+
+      - name: Upload AAB
+        uses: actions/upload-artifact@v7
+        if: ${{ always() }}
+        with:
+          name: mdsscope-android-aab
+          path: build/android-build/build/outputs/bundle/release/*.aab
+
+  # ── GitHub Release ──────────────────────────────────────────────────────
 
   release:
+    name: Create GitHub Release
     needs:
-      - deb
+      - linux-deb
+      - linux-appimage
+      - macos
       - windows
+      - android
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-26.04
 
     steps:
-      - name: Download release artifacts
+      - name: Download all artifacts
         uses: actions/download-artifact@v8
         with:
           path: artifacts
           pattern: mdsscope-*
           merge-multiple: true
 
-      - name: Create GitHub release
+      - name: Create release
         uses: softprops/action-gh-release@v3
         with:
-          files: |
-            artifacts/*.deb
-            artifacts/*.zip
+          files: artifacts/**/*
           generate_release_notes: true
