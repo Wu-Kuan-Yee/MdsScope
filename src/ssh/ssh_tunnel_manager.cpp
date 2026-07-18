@@ -24,13 +24,24 @@
 #include <netdb.h>
 #include <unistd.h>
 #include <fcntl.h>
+#define CLOSE_SOCKET close
+#elif defined(Q_OS_WIN)
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#define CLOSE_SOCKET closesocket
 #endif
 
 namespace {
 
-#ifdef Q_OS_UNIX
-int connectToHostPosix(const QString& host, int port, int timeoutMs, QString* error)
+#if defined(Q_OS_UNIX) || defined(Q_OS_WIN)
+int connectToHostRaw(const QString& host, int port, int timeoutMs, QString* error)
 {
+#ifdef Q_OS_WIN
+    // One-time WinSock init.
+    static bool wsaInit = false;
+    if (!wsaInit) { WSADATA d; WSAStartup(MAKEWORD(2,2), &d); wsaInit = true; }
+#endif
+
     struct addrinfo hints = {}, *result = nullptr;
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
@@ -40,20 +51,35 @@ int connectToHostPosix(const QString& host, int port, int timeoutMs, QString* er
 
     int ret = getaddrinfo(hostBytes.constData(), portBytes.constData(), &hints, &result);
     if (ret != 0) {
+#ifdef Q_OS_WIN
+        *error = QStringLiteral("Host resolution failed: %1").arg(ret);
+#else
         *error = QStringLiteral("Host resolution failed: %1").arg(gai_strerror(ret));
+#endif
         return -1;
     }
 
     int fd = -1;
     for (struct addrinfo* rp = result; rp; rp = rp->ai_next) {
-        fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+        fd = static_cast<int>(socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol));
         if (fd < 0) continue;
 
+#ifdef Q_OS_UNIX
         int flags = fcntl(fd, F_GETFL, 0);
         fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+#else
+        u_long mode = 1;
+        ioctlsocket(fd, FIONBIO, &mode);
+#endif
 
-        ret = connect(fd, rp->ai_addr, rp->ai_addrlen);
-        if (ret < 0 && errno != EINPROGRESS) { close(fd); fd = -1; continue; }
+        ret = connect(fd, rp->ai_addr, static_cast<int>(rp->ai_addrlen));
+        if (ret < 0
+#ifdef Q_OS_UNIX
+            && errno != EINPROGRESS
+#else
+            && WSAGetLastError() != WSAEWOULDBLOCK
+#endif
+            ) { CLOSE_SOCKET(fd); fd = -1; continue; }
 
         if (ret < 0) {
             fd_set wfds; FD_ZERO(&wfds); FD_SET(fd, &wfds);
@@ -61,13 +87,23 @@ int connectToHostPosix(const QString& host, int port, int timeoutMs, QString* er
             tv.tv_sec = timeoutMs / 1000;
             tv.tv_usec = (timeoutMs % 1000) * 1000;
             ret = select(fd + 1, nullptr, &wfds, nullptr, &tv);
-            if (ret <= 0) { close(fd); fd = -1; continue; }
+            if (ret <= 0) { CLOSE_SOCKET(fd); fd = -1; continue; }
             int err = 0; socklen_t len = sizeof(err);
-            getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &len);
-            if (err != 0) { close(fd); fd = -1; continue; }
+            getsockopt(fd, SOL_SOCKET, SO_ERROR,
+#ifdef Q_OS_WIN
+                       reinterpret_cast<char*>(&err),
+#else
+                       &err,
+#endif
+                       &len);
+            if (err != 0) { CLOSE_SOCKET(fd); fd = -1; continue; }
         }
 
+#ifdef Q_OS_UNIX
         fcntl(fd, F_SETFL, flags);
+#else
+        mode = 0; ioctlsocket(fd, FIONBIO, &mode);
+#endif
         break;
     }
 
@@ -75,7 +111,7 @@ int connectToHostPosix(const QString& host, int port, int timeoutMs, QString* er
     if (fd < 0) *error = QStringLiteral("Cannot connect to %1:%2.").arg(host).arg(port);
     return fd;
 }
-#endif // Q_OS_UNIX
+#endif
 
 #ifdef MDSSCOPE_HAS_LIBSSH2
 
@@ -209,14 +245,14 @@ LIBSSH2_SESSION* createAuthenticatedSession(const SshSettings& settings, QString
     *outFd = -1;
     initLibssh2();
 
-    int fd = connectToHostPosix(settings.host.trimmed(), settings.port, 8000, error);
+    int fd = connectToHostRaw(settings.host.trimmed(), settings.port, 8000, error);
     if (fd < 0) return nullptr;
     *outFd = fd;
 
     LIBSSH2_SESSION* session = libssh2_session_init();
     if (!session) {
         *error = QStringLiteral("Failed to initialize SSH session.");
-        close(fd); *outFd = -1;
+        CLOSE_SOCKET(fd); *outFd = -1;
         return nullptr;
     }
 
@@ -233,14 +269,14 @@ LIBSSH2_SESSION* createAuthenticatedSession(const SshSettings& settings, QString
         else
             *error = errMsg ? QString::fromUtf8(errMsg) : QStringLiteral("SSH handshake failed.");
         libssh2_session_free(session);
-        close(fd); *outFd = -1;
+        CLOSE_SOCKET(fd); *outFd = -1;
         return nullptr;
     }
 
     if (!authenticate(session, fd, settings, error)) {
         libssh2_session_disconnect(session, "Bye");
         libssh2_session_free(session);
-        close(fd); *outFd = -1;
+        CLOSE_SOCKET(fd); *outFd = -1;
         return nullptr;
     }
 
@@ -346,7 +382,7 @@ bool SshTunnelManager::testConnection(const SshSettings& settings, QString* erro
     if (session) {
         libssh2_session_disconnect(session, "Bye");
         libssh2_session_free(session);
-        if (fd >= 0) close(fd);
+        if (fd >= 0) CLOSE_SOCKET(fd);
         setState(State::Ready, QStringLiteral("SSH login succeeded"));
         return true;
     }
@@ -400,7 +436,7 @@ bool SshTunnelManager::ensureTunnel(const QString& endpoint, QString* localEndpo
         libssh2_session_disconnect(session, "Bye");
         libssh2_session_free(session);
 #endif
-        if (sshFd >= 0) close(sshFd);
+        if (sshFd >= 0) CLOSE_SOCKET(sshFd);
         delete localServer;
         if (!keepConnectedState) setState(State::Error, error ? *error : QString());
         return false;
@@ -583,8 +619,8 @@ void SshTunnelManager::cleanupTunnel(const Tunnel& t)
 #ifdef MDSSCOPE_HAS_LIBSSH2
     if (t.session) { libssh2_session_disconnect(t.session, "Bye"); libssh2_session_free(t.session); }
 #endif
-#ifdef Q_OS_UNIX
-    if (t.sshFd >= 0) close(t.sshFd);
+#if defined(Q_OS_UNIX) || defined(Q_OS_WIN)
+    if (t.sshFd >= 0) CLOSE_SOCKET(t.sshFd);
 #endif
     if (t.localServer) { t.localServer->close(); t.localServer->deleteLater(); }
 }
