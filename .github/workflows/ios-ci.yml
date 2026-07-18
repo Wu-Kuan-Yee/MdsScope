@@ -37,7 +37,7 @@ jobs:
         run: |
           echo "Qt6_DIR=$Qt6_DIR"
           ls "$Qt6_DIR/.." 2>/dev/null
-          ls "$Qt6_DIR/../clang_64" 2>/dev/null || echo "clang_64 not found"
+          ls "$Qt6_DIR/../macos" 2>/dev/null || echo "clang_64 not found"
 
       - name: Configure
         run: |
@@ -46,7 +46,7 @@ jobs:
             -DCMAKE_SYSTEM_NAME=iOS \
             -DCMAKE_OSX_SYSROOT=iphonesimulator \
             -DCMAKE_TOOLCHAIN_FILE="${{ env.Qt6_DIR }}/lib/cmake/Qt6/qt.toolchain.cmake" \
-            -DQT_HOST_PATH="${{ env.Qt6_DIR }}/../clang_64"
+            -DQT_HOST_PATH="${{ env.Qt6_DIR }}/../macos"
 
       - name: Build for simulator
         run: cmake --build build --config Release -- -sdk iphonesimulator -arch arm64
