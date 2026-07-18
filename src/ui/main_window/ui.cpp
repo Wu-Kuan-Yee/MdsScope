@@ -127,7 +127,11 @@ void MainWindow::buildUi()
     toolbar->setToolButtonStyle(Qt::ToolButtonIconOnly);
     toolbar->setStyleSheet(
         "QToolBar { spacing: 5px; padding: 2px 4px; border: 0px; }"
-        "QToolButton { margin: 0px; padding: 3px; min-width: 30px; min-height: 30px; }");
+        "QToolButton { margin: 0px; padding: 3px; min-width: 30px; min-height: 30px; }"
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+        "QToolBar::extension-button { min-width: 48px; min-height: 48px; }"
+#endif
+    );
     QAction* openAction = toolbar->addAction(style()->standardIcon(QStyle::SP_DirOpenIcon), "Open configure file");
     connect(openAction, &QAction::triggered, this, &MainWindow::openEnvironmentFile, Qt::QueuedConnection);
     openButton_ = qobject_cast<QToolButton*>(toolbar->widgetForAction(openAction));
@@ -255,16 +259,98 @@ void MainWindow::buildUi()
     statusLabel_->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
 
     toolbar->addSeparator();
+
 #if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
     addToolBarBreak(Qt::TopToolBarArea);
-    auto* topControls = addToolBar("Info");
-    topControls->setMovable(false);
-    topControls->setContextMenuPolicy(Qt::PreventContextMenu);
-    topControls->setStyleSheet(
-        "QToolBar { background: palette(window); border: none; }"
+    auto* topControls1 = addToolBar("Info 1");
+    topControls1->setMovable(false);
+    topControls1->setContextMenuPolicy(Qt::PreventContextMenu);
+    topControls1->setStyleSheet(
+        "QToolBar { background: palette(window); border: none; padding: 0px; margin: 0px; }"
         "QPushButton { padding: 1px 8px; min-height: 18px; }"
         "QLabel { margin-left: 2px; margin-right: 2px; }"
     );
+    
+    addToolBarBreak(Qt::TopToolBarArea);
+    auto* topControls2 = addToolBar("Info 2");
+    topControls2->setMovable(false);
+    topControls2->setContextMenuPolicy(Qt::PreventContextMenu);
+    topControls2->setStyleSheet(
+        "QToolBar { background: palette(window); border: none; padding: 0px; margin: 0px; }"
+        "QPushButton { padding: 1px 8px; min-height: 18px; }"
+        "QLabel { margin-left: 2px; margin-right: 2px; }"
+    );
+    
+    addToolBarBreak(Qt::TopToolBarArea);
+    auto* topControls3 = addToolBar("Info 3");
+    topControls3->setMovable(false);
+    topControls3->setContextMenuPolicy(Qt::PreventContextMenu);
+    topControls3->setStyleSheet(
+        "QToolBar { background: palette(window); border: none; padding: 0px; margin: 0px; }"
+        "QPushButton { padding: 1px 8px; min-height: 18px; }"
+        "QLabel { margin-left: 2px; margin-right: 2px; }"
+    );
+    
+    topControls1->addWidget(new QLabel("Rate", topControls1));
+
+    dataModeCombo_ = new QComboBox(topControls1);
+    dataModeCombo_->addItem("Thin", static_cast<int>(DataReadMode::Thin));
+    dataModeCombo_->addItem("Medium", static_cast<int>(DataReadMode::Medium));
+    dataModeCombo_->addItem("Full", static_cast<int>(DataReadMode::Full));
+    dataModeCombo_->setCurrentIndex(0);
+    if (auto* popup = dataModeCombo_->view()->window()) {
+        popup->installEventFilter(new PopupPositionFilter(dataModeCombo_));
+    }
+    topControls1->addWidget(dataModeCombo_);
+
+    topInfoLabel_ = new QLabel("Shot: --", topControls1);
+    ipInfoLabel_ = new QLabel("Ip: --", topControls1);
+    
+    pulseInfoLabel_ = new QLabel("Pulse: --", topControls2);
+    itInfoLabel_ = new QLabel("It: --", topControls2);
+    timeInfoLabel_ = new QLabel("Time: --", topControls3);
+    
+    for (QLabel* label : {topInfoLabel_, ipInfoLabel_}) {
+        label->setStyleSheet("color: palette(highlight);");
+        topControls1->addWidget(label);
+    }
+    for (QLabel* label : {pulseInfoLabel_, itInfoLabel_}) {
+        label->setStyleSheet("color: palette(highlight);");
+        topControls2->addWidget(label);
+    }
+    timeInfoLabel_->setStyleSheet("color: palette(highlight);");
+    topControls3->addWidget(timeInfoLabel_);
+    
+    auto* spacer1 = new QWidget(topControls1);
+    spacer1->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    topControls1->addWidget(spacer1);
+    
+    auto* spacer2 = new QWidget(topControls2);
+    spacer2->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    topControls2->addWidget(spacer2);
+    
+    auto* spacer3 = new QWidget(topControls3);
+    spacer3->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    topControls3->addWidget(spacer3);
+    
+    topControls2->addWidget(new ThemeModeButton(topControls2));
+
+    aboutButton_ = new QToolButton(topControls2);
+    aboutButton_->setObjectName("aboutButton");
+    aboutButton_->setIcon(infoIcon());
+    aboutButton_->setIconSize(QSize(28, 28));
+    aboutButton_->setFixedSize(34, 34);
+    aboutButton_->setToolTip("About MdsScope");
+    aboutButton_->setStyleSheet(
+        "QToolButton#aboutButton {"
+        "  border: 1px solid transparent;"
+        "  border-radius: 15px;"
+        "  background: transparent;"
+        "  padding: 0px;"
+        "  margin-left: 8px;"
+        "}");
+    topControls2->addWidget(aboutButton_);
+
 #else
     auto* topControls = new QWidget(toolbar);
     topControls->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
@@ -275,12 +361,9 @@ void MainWindow::buildUi()
         "QPushButton { padding: 1px 8px; min-height: 18px; }"
         "QLabel { margin-left: 2px; margin-right: 2px; }"
     );
-#endif
-#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
-    topControls->addWidget(new QLabel("Rate", topControls));
-#else
+
     topLayout->addWidget(new QLabel("Rate", topControls));
-#endif
+
     dataModeCombo_ = new QComboBox(topControls);
     dataModeCombo_->addItem("Thin", static_cast<int>(DataReadMode::Thin));
     dataModeCombo_->addItem("Medium", static_cast<int>(DataReadMode::Medium));
@@ -289,12 +372,8 @@ void MainWindow::buildUi()
     if (auto* popup = dataModeCombo_->view()->window()) {
         popup->installEventFilter(new PopupPositionFilter(dataModeCombo_));
     }
-#if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
     dataModeCombo_->setFixedWidth(90);
     topLayout->addWidget(dataModeCombo_);
-#else
-    topControls->addWidget(dataModeCombo_);
-#endif
 
     topInfoLabel_ = new QLabel("Shot: --", topControls);
     ipInfoLabel_ = new QLabel("Ip: --", topControls);
@@ -303,22 +382,11 @@ void MainWindow::buildUi()
     timeInfoLabel_ = new QLabel("Time: --", topControls);
     for (QLabel* label : {topInfoLabel_, ipInfoLabel_, pulseInfoLabel_, itInfoLabel_, timeInfoLabel_}) {
         label->setStyleSheet("color: palette(highlight);");
-#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
-        topControls->addWidget(label);
-#else
         topLayout->addWidget(label);
-#endif
     }
     
-#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
-    auto* spacer = new QWidget(topControls);
-    spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-    topControls->addWidget(spacer);
-    topControls->addWidget(new ThemeModeButton(topControls));
-#else
     topLayout->addStretch(1);
     topLayout->addWidget(new ThemeModeButton(topControls));
-#endif
     
     aboutButton_ = new QToolButton(topControls);
     aboutButton_->setObjectName("aboutButton");
@@ -334,10 +402,8 @@ void MainWindow::buildUi()
         "  padding: 0px;"
         "  margin-left: 8px;"
         "}");
-#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
-    topControls->addWidget(aboutButton_);
-#else
     topLayout->addWidget(aboutButton_);
+
     toolbar->addWidget(topControls);
 #endif
 
@@ -348,6 +414,9 @@ void MainWindow::buildUi()
     bottomToolBar->setStyleSheet(
         "QPushButton { padding: 1px 8px; min-height: 18px; }"
         "QToolButton { margin: 0px; padding: 1px; min-width: 30px; min-height: 28px; }"
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+        "QToolBar::extension-button { min-width: 48px; min-height: 48px; }"
+#endif
     );
     zoomButton_ = new QToolButton(bottomToolBar);
     pointButton_ = new QToolButton(bottomToolBar);
@@ -409,6 +478,9 @@ void MainWindow::buildUi()
     bottomToolBar2->setContextMenuPolicy(Qt::PreventContextMenu);
     bottomToolBar2->setStyleSheet(
         "QPushButton { padding: 1px 8px; min-height: 18px; }"
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
+        "QToolBar::extension-button { min-width: 48px; min-height: 48px; }"
+#endif
     );
 #else
     auto* bottomToolBar2 = bottomToolBar;
