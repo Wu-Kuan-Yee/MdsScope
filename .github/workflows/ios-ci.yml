@@ -33,6 +33,12 @@ jobs:
           target: ios
           arch: ios
 
+      - name: Debug Qt paths
+        run: |
+          echo "Qt6_DIR=$Qt6_DIR"
+          ls "$Qt6_DIR/.." 2>/dev/null
+          ls "$Qt6_DIR/../clang_64" 2>/dev/null || echo "clang_64 not found"
+
       - name: Configure
         run: |
           cmake -S . -B build -G Xcode \
