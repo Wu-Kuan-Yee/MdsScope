@@ -360,6 +360,12 @@ jobs:
     runs-on: ubuntu-26.04
 
     steps:
+      - name: Delete existing release (if re-tagging)
+        run: |
+          gh release delete "${{ github.ref_name }}" --yes --cleanup-tag 2>/dev/null || true
+        env:
+          GH_TOKEN: ${{ github.token }}
+
       - name: Download all artifacts
         uses: actions/download-artifact@v8
         with:
