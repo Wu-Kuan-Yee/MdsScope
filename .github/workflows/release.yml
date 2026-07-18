@@ -309,10 +309,27 @@ jobs:
           java-version: "17"
           distribution: temurin
 
-      - name: Install Qt
-        uses: jurplel/install-qt-action@v4.3.1
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android licenses
+        run: |
+          yes | sdkmanager --licenses || true
+          rm -rf $ANDROID_HOME/platforms/* || true
+          sdkmanager "platforms;android-33" || true
+
+      - name: Install Qt Desktop
+        uses: jurplel/install-qt-action@v3
         with:
-          version: "6.8.2"
+          version: "6.4.3"
+          host: linux
+          target: desktop
+          arch: gcc_64
+
+      - name: Install Qt Android
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: "6.4.3"
           host: linux
           target: android
           arch: android_arm64_v8a
@@ -321,10 +338,9 @@ jobs:
         run: |
           cmake -S . -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_SYSTEM_NAME=Android \
+            -DCMAKE_TOOLCHAIN_FILE="${{ env.Qt6_DIR }}/lib/cmake/Qt6/qt.toolchain.cmake" \
             -DQT_ANDROID_ABIS=arm64-v8a \
-            -DANDROID_ABI=arm64-v8a \
-            -DCMAKE_PREFIX_PATH="${{ env.Qt6_DIR }}"
+            -DQT_HOST_PATH="${{ env.Qt6_DIR }}/../gcc_64"
 
       - name: Build
         run: cmake --build build --target apk
