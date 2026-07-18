@@ -44,9 +44,10 @@ jobs:
           cmake -S . -B build -G Xcode \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_SYSTEM_NAME=iOS \
-            -DCMAKE_OSX_SYSROOT=iphonesimulator \
+            -DCMAKE_OSX_SYSROOT=iphoneos \
             -DCMAKE_TOOLCHAIN_FILE="${{ env.Qt6_DIR }}/lib/cmake/Qt6/qt.toolchain.cmake" \
-            -DQT_HOST_PATH="${{ env.Qt6_DIR }}/../macos"
+            -DQT_HOST_PATH="${{ env.Qt6_DIR }}/../macos" \
+            -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO
 
-      - name: Build for simulator
-        run: cmake --build build --config Release -- -sdk iphonesimulator -arch arm64
+      - name: Build for device
+        run: cmake --build build --config Release -- -sdk iphoneos -arch arm64 CODE_SIGNING_ALLOWED=NO
