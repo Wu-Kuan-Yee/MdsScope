@@ -10,6 +10,11 @@
 #include <QHash>
 
 class QProcess;
+class QTcpServer;
+#ifdef MDSSCOPE_HAS_LIBSSH2
+struct _LIBSSH2_SESSION;
+typedef struct _LIBSSH2_SESSION LIBSSH2_SESSION;
+#endif
 
 class SshTunnelManager final : public QObject {
     Q_OBJECT
@@ -46,15 +51,18 @@ private:
         QString host;
         int remotePort = 8000;
         int localPort = 0;
-        QProcess* process = nullptr;
+#ifdef MDSSCOPE_HAS_LIBSSH2
+        LIBSSH2_SESSION* session = nullptr;
+#endif
+        int sshFd = -1;
+        QTcpServer* localServer = nullptr;
     };
+
+    void cleanupTunnel(const Tunnel& tunnel);
 
     static bool splitEndpoint(const QString& endpoint, QString* host, int* port);
     static bool tcpReachable(const QString& host, int port, int timeoutMs);
     static int reserveLocalPort();
-    static QString sshTarget(const SshSettings& settings);
-    static QStringList commonArguments(const SshSettings& settings, bool tunnel);
-    static void configureAskPass(QProcess* process, const SshSettings& settings);
 
     bool ensureTunnel(const QString& endpoint, QString* localEndpoint, QString* error);
     bool prepareUrlImpl(const QString& source, QString* prepared, QString* error, bool allowDirect);
