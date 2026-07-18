@@ -66,7 +66,7 @@ jobs:
       - name: Package DEB
         run: |
           cpack --config build/CPackConfig.cmake -G DEB
-          mv build/*.deb "build/MdsScope-linux-${{ matrix.arch }}.deb"
+          mv build/*.deb "build/MdsScope-linux-${{ matrix.distro }}-${{ matrix.arch }}.deb"
 
       - name: Package RPM
         continue-on-error: true
@@ -75,19 +75,19 @@ jobs:
           deb="$(ls build/*.deb | head -1)"
           fakeroot alien --to-rpm --scripts "$deb" 2>/dev/null || true
           rpmfile="$(ls *.rpm 2>/dev/null | head -1)"
-          if [ -n "$rpmfile" ]; then mv "$rpmfile" "build/MdsScope-linux-${{ matrix.arch }}.rpm"; fi
+          if [ -n "$rpmfile" ]; then mv "$rpmfile" "build/MdsScope-linux-${{ matrix.distro }}-${{ matrix.arch }}.rpm"; fi
 
       - name: Upload DEB artifact
         uses: actions/upload-artifact@v7
         with:
           name: MdsScope-linux-${{ matrix.distro }}-${{ matrix.arch }}-deb
-          path: build/MdsScope-linux-${{ matrix.arch }}.deb
+          path: build/MdsScope-linux-${{ matrix.distro }}-${{ matrix.arch }}.deb
 
       - name: Upload RPM artifact
         uses: actions/upload-artifact@v7
         with:
           name: MdsScope-linux-${{ matrix.distro }}-${{ matrix.arch }}-rpm
-          path: build/MdsScope-linux-${{ matrix.arch }}.rpm
+          path: build/MdsScope-linux-${{ matrix.distro }}-${{ matrix.arch }}.rpm
 
   # ── Linux AppImage ─────────────────────────────────────────────────────────
 
@@ -360,12 +360,6 @@ jobs:
     runs-on: ubuntu-26.04
 
     steps:
-      - name: Delete existing release (if re-tagging)
-        run: |
-          gh release delete "${{ github.ref_name }}" --yes --cleanup-tag 2>/dev/null || true
-        env:
-          GH_TOKEN: ${{ github.token }}
-
       - name: Download all artifacts
         uses: actions/download-artifact@v8
         with:
