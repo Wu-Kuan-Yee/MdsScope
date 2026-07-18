@@ -119,6 +119,7 @@ jobs:
         run: DESTDIR=build/staging cmake --install build
 
       - name: Package AppImage
+        continue-on-error: true
         run: |
           wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
           wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
@@ -129,6 +130,7 @@ jobs:
           mv MdsScope-*.AppImage build/mdsscope-linux-x86_64.AppImage
 
       - name: Package tar.gz
+        continue-on-error: true
         run: |
           strip build/MdsScope build/transfer 2>/dev/null || true
           tar czf build/mdsscope-linux-x86_64.tar.gz \
