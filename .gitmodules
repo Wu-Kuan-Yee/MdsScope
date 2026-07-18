@@ -1,3 +1,6 @@
 [submodule "packaging/android_openssl"]
 	path = packaging/android_openssl
 	url = https://github.com/KDAB/android_openssl.git
+[submodule "packaging/libssh2"]
+	path = packaging/libssh2
+	url = https://github.com/libssh2/libssh2.git

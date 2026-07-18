@@ -293,6 +293,82 @@ if(ANDROID)
     endif()
 endif()
 
+# libssh2 — native SSH client.
+# Crypto backend per platform:
+#   - macOS:       system OpenSSL (Homebrew)
+#   - Linux:       system OpenSSL
+#   - Windows:     WinCNG (built into Windows, no external dependency)
+#   - Android:     OpenSSL via android_openssl submodule
+#   - iOS/iPadOS:  requires a prebuilt OpenSSL static library.
+#                  Place libssl.a and libcrypto.a in packaging/ios_openssl/
+#                  and set CRYPTO_BACKEND=OpenSSL below.
+if(EXISTS "${PROJECT_SOURCE_DIR}/packaging/libssh2/CMakeLists.txt")
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+    set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+
+    set(MDSSCOPE_SKIP_LIBSSH2 FALSE)
+
+    if(IOS)
+        # iOS: check for OpenSSL in packaging/ios_openssl/ (run build_ios_openssl.sh).
+        set(IOS_OPENSSL_DIR "${PROJECT_SOURCE_DIR}/packaging/ios_openssl")
+        # Accept both flat (libssl.a at root) and make-install layout (lib/libssl.a).
+        if(EXISTS "${IOS_OPENSSL_DIR}/libssl.a" AND EXISTS "${IOS_OPENSSL_DIR}/libcrypto.a")
+            set(IOS_SSL "${IOS_OPENSSL_DIR}/libssl.a")
+            set(IOS_CRYPTO "${IOS_OPENSSL_DIR}/libcrypto.a")
+        elseif(EXISTS "${IOS_OPENSSL_DIR}/lib/libssl.a" AND EXISTS "${IOS_OPENSSL_DIR}/lib/libcrypto.a")
+            set(IOS_SSL "${IOS_OPENSSL_DIR}/lib/libssl.a")
+            set(IOS_CRYPTO "${IOS_OPENSSL_DIR}/lib/libcrypto.a")
+        endif()
+        if(DEFINED IOS_SSL)
+            set(CRYPTO_BACKEND "OpenSSL" CACHE STRING "" FORCE)
+            set(OPENSSL_INCLUDE_DIR "${IOS_OPENSSL_DIR}/include" CACHE PATH "" FORCE)
+            set(OPENSSL_CRYPTO_LIBRARY "${IOS_CRYPTO}" CACHE FILEPATH "" FORCE)
+            set(OPENSSL_SSL_LIBRARY "${IOS_SSL}" CACHE FILEPATH "" FORCE)
+            message(STATUS "Using OpenSSL for iOS: ${IOS_SSL}")
+        else()
+            message(WARNING "iOS OpenSSL not found at ${IOS_OPENSSL_DIR}/."
+                            " SSH tunneling disabled on iOS."
+                            " Run packaging/build_ios_openssl.sh to build it.")
+            set(MDSSCOPE_SKIP_LIBSSH2 TRUE)
+        endif()
+    elseif(WIN32)
+        set(CRYPTO_BACKEND "WinCNG" CACHE STRING "" FORCE)
+    elseif(ANDROID)
+        # Point libssh2 at the android_openssl submodule.
+        set(CRYPTO_BACKEND "OpenSSL" CACHE STRING "" FORCE)
+        if(Qt6_VERSION VERSION_GREATER_EQUAL 6.5.0)
+            set(ANDROID_SSL_VER "ssl_3")
+        else()
+            set(ANDROID_SSL_VER "ssl_1.1")
+        endif()
+        set(ANDROID_SSL_DIR "${PROJECT_SOURCE_DIR}/packaging/android_openssl/${ANDROID_SSL_VER}")
+        set(ANDROID_SSL_LIB "${ANDROID_SSL_DIR}/${CMAKE_ANDROID_ARCH_ABI}")
+        set(OPENSSL_ROOT_DIR "${ANDROID_SSL_DIR}" CACHE PATH "" FORCE)
+        set(OPENSSL_INCLUDE_DIR "${ANDROID_SSL_DIR}/include" CACHE PATH "" FORCE)
+        if(Qt6_VERSION VERSION_GREATER_EQUAL 6.5.0)
+            set(OPENSSL_CRYPTO_LIBRARY "${ANDROID_SSL_LIB}/libcrypto_3.so" CACHE FILEPATH "" FORCE)
+            set(OPENSSL_SSL_LIBRARY "${ANDROID_SSL_LIB}/libssl_3.so" CACHE FILEPATH "" FORCE)
+        else()
+            set(OPENSSL_CRYPTO_LIBRARY "${ANDROID_SSL_LIB}/libcrypto_1_1.so" CACHE FILEPATH "" FORCE)
+            set(OPENSSL_SSL_LIBRARY "${ANDROID_SSL_LIB}/libssl_1_1.so" CACHE FILEPATH "" FORCE)
+        endif()
+    else()
+        # macOS / Linux: use system OpenSSL.
+        set(CRYPTO_BACKEND "OpenSSL" CACHE STRING "" FORCE)
+    endif()
+
+    if(NOT MDSSCOPE_SKIP_LIBSSH2)
+        add_subdirectory(${PROJECT_SOURCE_DIR}/packaging/libssh2
+                         ${CMAKE_CURRENT_BINARY_DIR}/libssh2
+                         EXCLUDE_FROM_ALL)
+        target_link_libraries(MdsScope PRIVATE libssh2_static)
+        target_include_directories(MdsScope PRIVATE
+            ${PROJECT_SOURCE_DIR}/packaging/libssh2/include)
+        target_compile_definitions(MdsScope PRIVATE MDSSCOPE_HAS_LIBSSH2=1)
+    endif()
+endif()
+
 if(NOT ANDROID AND NOT IOS)
 target_link_libraries(transfer PRIVATE
     Qt6::Core
