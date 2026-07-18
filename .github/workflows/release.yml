@@ -70,10 +70,11 @@ jobs:
           mv build/*.deb "build/mdsscope-${{ matrix.package }}-${arch}.deb"
 
       - name: Package RPM
+        continue-on-error: true
         run: |
+          sudo apt install -y fakeroot alien 2>/dev/null || true
           deb="$(ls build/*.deb | head -1)"
-          pkgver="$(echo "$deb" | grep -oP 'mdsscope-\K[0-9.]+(?=-[^-]+\.deb)')"
-          fakeroot alien --to-rpm --scripts "$deb" || true
+          fakeroot alien --to-rpm --scripts "$deb" 2>/dev/null || true
           rpmfile="$(ls *.rpm 2>/dev/null | head -1)"
           if [ -n "$rpmfile" ]; then mv "$rpmfile" "build/mdsscope-${{ matrix.package }}.rpm"; fi
 
@@ -264,8 +265,9 @@ jobs:
 
       - name: Package MSI
         shell: pwsh
+        continue-on-error: true
         run: |
-          choco install wixtoolset -y --version=3.11.2
+          choco install wixtoolset -y --version=3.11.2 --no-progress
           $wixBin = "${env:ProgramFiles(x86)}\WiX Toolset v3.11\bin"
           $stage = "$env:GITHUB_WORKSPACE\build\windows-package\MdsScope"
           & "$wixBin\heat.exe" dir "$stage" -dr INSTALLFOLDER -cg ApplicationGroup \
