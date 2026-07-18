@@ -202,7 +202,7 @@ void MainWindow::buildUi()
         internalWebButton->setStyleSheet(
             QStringLiteral("QToolButton#internalWebButton::menu-indicator { image: none; width: 0px; }"));
         internalWebMenu_ = new QMenu(internalWebButton);
-        connect(internalWebMenu_, &QMenu::aboutToShow, this, &MainWindow::refreshInternalWebMenu);
+        // connect(internalWebMenu_, &QMenu::aboutToShow, this, &MainWindow::refreshInternalWebMenu);
         internalWebButton->setMenu(internalWebMenu_);
         internalWebButton->setPopupMode(QToolButton::InstantPopup);
         refreshInternalWebMenu();
