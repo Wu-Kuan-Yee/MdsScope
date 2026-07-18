@@ -33,6 +33,11 @@ jobs:
         rm -rf $ANDROID_HOME/platforms/* || true
         sdkmanager "platforms;android-33" || true
 
+    - name: Setup Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: "3.11"
+
     - name: Install Qt Host Tools
       uses: jurplel/install-qt-action@v4
       with:
