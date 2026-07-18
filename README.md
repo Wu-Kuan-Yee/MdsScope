@@ -93,6 +93,14 @@ cmake --build build-ios --config Release
 
 Android (requires Android SDK/NDK and Qt for Android):
 
+To enable native HTTPS (TLS) support for the Update feature on Android, you must initialize the `android_openssl` submodule before building:
+
+```bash
+git submodule update --init
+```
+
+Then build as usual:
+
 ```bash
 export ANDROID_NDK_ROOT=/path/to/android/sdk/ndk/xx.y.zzzz
 /path/to/Qt/6.x.x/android_arm64_v8a/bin/qt-cmake -S . -B build-android -DCMAKE_SYSTEM_NAME=Android -DCMAKE_ANDROID_NDK=$ANDROID_NDK_ROOT
