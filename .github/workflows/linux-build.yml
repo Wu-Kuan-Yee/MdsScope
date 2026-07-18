@@ -1,0 +1,30 @@
+name: Linux Build
+
+on:
+  push:
+    branches: [ "main", "feature/v5.8-cross-platform", "feature/v5.8-mobile-ssh-libssh2" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-26.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y build-essential cmake ninja-build \
+            qt6-base-dev qt6-base-dev-tools libssl-dev
+
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build

@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+      - feature/v5.8-cross-platform
+      - feature/v5.8-mobile-ssh-libssh2
   pull_request:
   workflow_dispatch:
 
