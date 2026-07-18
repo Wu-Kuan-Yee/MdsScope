@@ -40,6 +40,13 @@ jobs:
         target: 'android'
         arch: 'android_arm64_v8a'
 
+    - name: Debug Qt paths
+      run: |
+        echo "Qt6_DIR=$Qt6_DIR"
+        echo "QT_ROOT_DIR=$QT_ROOT_DIR"
+        ls "$Qt6_DIR" 2>/dev/null || echo "Qt6_DIR not found"
+        ls "$QT_ROOT_DIR" 2>/dev/null || echo "QT_ROOT_DIR not found"
+
     - name: Configure CMake
       run: |
         cmake -B build-android -S . -G Ninja \
@@ -47,7 +54,7 @@ jobs:
           -DCMAKE_SYSTEM_NAME=Android \
           -DQT_ANDROID_ABIS="arm64-v8a" \
           -DANDROID_ABI=arm64-v8a \
-          -DCMAKE_PREFIX_PATH="${{ env.Qt6_DIR }}" \
+          -DCMAKE_PREFIX_PATH="${{ env.QT_ROOT_DIR }}" \
           -DQT_HOST_PATH="${{ env.QT_ROOT_DIR }}"
 
     - name: Build APK
