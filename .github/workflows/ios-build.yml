@@ -1,0 +1,37 @@
+name: iOS Build
+
+on:
+  push:
+    branches: [ "main", "feature/v5.8-cross-platform", "feature/v5.8-mobile-ssh-libssh2" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4.3.1
+        with:
+          version: "6.8.3"
+          host: mac
+          target: ios
+          arch: clang_64
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Xcode \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_SYSTEM_NAME=iOS \
+            -DCMAKE_OSX_SYSROOT=iphonesimulator \
+            -DCMAKE_PREFIX_PATH="${{ env.QT_ROOT_DIR }}"
+
+      - name: Build for simulator
+        run: cmake --build build --config Release -- -sdk iphonesimulator -arch arm64
