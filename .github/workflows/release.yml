@@ -22,9 +22,9 @@ permissions:
   contents: write
 
 jobs:
-  # ── Linux DEB + RPM ────────────────────────────────────────────────────────
+  # ── Linux ───────────────────────────────────────────────────────────────────
 
-  linux-deb:
+  linux:
     name: Linux (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
     if: ${{ inputs.target == 'all' || inputs.target == 'linux' || startsWith(github.ref, 'refs/tags/') }}
@@ -50,58 +50,8 @@ jobs:
             qt6-base-dev qt6-base-dev-tools libssl-dev
 
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-
-      - name: Build
-        run: cmake --build build
-
-      - name: Package DEB
-        run: |
-          cpack --config build/CPackConfig.cmake -G DEB
-          mv build/*.deb "build/MdsScope-linux-${{ matrix.arch }}.deb"
-
-      - name: Package RPM
-        continue-on-error: true
-        run: |
-          sudo apt install -y fakeroot alien 2>/dev/null || true
-          deb="$(ls build/*.deb | head -1)"
-          fakeroot alien --to-rpm --scripts "$deb" 2>/dev/null || true
-          rpmfile="$(ls *.rpm 2>/dev/null | head -1)"
-          if [ -n "$rpmfile" ]; then mv "$rpmfile" "build/MdsScope-linux-${{ matrix.arch }}.rpm"; fi
-
-      - name: Upload DEB artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: MdsScope-linux-${{ matrix.arch }}-deb
-          path: build/MdsScope-linux-${{ matrix.arch }}.deb
-
-      - name: Upload RPM artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: MdsScope-linux-${{ matrix.arch }}-rpm
-          path: build/MdsScope-linux-${{ matrix.arch }}.rpm
-
-  # ── Linux AppImage ─────────────────────────────────────────────────────────
-
-  linux-appimage:
-    name: Linux AppImage (x86_64)
-    runs-on: ubuntu-26.04
-    if: ${{ inputs.target == 'all' || inputs.target == 'linux' || startsWith(github.ref, 'refs/tags/') }}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-        with:
-          submodules: recursive
-
-      - name: Install dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y build-essential cmake ninja-build \
-            qt6-base-dev qt6-base-dev-tools libssl-dev libfuse2
-
-      - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_INSTALL_PREFIX=/usr
 
       - name: Build
         run: cmake --build build
@@ -109,22 +59,60 @@ jobs:
       - name: Install to staging
         run: DESTDIR=build/staging cmake --install build
 
-      - name: Package AppImage
-        continue-on-error: true
+      - name: Package DEB
         run: |
-          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
-          wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+          cpack --config build/CPackConfig.cmake -G DEB
+          mv build/*.deb "build/MdsScope-linux-${{ matrix.arch }}.deb"
+
+      - name: Package RPM
+        run: |
+          sudo apt install -y fakeroot alien 2>/dev/null || true
+          deb="$(ls build/*.deb | head -1)"
+          fakeroot alien --to-rpm --scripts "$deb" 2>/dev/null || true
+          rpmfile="$(ls *.rpm 2>/dev/null | head -1)"
+          if [ -n "$rpmfile" ]; then mv "$rpmfile" "build/MdsScope-linux-${{ matrix.arch }}.rpm"; fi
+
+      - name: Package AppImage
+        run: |
+          DL_ARCH="${{ matrix.arch == 'x86_64' && 'x86_64' || 'aarch64' }}"
+          wget -q "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-${DL_ARCH}.AppImage"
+          wget -q "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-${DL_ARCH}.AppImage"
           chmod +x linuxdeploy*.AppImage
           export QTDIR="$(dpkg -L qt6-base-dev | grep '/bin/qmake6$' | head -1 | xargs dirname)/.."
-          ./linuxdeploy-x86_64.AppImage --appdir build/staging \
-            --plugin qt --output appimage
-          mv MdsScope-*.AppImage build/MdsScope-linux-x86_64.AppImage
+          ./linuxdeploy-${DL_ARCH}.AppImage --appdir build/staging --plugin qt --output appimage
+          mv MdsScope-*.AppImage "build/MdsScope-linux-${{ matrix.arch }}.AppImage"
+
+      - name: Package ZIP
+        run: |
+          strip build/MdsScope build/transfer 2>/dev/null || true
+          tar czf build/staging.tar.gz -C build/staging .
+          mkdir -p build/zip-root/MdsScope
+          tar xzf build/staging.tar.gz -C build/zip-root/MdsScope
+          (cd build/zip-root && zip -qr ../MdsScope-linux-${{ matrix.arch }}.zip MdsScope)
+
+      - name: Upload DEB
+        uses: actions/upload-artifact@v7
+        with:
+          name: MdsScope-linux-${{ matrix.arch }}-deb
+          path: build/MdsScope-linux-${{ matrix.arch }}.deb
+
+      - name: Upload RPM
+        uses: actions/upload-artifact@v7
+        with:
+          name: MdsScope-linux-${{ matrix.arch }}-rpm
+          path: build/MdsScope-linux-${{ matrix.arch }}.rpm
 
       - name: Upload AppImage
         uses: actions/upload-artifact@v7
         with:
-          name: MdsScope-linux-x86_64-AppImage
-          path: build/MdsScope-linux-x86_64.AppImage
+          name: MdsScope-linux-${{ matrix.arch }}-AppImage
+          path: build/MdsScope-linux-${{ matrix.arch }}.AppImage
+
+      - name: Upload ZIP
+        uses: actions/upload-artifact@v7
+        with:
+          name: MdsScope-linux-${{ matrix.arch }}-zip
+          path: build/MdsScope-linux-${{ matrix.arch }}.zip
 
   # ── macOS ──────────────────────────────────────────────────────────────────
 
@@ -159,7 +147,8 @@ jobs:
         run: brew install openssl
 
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="${{ env.QT_ROOT_DIR }}"
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_PREFIX_PATH="${{ env.QT_ROOT_DIR }}"
 
       - name: Build
         run: cmake --build build
@@ -178,7 +167,7 @@ jobs:
           cp -R build/macos-package/MdsScope.app build/dmg-root/
           ln -s /Applications build/dmg-root/Applications
           hdiutil create -volname MdsScope -srcfolder build/dmg-root \
-            -ov -format UDZO build/MdsScope-macos-${{ matrix.arch }}.dmg
+            -ov -format UDZO "build/MdsScope-macos-${{ matrix.arch }}.dmg"
 
       - name: Package PKG
         run: |
@@ -186,11 +175,11 @@ jobs:
             --install-location /Applications \
             --identifier com.mdsscope.app \
             --version "$(echo '${{ github.ref_name }}' | sed 's/^v//')" \
-            build/MdsScope-macos-${{ matrix.arch }}.pkg
+            "build/MdsScope-macos-${{ matrix.arch }}.pkg"
 
       - name: Package ZIP
         run: |
-          (cd build/macos-package && zip -qr ../MdsScope-macos-${{ matrix.arch }}.zip MdsScope.app)
+          (cd build/macos-package && zip -qr "../MdsScope-macos-${{ matrix.arch }}.zip" MdsScope.app)
 
       - name: Upload DMG
         uses: actions/upload-artifact@v7
@@ -213,9 +202,17 @@ jobs:
   # ── Windows ────────────────────────────────────────────────────────────────
 
   windows:
-    name: Windows (x86_64)
-    runs-on: windows-2022
+    name: Windows (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
     if: ${{ inputs.target == 'all' || inputs.target == 'windows' || startsWith(github.ref, 'refs/tags/') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: windows-2022
+          - arch: arm64
+            runner: windows-2022
 
     steps:
       - name: Checkout
@@ -229,10 +226,11 @@ jobs:
           version: "6.8.2"
           host: windows
           target: desktop
-          arch: win64_msvc2022_64
+          arch: ${{ matrix.arch == 'x86_64' && 'win64_msvc2022_64' || 'win64_msvc2022_arm64' }}
 
       - name: Configure
-        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+        run: cmake -S . -B build -G "Visual Studio 17 2022" \
+          -A ${{ matrix.arch == 'x86_64' && 'x64' || 'ARM64' }}
 
       - name: Build
         run: cmake --build build --config Release
@@ -247,7 +245,12 @@ jobs:
           windeployqt --release --compiler-runtime --no-translations --dir $stage "$stage\MdsScope.exe"
           Copy-Item resources "$stage\resources" -Recurse -ErrorAction SilentlyContinue
           Copy-Item COPYING $stage -ErrorAction SilentlyContinue
-          Compress-Archive -Path $stage -DestinationPath build\MdsScope-windows-x86_64.zip -Force
+          Compress-Archive -Path $stage -DestinationPath "build\MdsScope-windows-${{ matrix.arch }}.zip" -Force
+
+      - name: Package EXE
+        shell: pwsh
+        run: |
+          Copy-Item build\Release\MdsScope.exe "build\MdsScope-windows-${{ matrix.arch }}.exe"
 
       - name: Package MSI
         shell: pwsh
@@ -260,28 +263,34 @@ jobs:
             -gg -g1 -sfrag -srd -scom -svb -var var.SourceDir \
             -out build\wix-files.wxs
           & "$wixBin\candle.exe" build\wix-files.wxs `
-            -dSourceDir="$stage" -arch x64 `
+            -dSourceDir="$stage" -arch ${{ matrix.arch == 'x86_64' && 'x64' || 'arm64' }} `
             -out build\wix-files.wixobj
           & "$wixBin\light.exe" build\wix-files.wixobj `
             -ext WixUIExtension -cultures:en-us `
-            -out build\MdsScope-windows-x86_64.msi
+            -out "build\MdsScope-windows-${{ matrix.arch }}.msi"
 
       - name: Upload ZIP
         uses: actions/upload-artifact@v7
         with:
-          name: MdsScope-windows-x86_64-zip
-          path: build/MdsScope-windows-x86_64.zip
+          name: MdsScope-windows-${{ matrix.arch }}-zip
+          path: build/MdsScope-windows-${{ matrix.arch }}.zip
+
+      - name: Upload EXE
+        uses: actions/upload-artifact@v7
+        with:
+          name: MdsScope-windows-${{ matrix.arch }}-exe
+          path: build/MdsScope-windows-${{ matrix.arch }}.exe
 
       - name: Upload MSI
         uses: actions/upload-artifact@v7
         with:
-          name: MdsScope-windows-x86_64-msi
-          path: build/MdsScope-windows-x86_64.msi
+          name: MdsScope-windows-${{ matrix.arch }}-msi
+          path: build/MdsScope-windows-${{ matrix.arch }}.msi
 
   # ── Android ────────────────────────────────────────────────────────────────
 
   android:
-    name: Android (arm64-v8a)
+    name: Android (arm64)
     runs-on: ubuntu-26.04
     if: ${{ inputs.target == 'all' || inputs.target == 'android' || startsWith(github.ref, 'refs/tags/') }}
 
@@ -351,8 +360,7 @@ jobs:
   release:
     name: Create GitHub Release
     needs:
-      - linux-deb
-      - linux-appimage
+      - linux
       - macos
       - windows
       - android
@@ -367,7 +375,7 @@ jobs:
           pattern: MdsScope-*
           merge-multiple: true
 
-      - name: Flatten and rename for release
+      - name: Flatten for release
         run: |
           mkdir -p release
           find artifacts -type f | while read f; do
