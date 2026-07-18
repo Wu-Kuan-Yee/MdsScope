@@ -41,7 +41,7 @@ jobs:
     - name: Install Qt Host Tools
       uses: jurplel/install-qt-action@v4
       with:
-        version: '6.8.3'
+        version: '6.8.2'
         host: 'linux'
         target: 'desktop'
         arch: 'gcc_64'
@@ -52,7 +52,7 @@ jobs:
     - name: Install Qt Android
       uses: jurplel/install-qt-action@v4
       with:
-        version: '6.8.3'
+        version: '6.8.2'
         host: 'linux'
         target: 'android'
         arch: 'android_arm64_v8a'
