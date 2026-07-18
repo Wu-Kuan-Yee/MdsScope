@@ -479,17 +479,12 @@ private:
 
     void checkForUpdate()
     {
-#if defined(Q_OS_ANDROID)
-        QDesktopServices::openUrl(QUrl(QStringLiteral("https://github.com/wwktz/MdsScope/releases/latest")));
-        setUpdateBusy(false, "Opened browser");
-#else
         setUpdateBusy(true, "Checking...");
         QNetworkReply* reply = networkManager_->get(updateRequest(QUrl(QStringLiteral("https://api.github.com/repos/wwktz/MdsScope/releases/latest"))));
         connect(reply, &QNetworkReply::finished, this, [this, reply] {
             handleLatestRelease(reply);
             reply->deleteLater();
         });
-#endif
     }
 
     void handleLatestRelease(QNetworkReply* reply)

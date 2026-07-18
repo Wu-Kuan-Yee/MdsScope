@@ -282,6 +282,17 @@ target_link_libraries(MdsScope PRIVATE
     Qt6::Concurrent
 )
 
+if(ANDROID)
+    if(EXISTS "${PROJECT_SOURCE_DIR}/packaging/android_openssl/android_openssl.cmake")
+        message(STATUS "Integrating android_openssl for Android TLS support.")
+        include("${PROJECT_SOURCE_DIR}/packaging/android_openssl/android_openssl.cmake")
+        add_android_openssl_libraries(MdsScope)
+    else()
+        message(WARNING "android_openssl not found in packaging/android_openssl. TLS/HTTPS may fail on Android. "
+                        "Clone https://github.com/KDAB/android_openssl into packaging/android_openssl to enable it.")
+    endif()
+endif()
+
 if(NOT ANDROID AND NOT IOS)
 target_link_libraries(transfer PRIVATE
     Qt6::Core
