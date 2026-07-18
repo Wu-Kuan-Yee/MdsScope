@@ -13,8 +13,8 @@ public:
     QPointer<QWidget> dialog;
 
     template <typename T>
-    DialogOverlayManager(QMainWindow* mainWindow, T* d) 
-        : QObject(mainWindow), dialog(d) 
+    DialogOverlayManager(QMainWindow* mainWindow, T* d)
+        : QObject(mainWindow), dialog(d)
     {
         overlay = new QWidget(mainWindow);
         overlay->setObjectName("dialogOverlayBackground");
@@ -27,7 +27,7 @@ public:
         dialog->setParent(overlay);
         dialog->setWindowFlags(Qt::Widget);
         dialog->setAttribute(Qt::WA_StyledBackground, true);
-        
+
         dialog->setObjectName("dialogOverlayTarget");
         QString shadow = "#dialogOverlayTarget { border: 1px solid palette(mid); border-radius: 8px; }";
         dialog->setStyleSheet(dialog->styleSheet() + shadow);
@@ -40,9 +40,7 @@ public:
         connect(d, &T::finished, this, [this]() {
             if (overlay) {
                 overlay->hide();
-                // QTimer::singleShot(2000, overlay, &QObject::deleteLater);
             }
-            // QTimer::singleShot(2000, this, &QObject::deleteLater);
         });
     }
 
