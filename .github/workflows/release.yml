@@ -331,11 +331,13 @@ jobs:
             -DQT_HOST_PATH="${{ env.Qt6_DIR }}/../gcc_64"
 
       - name: Build APK
-        run: cmake --build build --target apk
+        env:
+          ANDROID_BUILD_PLATFORM: android-33
+        run: cmake --build build --target MdsScope_make_apk -j4
 
       - name: Rename APK
         run: |
-          apk=$(ls build/android-build/build/outputs/apk/release/*.apk | head -1)
+          apk=$(find build -name "*.apk" | head -1)
           cp "$apk" build/MdsScope-android-arm64.apk
 
       - name: Upload APK
