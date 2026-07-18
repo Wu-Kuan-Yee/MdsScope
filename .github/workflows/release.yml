@@ -73,22 +73,21 @@ jobs:
           if [ -n "$rpmfile" ]; then mv "$rpmfile" "build/MdsScope-linux-${{ matrix.arch }}.rpm"; fi
 
       - name: Package AppImage
+        continue-on-error: ${{ matrix.arch != 'x86_64' }}
         run: |
-          DL_ARCH="${{ matrix.arch == 'x86_64' && 'x86_64' || 'aarch64' }}"
-          wget -q "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-${DL_ARCH}.AppImage"
-          wget -q "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-${DL_ARCH}.AppImage"
+          wget -q "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-${{ matrix.arch }}.AppImage"
+          wget -q "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-${{ matrix.arch }}.AppImage"
           chmod +x linuxdeploy*.AppImage
           export QTDIR="$(dpkg -L qt6-base-dev | grep '/bin/qmake6$' | head -1 | xargs dirname)/.."
-          ./linuxdeploy-${DL_ARCH}.AppImage --appdir build/staging --plugin qt --output appimage
+          ./linuxdeploy-${{ matrix.arch }}.AppImage --appdir build/staging --plugin qt --output appimage
           mv MdsScope-*.AppImage "build/MdsScope-linux-${{ matrix.arch }}.AppImage"
 
       - name: Package ZIP
         run: |
           strip build/MdsScope build/transfer 2>/dev/null || true
-          tar czf build/staging.tar.gz -C build/staging .
-          mkdir -p build/zip-root/MdsScope
-          tar xzf build/staging.tar.gz -C build/zip-root/MdsScope
-          (cd build/zip-root && zip -qr ../MdsScope-linux-${{ matrix.arch }}.zip MdsScope)
+          mkdir -p build/zip-root
+          cp -a build/staging/* build/zip-root/
+          (cd build/zip-root && zip -qr "../MdsScope-linux-${{ matrix.arch }}.zip" .)
 
       - name: Upload DEB
         uses: actions/upload-artifact@v7
@@ -211,8 +210,6 @@ jobs:
         include:
           - arch: x86_64
             runner: windows-2022
-          - arch: arm64
-            runner: windows-2022
 
     steps:
       - name: Checkout
@@ -226,11 +223,10 @@ jobs:
           version: "6.8.2"
           host: windows
           target: desktop
-          arch: ${{ matrix.arch == 'x86_64' && 'win64_msvc2022_64' || 'win64_msvc2022_arm64' }}
+          arch: win64_msvc2022_64
 
       - name: Configure
-        run: cmake -S . -B build -G "Visual Studio 17 2022" \
-          -A ${{ matrix.arch == 'x86_64' && 'x64' || 'ARM64' }}
+        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64
 
       - name: Build
         run: cmake --build build --config Release
