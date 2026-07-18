@@ -184,7 +184,7 @@ void editSavedWebAddresses(QWidget* parent, const QVector<InternalWebBookmark>& 
 
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel, &dialog);
     auto* save = buttons->button(QDialogButtonBox::Save);
-    auto updateSave = [&] {
+    auto updateSave = [=] {
         QSet<QString> urls;
         bool valid = true;
         for (int i = 0; i < list->count(); ++i) {
@@ -200,7 +200,7 @@ void editSavedWebAddresses(QWidget* parent, const QVector<InternalWebBookmark>& 
         }
         save->setEnabled(valid);
     };
-    auto loadCurrent = [&] {
+    auto loadCurrent = [=] {
         const QSignalBlocker nameBlocker(nameEdit);
         const QSignalBlocker addressBlocker(addressEdit);
         const QListWidgetItem* item = list->currentItem();
@@ -209,7 +209,7 @@ void editSavedWebAddresses(QWidget* parent, const QVector<InternalWebBookmark>& 
         nameEdit->setText(item ? item->data(kNameRole).toString() : QString());
         addressEdit->setText(item ? item->data(kAddressRole).toString() : QString());
     };
-    auto updateCurrent = [&] {
+    auto updateCurrent = [=] {
         QListWidgetItem* item = list->currentItem();
         if (!item) {
             return;
@@ -261,7 +261,9 @@ void selectWebAddressToRemove(QWidget* parent, const QVector<InternalWebBookmark
     BaseDialog& dialog = *_dialog;
     dialog.setWindowTitle(QStringLiteral("Remove"));
     dialog.setWindowIcon(appIcon());
+#if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
     dialog.setMinimumSize(560, 280);
+#endif
 
     auto* layout = new QVBoxLayout(&dialog);
     layout->addWidget(new QLabel(QStringLiteral("Select addresses to remove:"), &dialog));
