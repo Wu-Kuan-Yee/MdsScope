@@ -25,7 +25,7 @@ jobs:
   # ── Linux DEB + RPM ────────────────────────────────────────────────────────
 
   linux-deb:
-    name: Linux (${{ matrix.distro }} ${{ matrix.arch }})
+    name: Linux (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
     if: ${{ inputs.target == 'all' || inputs.target == 'linux' || startsWith(github.ref, 'refs/tags/') }}
     strategy:
@@ -34,16 +34,8 @@ jobs:
         include:
           - arch: x86_64
             runner: ubuntu-26.04
-            distro: ubuntu-26.04
           - arch: aarch64
             runner: ubuntu-26.04-arm
-            distro: ubuntu-26.04
-          - arch: x86_64
-            runner: ubuntu-24.04
-            distro: ubuntu-24.04
-          - arch: aarch64
-            runner: ubuntu-24.04-arm
-            distro: ubuntu-24.04
 
     steps:
       - name: Checkout
@@ -66,7 +58,7 @@ jobs:
       - name: Package DEB
         run: |
           cpack --config build/CPackConfig.cmake -G DEB
-          mv build/*.deb "build/MdsScope-linux-${{ matrix.distro }}-${{ matrix.arch }}.deb"
+          mv build/*.deb "build/MdsScope-linux-${{ matrix.arch }}.deb"
 
       - name: Package RPM
         continue-on-error: true
@@ -75,19 +67,19 @@ jobs:
           deb="$(ls build/*.deb | head -1)"
           fakeroot alien --to-rpm --scripts "$deb" 2>/dev/null || true
           rpmfile="$(ls *.rpm 2>/dev/null | head -1)"
-          if [ -n "$rpmfile" ]; then mv "$rpmfile" "build/MdsScope-linux-${{ matrix.distro }}-${{ matrix.arch }}.rpm"; fi
+          if [ -n "$rpmfile" ]; then mv "$rpmfile" "build/MdsScope-linux-${{ matrix.arch }}.rpm"; fi
 
       - name: Upload DEB artifact
         uses: actions/upload-artifact@v7
         with:
-          name: MdsScope-linux-${{ matrix.distro }}-${{ matrix.arch }}-deb
-          path: build/MdsScope-linux-${{ matrix.distro }}-${{ matrix.arch }}.deb
+          name: MdsScope-linux-${{ matrix.arch }}-deb
+          path: build/MdsScope-linux-${{ matrix.arch }}.deb
 
       - name: Upload RPM artifact
         uses: actions/upload-artifact@v7
         with:
-          name: MdsScope-linux-${{ matrix.distro }}-${{ matrix.arch }}-rpm
-          path: build/MdsScope-linux-${{ matrix.distro }}-${{ matrix.arch }}.rpm
+          name: MdsScope-linux-${{ matrix.arch }}-rpm
+          path: build/MdsScope-linux-${{ matrix.arch }}.rpm
 
   # ── Linux AppImage ─────────────────────────────────────────────────────────
 
@@ -137,9 +129,17 @@ jobs:
   # ── macOS ──────────────────────────────────────────────────────────────────
 
   macos:
-    name: macOS (arm64)
-    runs-on: macos-latest
+    name: macOS (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
     if: ${{ inputs.target == 'all' || inputs.target == 'macos' || startsWith(github.ref, 'refs/tags/') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-latest
+          - arch: x86_64
+            runner: macos-13
 
     steps:
       - name: Checkout
@@ -178,7 +178,7 @@ jobs:
           cp -R build/macos-package/MdsScope.app build/dmg-root/
           ln -s /Applications build/dmg-root/Applications
           hdiutil create -volname MdsScope -srcfolder build/dmg-root \
-            -ov -format UDZO build/MdsScope-macos-arm64.dmg
+            -ov -format UDZO build/MdsScope-macos-${{ matrix.arch }}.dmg
 
       - name: Package PKG
         run: |
@@ -186,29 +186,29 @@ jobs:
             --install-location /Applications \
             --identifier com.mdsscope.app \
             --version "$(echo '${{ github.ref_name }}' | sed 's/^v//')" \
-            build/MdsScope-macos-arm64.pkg
+            build/MdsScope-macos-${{ matrix.arch }}.pkg
 
       - name: Package ZIP
         run: |
-          (cd build/macos-package && zip -qr ../MdsScope-macos-arm64.zip MdsScope.app)
+          (cd build/macos-package && zip -qr ../MdsScope-macos-${{ matrix.arch }}.zip MdsScope.app)
 
       - name: Upload DMG
         uses: actions/upload-artifact@v7
         with:
-          name: MdsScope-macos-arm64-dmg
-          path: build/MdsScope-macos-arm64.dmg
+          name: MdsScope-macos-${{ matrix.arch }}-dmg
+          path: build/MdsScope-macos-${{ matrix.arch }}.dmg
 
       - name: Upload PKG
         uses: actions/upload-artifact@v7
         with:
-          name: MdsScope-macos-arm64-pkg
-          path: build/MdsScope-macos-arm64.pkg
+          name: MdsScope-macos-${{ matrix.arch }}-pkg
+          path: build/MdsScope-macos-${{ matrix.arch }}.pkg
 
       - name: Upload ZIP
         uses: actions/upload-artifact@v7
         with:
-          name: MdsScope-macos-arm64-zip
-          path: build/MdsScope-macos-arm64.zip
+          name: MdsScope-macos-${{ matrix.arch }}-zip
+          path: build/MdsScope-macos-${{ matrix.arch }}.zip
 
   # ── Windows ────────────────────────────────────────────────────────────────
 
