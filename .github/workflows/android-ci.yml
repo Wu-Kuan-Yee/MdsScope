@@ -33,29 +33,30 @@ jobs:
         rm -rf $ANDROID_HOME/platforms/* || true
         sdkmanager "platforms;android-33" || true
 
-    - name: Install host Qt tools
-      run: |
-        sudo apt update
-        sudo apt install -y qt6-base-dev qt6-base-dev-tools
+    - name: Install Qt Desktop
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: '6.8.0'
+        host: 'linux'
+        target: 'desktop'
+        arch: 'gcc_64'
 
     - name: Install Qt Android
       uses: jurplel/install-qt-action@v3
       with:
-        version: '6.8.2'
+        version: '6.8.0'
         host: 'linux'
         target: 'android'
         arch: 'android_arm64_v8a'
 
     - name: Configure CMake
       run: |
-        HOST_QT=$(qmake6 -query QT_INSTALL_PREFIX)
         cmake -B build-android -S . -G Ninja \
           -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_TOOLCHAIN_FILE="${{ env.Qt6_DIR }}/lib/cmake/Qt6/qt.toolchain.cmake" \
           -DQT_ANDROID_ABIS="arm64-v8a" \
           -DANDROID_ABI=arm64-v8a \
-          -DQT_HOST_PATH="$HOST_QT" \
-          -DQt6HostInfo_DIR="$HOST_QT/lib/cmake/Qt6HostInfo"
+          -DQT_HOST_PATH="${{ env.Qt6_DIR }}/../gcc_64"
 
     - name: Build APK
       env:
