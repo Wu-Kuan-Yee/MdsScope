@@ -32,7 +32,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - arch: x86_64
+          - arch: amd64
             runner: ubuntu-26.04
           - arch: aarch64
             runner: ubuntu-26.04-arm
@@ -62,7 +62,7 @@ jobs:
       - name: Package DEB
         run: |
           cpack --config build/CPackConfig.cmake -G DEB
-          mv build/*.deb "build/MdsScope-linux-${{ matrix.arch }}.deb"
+          mv build/*.deb "build/mdsscope-linux-${{ matrix.arch }}.deb"
 
       - name: Package RPM
         run: |
@@ -70,7 +70,7 @@ jobs:
           deb="$(ls build/*.deb | head -1)"
           fakeroot alien --to-rpm --scripts "$deb" 2>/dev/null || true
           rpmfile="$(ls *.rpm 2>/dev/null | head -1)"
-          if [ -n "$rpmfile" ]; then mv "$rpmfile" "build/MdsScope-linux-${{ matrix.arch }}.rpm"; fi
+          if [ -n "$rpmfile" ]; then mv "$rpmfile" "build/mdsscope-linux-${{ matrix.arch }}.rpm"; fi
 
       - name: Package AppImage
         continue-on-error: true
@@ -80,38 +80,38 @@ jobs:
           chmod +x linuxdeploy*.AppImage
           export QTDIR="$(dpkg -L qt6-base-dev | grep '/bin/qmake6$' | head -1 | xargs dirname)/.."
           ./linuxdeploy-${{ matrix.arch }}.AppImage --appdir build/staging --plugin qt --output appimage
-          mv MdsScope-*.AppImage "build/MdsScope-linux-${{ matrix.arch }}.AppImage"
+          mv mdsscope-*.AppImage "build/mdsscope-linux-${{ matrix.arch }}.AppImage"
 
       - name: Package ZIP
         run: |
           strip build/MdsScope build/transfer 2>/dev/null || true
           mkdir -p build/zip-root
           cp -a build/staging/* build/zip-root/
-          (cd build/zip-root && zip -qr "../MdsScope-linux-${{ matrix.arch }}.zip" .)
+          (cd build/zip-root && zip -qr "../mdsscope-linux-${{ matrix.arch }}.zip" .)
 
       - name: Upload DEB
         uses: actions/upload-artifact@v7
         with:
-          name: MdsScope-linux-${{ matrix.arch }}-deb
-          path: build/MdsScope-linux-${{ matrix.arch }}.deb
+          name: mdsscope-linux-${{ matrix.arch }}-deb
+          path: build/mdsscope-linux-${{ matrix.arch }}.deb
 
       - name: Upload RPM
         uses: actions/upload-artifact@v7
         with:
-          name: MdsScope-linux-${{ matrix.arch }}-rpm
-          path: build/MdsScope-linux-${{ matrix.arch }}.rpm
+          name: mdsscope-linux-${{ matrix.arch }}-rpm
+          path: build/mdsscope-linux-${{ matrix.arch }}.rpm
 
       - name: Upload AppImage
         uses: actions/upload-artifact@v7
         with:
-          name: MdsScope-linux-${{ matrix.arch }}-AppImage
-          path: build/MdsScope-linux-${{ matrix.arch }}.AppImage
+          name: mdsscope-linux-${{ matrix.arch }}-AppImage
+          path: build/mdsscope-linux-${{ matrix.arch }}.AppImage
 
       - name: Upload ZIP
         uses: actions/upload-artifact@v7
         with:
-          name: MdsScope-linux-${{ matrix.arch }}-zip
-          path: build/MdsScope-linux-${{ matrix.arch }}.zip
+          name: mdsscope-linux-${{ matrix.arch }}-zip
+          path: build/mdsscope-linux-${{ matrix.arch }}.zip
 
   # ── macOS ──────────────────────────────────────────────────────────────────
 
@@ -123,7 +123,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - arch: arm64
+          - arch: aarch64
             runner: macos-latest
 
     steps:
@@ -164,7 +164,7 @@ jobs:
           cp -R build/macos-package/MdsScope.app build/dmg-root/
           ln -s /Applications build/dmg-root/Applications
           hdiutil create -volname MdsScope -srcfolder build/dmg-root \
-            -ov -format UDZO "build/MdsScope-macos-${{ matrix.arch }}.dmg"
+            -ov -format UDZO "build/mdsscope-macos-${{ matrix.arch }}.dmg"
 
       - name: Package PKG
         run: |
@@ -172,29 +172,29 @@ jobs:
             --install-location /Applications \
             --identifier com.mdsscope.app \
             --version "$(echo '${{ github.ref_name }}' | sed 's/^v//')" \
-            "build/MdsScope-macos-${{ matrix.arch }}.pkg"
+            "build/mdsscope-macos-${{ matrix.arch }}.pkg"
 
       - name: Package ZIP
         run: |
-          (cd build/macos-package && zip -qr "../MdsScope-macos-${{ matrix.arch }}.zip" MdsScope.app)
+          (cd build/macos-package && zip -qr "../mdsscope-macos-${{ matrix.arch }}.zip" MdsScope.app)
 
       - name: Upload DMG
         uses: actions/upload-artifact@v7
         with:
-          name: MdsScope-macos-${{ matrix.arch }}-dmg
-          path: build/MdsScope-macos-${{ matrix.arch }}.dmg
+          name: mdsscope-macos-${{ matrix.arch }}-dmg
+          path: build/mdsscope-macos-${{ matrix.arch }}.dmg
 
       - name: Upload PKG
         uses: actions/upload-artifact@v7
         with:
-          name: MdsScope-macos-${{ matrix.arch }}-pkg
-          path: build/MdsScope-macos-${{ matrix.arch }}.pkg
+          name: mdsscope-macos-${{ matrix.arch }}-pkg
+          path: build/mdsscope-macos-${{ matrix.arch }}.pkg
 
       - name: Upload ZIP
         uses: actions/upload-artifact@v7
         with:
-          name: MdsScope-macos-${{ matrix.arch }}-zip
-          path: build/MdsScope-macos-${{ matrix.arch }}.zip
+          name: mdsscope-macos-${{ matrix.arch }}-zip
+          path: build/mdsscope-macos-${{ matrix.arch }}.zip
 
   # ── Windows ────────────────────────────────────────────────────────────────
 
@@ -206,7 +206,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - arch: x86_64
+          - arch: amd64
             runner: windows-2022
 
     steps:
@@ -239,7 +239,7 @@ jobs:
           windeployqt --release --compiler-runtime --no-translations --dir $stage "$stage\MdsScope.exe"
           Copy-Item resources "$stage\resources" -Recurse -ErrorAction SilentlyContinue
           Copy-Item COPYING $stage -ErrorAction SilentlyContinue
-          Compress-Archive -Path $stage -DestinationPath "build\MdsScope-windows-${{ matrix.arch }}.zip" -Force
+          Compress-Archive -Path $stage -DestinationPath "build\mdsscope-windows-${{ matrix.arch }}.zip" -Force
 
       - name: Package MSI
         shell: pwsh
@@ -252,23 +252,23 @@ jobs:
             -gg -g1 -sfrag -srd -scom -svb -var var.SourceDir \
             -out build\wix-files.wxs
           & "$wixBin\candle.exe" build\wix-files.wxs `
-            -dSourceDir="$stage" -arch ${{ matrix.arch == 'x86_64' && 'x64' || 'arm64' }} `
+            -dSourceDir="$stage" -arch ${{ matrix.arch == 'amd64' && 'x64' || 'arm64' }} `
             -out build\wix-files.wixobj
           & "$wixBin\light.exe" build\wix-files.wixobj `
             -ext WixUIExtension -cultures:en-us `
-            -out "build\MdsScope-windows-${{ matrix.arch }}.msi"
+            -out "build\mdsscope-windows-${{ matrix.arch }}.msi"
 
       - name: Upload ZIP
         uses: actions/upload-artifact@v7
         with:
-          name: MdsScope-windows-${{ matrix.arch }}-zip
-          path: build/MdsScope-windows-${{ matrix.arch }}.zip
+          name: mdsscope-windows-${{ matrix.arch }}-zip
+          path: build/mdsscope-windows-${{ matrix.arch }}.zip
 
       - name: Upload MSI
         uses: actions/upload-artifact@v7
         with:
-          name: MdsScope-windows-${{ matrix.arch }}-msi
-          path: build/MdsScope-windows-${{ matrix.arch }}.msi
+          name: mdsscope-windows-${{ matrix.arch }}-msi
+          path: build/mdsscope-windows-${{ matrix.arch }}.msi
 
   # ── Android ────────────────────────────────────────────────────────────────
 
@@ -330,13 +330,13 @@ jobs:
       - name: Rename APK
         run: |
           apk=$(find build -name "*.apk" | head -1)
-          cp "$apk" build/MdsScope-android-arm64.apk
+          cp "$apk" build/mdsscope-android-aarch64.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v7
         with:
-          name: MdsScope-android-arm64-apk
-          path: build/MdsScope-android-arm64.apk
+          name: mdsscope-android-aarch64-apk
+          path: build/mdsscope-android-aarch64.apk
 
   # ── GitHub Release ────────────────────────────────────────────────────────
 
@@ -355,7 +355,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           path: artifacts
-          pattern: MdsScope-*
+          pattern: mdsscope-*
           merge-multiple: true
 
       - name: Flatten for release
