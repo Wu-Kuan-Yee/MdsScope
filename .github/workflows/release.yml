@@ -245,14 +245,16 @@ jobs:
         shell: pwsh
         continue-on-error: true
         run: |
-          choco install wixtoolset -y --version=3.11.2 --no-progress
-          $wixBin = "${env:ProgramFiles(x86)}\WiX Toolset v3.11\bin"
+          $wizZip = "$env:TEMP\wix.zip"; $wixDir = "$env:TEMP\wix"
+          Invoke-WebRequest -Uri "https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip" -OutFile $wizZip
+          Expand-Archive -Path $wizZip -DestinationPath $wixDir -Force
+          $wixBin = $wixDir
           $stage = "$env:GITHUB_WORKSPACE\build\windows-package\MdsScope"
           & "$wixBin\heat.exe" dir "$stage" -dr INSTALLFOLDER -cg ApplicationGroup \
             -gg -g1 -sfrag -srd -scom -svb -var var.SourceDir \
             -out build\wix-files.wxs
           & "$wixBin\candle.exe" build\wix-files.wxs `
-            -dSourceDir="$stage" -arch ${{ matrix.arch == 'amd64' && 'x64' || 'arm64' }} `
+            -dSourceDir="$stage" -arch x64 `
             -out build\wix-files.wixobj
           & "$wixBin\light.exe" build\wix-files.wixobj `
             -ext WixUIExtension -cultures:en-us `
