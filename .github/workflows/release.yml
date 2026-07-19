@@ -83,6 +83,7 @@ jobs:
           # Copy xcb platform plugin
           cp -a "${QT_PLUGINS}/platforms/libqxcb.so" build/staging/usr/plugins/ 2>/dev/null || true
           # Launch script
+          mkdir -p build/staging/usr/bin
           cat > build/staging/usr/bin/mdsscope.sh << 'EOF'
           #!/bin/sh
           DIR="$(cd "$(dirname "$0")" && pwd)"
