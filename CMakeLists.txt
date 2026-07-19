@@ -172,6 +172,9 @@ add_executable(transfer
 set_target_properties(transfer PROPERTIES AUTOMOC OFF)
 endif()
 set_target_properties(MdsScope PROPERTIES WIN32_EXECUTABLE TRUE)
+if(WIN32)
+    target_sources(MdsScope PRIVATE "${PROJECT_SOURCE_DIR}/packaging/windows/mdsscope.rc")
+endif()
 
     file(GLOB MDS_SCOPE_SOURCE_INDEX_SIGNALS RELATIVE "${PROJECT_SOURCE_DIR}" CONFIGURE_DEPENDS
         "${PROJECT_SOURCE_DIR}/resources/source_index/signals/*.txt"
