@@ -14,7 +14,6 @@ on:
         options:
           - all
           - linux
-          - macos
           - windows
           - android
 
@@ -72,16 +71,6 @@ jobs:
           rpmfile="$(ls *.rpm 2>/dev/null | head -1)"
           if [ -n "$rpmfile" ]; then mv "$rpmfile" "build/mdsscope-linux-${{ matrix.arch }}.rpm"; fi
 
-      - name: Package AppImage
-        continue-on-error: true
-        run: |
-          wget -q "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-${{ matrix.arch }}.AppImage"
-          wget -q "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-${{ matrix.arch }}.AppImage"
-          chmod +x linuxdeploy*.AppImage
-          export QTDIR="$(dpkg -L qt6-base-dev | grep '/bin/qmake6$' | head -1 | xargs dirname)/.."
-          ./linuxdeploy-${{ matrix.arch }}.AppImage --appdir build/staging --plugin qt --output appimage
-          mv mdsscope-*.AppImage "build/mdsscope-linux-${{ matrix.arch }}.AppImage"
-
       - name: Package ZIP
         run: |
           strip build/MdsScope build/transfer 2>/dev/null || true
@@ -101,113 +90,18 @@ jobs:
           name: mdsscope-linux-${{ matrix.arch }}-rpm
           path: build/mdsscope-linux-${{ matrix.arch }}.rpm
 
-      - name: Upload AppImage
-        uses: actions/upload-artifact@v7
-        with:
-          name: mdsscope-linux-${{ matrix.arch }}-AppImage
-          path: build/mdsscope-linux-${{ matrix.arch }}.AppImage
-
       - name: Upload ZIP
         uses: actions/upload-artifact@v7
         with:
           name: mdsscope-linux-${{ matrix.arch }}-zip
           path: build/mdsscope-linux-${{ matrix.arch }}.zip
 
-  # ── macOS ──────────────────────────────────────────────────────────────────
-
-  macos:
-    name: macOS (${{ matrix.arch }})
-    runs-on: ${{ matrix.runner }}
-    if: ${{ inputs.target == 'all' || inputs.target == 'macos' || startsWith(github.ref, 'refs/tags/') }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - arch: aarch64
-            runner: macos-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-        with:
-          submodules: recursive
-
-      - name: Install Qt
-        uses: jurplel/install-qt-action@v4.3.1
-        with:
-          version: "6.8.2"
-          host: mac
-          target: desktop
-          arch: clang_64
-
-      - name: Install OpenSSL
-        run: brew install openssl
-
-      - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_PREFIX_PATH="${{ env.QT_ROOT_DIR }}"
-
-      - name: Build
-        run: cmake --build build
-
-      - name: Package .app bundle
-        run: |
-          mkdir -p build/macos-package
-          cp -R build/MdsScope.app build/macos-package/
-          macdeployqt build/macos-package/MdsScope.app -no-strip
-          cp build/transfer build/macos-package/MdsScope.app/Contents/MacOS/ 2>/dev/null || true
-          cp -R resources build/macos-package/MdsScope.app/Contents/Resources/ 2>/dev/null || true
-
-      - name: Package DMG
-        run: |
-          mkdir -p build/dmg-root
-          cp -R build/macos-package/MdsScope.app build/dmg-root/
-          ln -s /Applications build/dmg-root/Applications
-          hdiutil create -volname MdsScope -srcfolder build/dmg-root \
-            -ov -format UDZO "build/mdsscope-macos-${{ matrix.arch }}.dmg"
-
-      - name: Package PKG
-        run: |
-          pkgbuild --root build/macos-package \
-            --install-location /Applications \
-            --identifier com.mdsscope.app \
-            --version "$(echo '${{ github.ref_name }}' | sed 's/^v//')" \
-            "build/mdsscope-macos-${{ matrix.arch }}.pkg"
-
-      - name: Package ZIP
-        run: |
-          (cd build/macos-package && zip -qr "../mdsscope-macos-${{ matrix.arch }}.zip" MdsScope.app)
-
-      - name: Upload DMG
-        uses: actions/upload-artifact@v7
-        with:
-          name: mdsscope-macos-${{ matrix.arch }}-dmg
-          path: build/mdsscope-macos-${{ matrix.arch }}.dmg
-
-      - name: Upload PKG
-        uses: actions/upload-artifact@v7
-        with:
-          name: mdsscope-macos-${{ matrix.arch }}-pkg
-          path: build/mdsscope-macos-${{ matrix.arch }}.pkg
-
-      - name: Upload ZIP
-        uses: actions/upload-artifact@v7
-        with:
-          name: mdsscope-macos-${{ matrix.arch }}-zip
-          path: build/mdsscope-macos-${{ matrix.arch }}.zip
-
   # ── Windows ────────────────────────────────────────────────────────────────
 
   windows:
-    name: Windows (${{ matrix.arch }})
-    runs-on: ${{ matrix.runner }}
+    name: Windows (amd64)
+    runs-on: windows-2022
     if: ${{ inputs.target == 'all' || inputs.target == 'windows' || startsWith(github.ref, 'refs/tags/') }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - arch: amd64
-            runner: windows-2022
 
     steps:
       - name: Checkout
@@ -239,43 +133,18 @@ jobs:
           windeployqt --release --compiler-runtime --no-translations --dir $stage "$stage\MdsScope.exe"
           Copy-Item resources "$stage\resources" -Recurse -ErrorAction SilentlyContinue
           Copy-Item COPYING $stage -ErrorAction SilentlyContinue
-          Compress-Archive -Path $stage -DestinationPath "build\mdsscope-windows-${{ matrix.arch }}.zip" -Force
-
-      - name: Package MSI
-        shell: pwsh
-        continue-on-error: true
-        run: |
-          $wizZip = "$env:TEMP\wix.zip"; $wixDir = "$env:TEMP\wix"
-          Invoke-WebRequest -Uri "https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip" -OutFile $wizZip
-          Expand-Archive -Path $wizZip -DestinationPath $wixDir -Force
-          $wixBin = $wixDir
-          $stage = "$env:GITHUB_WORKSPACE\build\windows-package\MdsScope"
-          & "$wixBin\heat.exe" dir "$stage" -dr INSTALLFOLDER -cg ApplicationGroup \
-            -gg -g1 -sfrag -srd -scom -svb -var var.SourceDir \
-            -out build\wix-files.wxs
-          & "$wixBin\candle.exe" build\wix-files.wxs `
-            -dSourceDir="$stage" -arch x64 `
-            -out build\wix-files.wixobj
-          & "$wixBin\light.exe" build\wix-files.wixobj `
-            -ext WixUIExtension -cultures:en-us `
-            -out "build\mdsscope-windows-${{ matrix.arch }}.msi"
+          Compress-Archive -Path $stage -DestinationPath "build\mdsscope-windows-amd64.zip" -Force
 
       - name: Upload ZIP
         uses: actions/upload-artifact@v7
         with:
-          name: mdsscope-windows-${{ matrix.arch }}-zip
-          path: build/mdsscope-windows-${{ matrix.arch }}.zip
-
-      - name: Upload MSI
-        uses: actions/upload-artifact@v7
-        with:
-          name: mdsscope-windows-${{ matrix.arch }}-msi
-          path: build/mdsscope-windows-${{ matrix.arch }}.msi
+          name: mdsscope-windows-amd64-zip
+          path: build/mdsscope-windows-amd64.zip
 
   # ── Android ────────────────────────────────────────────────────────────────
 
   android:
-    name: Android (arm64)
+    name: Android (aarch64)
     runs-on: ubuntu-26.04
     if: ${{ inputs.target == 'all' || inputs.target == 'android' || startsWith(github.ref, 'refs/tags/') }}
 
@@ -346,7 +215,6 @@ jobs:
     name: Create GitHub Release
     needs:
       - linux
-      - macos
       - windows
       - android
     if: startsWith(github.ref, 'refs/tags/')
