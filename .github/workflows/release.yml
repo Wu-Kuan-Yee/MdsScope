@@ -72,13 +72,14 @@ jobs:
           if [ -n "$rpmfile" ]; then mv "$rpmfile" "build/mdsscope-linux-${{ matrix.arch }}.rpm"; fi
 
       - name: Bundle Qt into staging (for portable zip)
+        continue-on-error: true
         run: |
-          wget -q "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-${{ matrix.arch }}.AppImage"
-          wget -q "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-${{ matrix.arch }}.AppImage"
+          LDA="${{ matrix.arch == 'amd64' && 'x86_64' || matrix.arch }}"
+          wget -q "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-${LDA}.AppImage"
+          wget -q "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-${LDA}.AppImage"
           chmod +x linuxdeploy*.AppImage
           export QTDIR="$(dpkg -L qt6-base-dev | grep '/bin/qmake6$' | head -1 | xargs dirname)/.."
-          # Run linuxdeploy just to bundle Qt libs, then stop before making AppImage
-          ./linuxdeploy-${{ matrix.arch }}.AppImage --appdir build/staging --plugin qt 2>/dev/null || true
+          ./linuxdeploy-${LDA}.AppImage --appdir build/staging --plugin qt 2>/dev/null || true
 
       - name: Package ZIP
         run: |
