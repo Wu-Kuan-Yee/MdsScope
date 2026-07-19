@@ -71,12 +71,19 @@ jobs:
           rpmfile="$(ls *.rpm 2>/dev/null | head -1)"
           if [ -n "$rpmfile" ]; then mv "$rpmfile" "build/mdsscope-linux-${{ matrix.arch }}.rpm"; fi
 
+      - name: Bundle Qt into staging (for portable zip)
+        run: |
+          wget -q "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-${{ matrix.arch }}.AppImage"
+          wget -q "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-${{ matrix.arch }}.AppImage"
+          chmod +x linuxdeploy*.AppImage
+          export QTDIR="$(dpkg -L qt6-base-dev | grep '/bin/qmake6$' | head -1 | xargs dirname)/.."
+          # Run linuxdeploy just to bundle Qt libs, then stop before making AppImage
+          ./linuxdeploy-${{ matrix.arch }}.AppImage --appdir build/staging --plugin qt 2>/dev/null || true
+
       - name: Package ZIP
         run: |
-          strip build/MdsScope build/transfer 2>/dev/null || true
-          mkdir -p build/zip-root
-          cp -a build/staging/* build/zip-root/
-          (cd build/zip-root && zip -qr "../mdsscope-linux-${{ matrix.arch }}.zip" .)
+          strip build/staging/usr/bin/MdsScope build/staging/usr/bin/transfer 2>/dev/null || true
+          (cd build/staging && zip -qr "../mdsscope-linux-${{ matrix.arch }}.zip" .)
 
       - name: Upload DEB
         uses: actions/upload-artifact@v7
