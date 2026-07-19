@@ -71,15 +71,26 @@ jobs:
           rpmfile="$(ls *.rpm 2>/dev/null | head -1)"
           if [ -n "$rpmfile" ]; then mv "$rpmfile" "build/mdsscope-linux-${{ matrix.arch }}.rpm"; fi
 
-      - name: Bundle Qt into staging (for portable zip)
-        continue-on-error: true
+      - name: Bundle Qt libs into staging
         run: |
-          LDA="${{ matrix.arch == 'amd64' && 'x86_64' || matrix.arch }}"
-          wget -q "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-${LDA}.AppImage"
-          wget -q "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-${LDA}.AppImage"
-          chmod +x linuxdeploy*.AppImage
-          export QTDIR="$(dpkg -L qt6-base-dev | grep '/bin/qmake6$' | head -1 | xargs dirname)/.."
-          ./linuxdeploy-${LDA}.AppImage --appdir build/staging --plugin qt 2>/dev/null || true
+          QT_LIBS="$(qmake6 -query QT_INSTALL_LIBS)"
+          QT_PLUGINS="$(qmake6 -query QT_INSTALL_PLUGINS)"
+          mkdir -p build/staging/usr/lib build/staging/usr/plugins
+          # Copy Qt shared libs used at runtime
+          for lib in libQt6Core libQt6Widgets libQt6Gui libQt6Network libQt6Concurrent libQt6Svg libQt6OpenGLWidgets libQt6OpenGL; do
+            find "${QT_LIBS}" -name "${lib}.so.*" -exec cp -a {} build/staging/usr/lib/ \; 2>/dev/null || true
+          done
+          # Copy xcb platform plugin
+          cp -a "${QT_PLUGINS}/platforms/libqxcb.so" build/staging/usr/plugins/ 2>/dev/null || true
+          # Launch script
+          cat > build/staging/usr/bin/mdsscope.sh << 'EOF'
+          #!/bin/sh
+          DIR="$(cd "$(dirname "$0")" && pwd)"
+          export LD_LIBRARY_PATH="${DIR}/../lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          export QT_PLUGIN_PATH="${DIR}/../plugins${QT_PLUGIN_PATH:+:$QT_PLUGIN_PATH}"
+          exec "${DIR}/MdsScope" "$@"
+          EOF
+          chmod +x build/staging/usr/bin/mdsscope.sh
 
       - name: Package ZIP
         run: |
