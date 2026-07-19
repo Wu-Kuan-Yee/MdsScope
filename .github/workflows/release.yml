@@ -191,7 +191,8 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_TOOLCHAIN_FILE="${{ env.Qt6_DIR }}/lib/cmake/Qt6/qt.toolchain.cmake" \
             -DQT_ANDROID_ABIS=arm64-v8a \
-            -DQT_HOST_PATH="${{ env.Qt6_DIR }}/../gcc_64"
+            -DQT_HOST_PATH="${{ env.Qt6_DIR }}/../gcc_64" \
+            -Wno-deprecated
 
       - name: Build APK
         env:
