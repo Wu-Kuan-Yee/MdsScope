@@ -241,11 +241,6 @@ jobs:
           Copy-Item COPYING $stage -ErrorAction SilentlyContinue
           Compress-Archive -Path $stage -DestinationPath "build\MdsScope-windows-${{ matrix.arch }}.zip" -Force
 
-      - name: Package EXE
-        shell: pwsh
-        run: |
-          Copy-Item build\Release\MdsScope.exe "build\MdsScope-windows-${{ matrix.arch }}.exe"
-
       - name: Package MSI
         shell: pwsh
         continue-on-error: true
@@ -268,12 +263,6 @@ jobs:
         with:
           name: MdsScope-windows-${{ matrix.arch }}-zip
           path: build/MdsScope-windows-${{ matrix.arch }}.zip
-
-      - name: Upload EXE
-        uses: actions/upload-artifact@v7
-        with:
-          name: MdsScope-windows-${{ matrix.arch }}-exe
-          path: build/MdsScope-windows-${{ matrix.arch }}.exe
 
       - name: Upload MSI
         uses: actions/upload-artifact@v7
