@@ -894,7 +894,6 @@ void MainWindow::scheduleTopInfoUpdate(const QString& shot)
 
 void MainWindow::setStatus(const QString& text)
 {
-    qDebug() << "setStatus:" << text;
     setLabelTextIfChanged(statusLabel_, text);
 }
 
