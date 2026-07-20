@@ -59,7 +59,7 @@ void MainWindow::stepShot(int delta)
 
 void MainWindow::latestShot()
 {
-    // Latest is an active refresh, not a jump to a possibly stale cached value.
+    qDebug() << "latestShot() called";
     fetchLatestShotAsync(true);
 }
 
@@ -131,6 +131,7 @@ void MainWindow::updateLoginActionIcon()
 
 void MainWindow::fetchLatestShotAsync(bool applyLatest)
 {
+    qDebug() << "fetchLatestShotAsync" << applyLatest;
     if (applyLatest) {
         latestShotApplyPending_ = true;
         setStatus("Fetching latest shot...");
