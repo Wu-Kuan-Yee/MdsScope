@@ -56,6 +56,9 @@ bool MainWindow::prepareSshUrl(const QString& source, QString* prepared)
         *prepared = source;
         return true;
     }
+    qDebug() << "prepareSshUrl state:" << (int)sshTunnelManager_->state()
+             << "mode:" << (int)sshTunnelManager_->settings().mode
+             << "cache:" << cachedPreparedApiUrl_;
     if (!cachedPreparedApiUrl_.isEmpty() && cachedApiSourceUrl_ == source
         && sshTunnelManager_->state() == SshTunnelManager::State::Connected) {
         *prepared = cachedPreparedApiUrl_;
