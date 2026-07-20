@@ -139,6 +139,11 @@ void MainWindow::fetchLatestShotAsync(bool applyLatest)
         return;
     }
     latestShotFetchRunning_ = true;
+    // Watchdog: reset the flag after 8 s in case the thread-pool task
+    // never invokes its completion callback (e.g. network stall).
+    QTimer::singleShot(8000, this, [this] {
+        latestShotFetchRunning_ = false;
+    });
     const int generation = ++latestShotGeneration_;
     QString apiUrl;
     if (!prepareSshUrl(readApiUrl(rootPath_), &apiUrl)) {
