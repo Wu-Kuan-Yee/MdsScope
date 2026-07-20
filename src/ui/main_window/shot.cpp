@@ -59,7 +59,6 @@ void MainWindow::stepShot(int delta)
 
 void MainWindow::latestShot()
 {
-    qDebug() << "latestShot() called";
     fetchLatestShotAsync(true);
 }
 
@@ -131,7 +130,6 @@ void MainWindow::updateLoginActionIcon()
 
 void MainWindow::fetchLatestShotAsync(bool applyLatest)
 {
-    qDebug() << "fetchLatestShotAsync" << applyLatest;
     if (applyLatest) {
         latestShotApplyPending_ = true;
         setStatus("Fetching latest shot...");
@@ -148,10 +146,8 @@ void MainWindow::fetchLatestShotAsync(bool applyLatest)
         }
         return;
     }
-    qDebug() << "latestShotFromApi starting for" << apiUrl;
     QThreadPool::globalInstance()->start([this, generation, apiUrl] {
         const QString latest = latestShotFromApi(apiUrl);
-        qDebug() << "latestShotFromApi returned" << (latest.isEmpty() ? "EMPTY" : latest);
         QMetaObject::invokeMethod(this, [this, latest, generation] {
             if (generation != latestShotGeneration_) {
                 latestShotFetchRunning_ = false;

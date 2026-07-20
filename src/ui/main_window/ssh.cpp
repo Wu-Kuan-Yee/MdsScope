@@ -56,10 +56,13 @@ bool MainWindow::prepareSshUrl(const QString& source, QString* prepared)
         *prepared = source;
         return true;
     }
-    if (!cachedPreparedApiUrl_.isEmpty() && cachedApiSourceUrl_ == source) {
+    if (!cachedPreparedApiUrl_.isEmpty() && cachedApiSourceUrl_ == source
+        && sshTunnelManager_->state() == SshTunnelManager::State::Connected) {
         *prepared = cachedPreparedApiUrl_;
         return true;
     }
+    cachedApiSourceUrl_.clear();
+    cachedPreparedApiUrl_.clear();
     QString error;
     if (sshTunnelManager_->prepareUrl(source, prepared, &error)) {
         cachedApiSourceUrl_ = source;
