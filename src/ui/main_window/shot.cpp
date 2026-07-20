@@ -146,10 +146,8 @@ void MainWindow::fetchLatestShotAsync(bool applyLatest)
         }
         return;
     }
-    qDebug() << "API URL:" << apiUrl;
     QThreadPool::globalInstance()->start([this, generation, apiUrl] {
         const QString latest = latestShotFromApi(apiUrl);
-        qDebug() << "latestShotFromApi:" << (latest.isEmpty() ? "EMPTY" : latest);
         QMetaObject::invokeMethod(this, [this, latest, generation] {
             if (generation != latestShotGeneration_) {
                 latestShotFetchRunning_ = false;
