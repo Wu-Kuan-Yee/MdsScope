@@ -56,9 +56,6 @@ bool MainWindow::prepareSshUrl(const QString& source, QString* prepared)
         *prepared = source;
         return true;
     }
-    qDebug() << "prepareSshUrl state:" << (int)sshTunnelManager_->state()
-             << "mode:" << (int)sshTunnelManager_->settings().mode
-             << "cache:" << cachedPreparedApiUrl_;
     if (!cachedPreparedApiUrl_.isEmpty() && cachedApiSourceUrl_ == source
         && sshTunnelManager_->state() == SshTunnelManager::State::Connected) {
         *prepared = cachedPreparedApiUrl_;
@@ -86,6 +83,11 @@ void MainWindow::updateSshActionIcon()
         return;
     }
     const auto state = sshTunnelManager_->state();
+    // Clear the SSH-tunneled API URL override when not connected,
+    // otherwise the stale 127.0.0.1 address persists across restarts.
+    if (state != SshTunnelManager::State::Connected) {
+        QSettings().remove("ApiUrlOverride");
+    }
     sshAction_->setIcon(sshIcon(static_cast<int>(state)));
     QString tooltip = QStringLiteral("SSH remote access");
     switch (state) {
