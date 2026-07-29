@@ -1,12 +1,20 @@
 # MdsScope
 
+> [!IMPORTANT]
+> **This Flutter and Rust implementation has moved to the independent
+> [MDSLens project](https://github.com/Wu-Kuan-Yee/MDSLens).**
+>
+> Active development, documentation, issue tracking, downloads, and releases
+> now live in the MDSLens repository. This directory and its `flutter-rewrite`
+> branch are retained only as historical source and will not receive further
+> application updates.
+
 MdsScope is an MDSplus experimental signal waveform viewer, comparison, and
 configuration tool for desktop, tablet, and mobile devices.
 
-The independently maintained source is the
-[flutter-rewrite branch](https://github.com/Wu-Kuan-Yee/MdsScope/tree/flutter-rewrite)
-of the Wu-Kuan-Yee/MdsScope repository. Releases and update checks come from
-that repository.
+The maintained successor is
+[MDSLens](https://github.com/Wu-Kuan-Yee/MDSLens). Use that repository for
+current source code, releases, installation instructions, and support.
 
 ## Features
 
